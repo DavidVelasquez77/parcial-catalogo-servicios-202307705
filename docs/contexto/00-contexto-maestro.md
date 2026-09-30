@@ -69,7 +69,7 @@ Cada hijo tiene un solo padre. No se crean huérfanos ni se permiten asociacione
 - Una fila sin COD.N2 no crea un servicio.
 - Las celdas combinadas se resuelven desde su celda principal.
 - SE.12 conserva el primer nombre canónico y registra el conflicto.
-- La línea base original era 12 niveles 1 y 46 niveles 2; el archivo ampliado actual conserva esa base y agrega 5 de cada tipo, por lo que el resultado actual es 17 niveles 1, 51 niveles 2 y 3 servicios REVIEW.
+- El Excel oficial conserva 12 niveles 1 y 46 niveles 2, con 3 servicios `REVIEW` por los datos incompletos de SE.12.
 
 ## 5. Decisiones técnicas y razones
 

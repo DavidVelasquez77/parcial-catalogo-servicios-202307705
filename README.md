@@ -16,7 +16,7 @@ Este repositorio corresponde al parcial práctico de Software Avanzado, carné 2
 | Colaborador solicitado | maldanap-usac |
 | Archivo de entrada | data/CatalogoServicios.xlsx |
 
-La etiqueta `parcial-v2.0` apunta al commit entregado. El archivo de entrada actual conserva los registros base del parcial y agrega los servicios de ejemplo documentados; la importación no modifica el Excel, solo sincroniza la base de datos.
+La etiqueta `parcial-v2.0` apunta al commit entregado. El archivo de entrada es el Excel original del parcial y no se modifica durante la importación; únicamente se sincroniza la base de datos.
 
 ## 2. Qué resuelve la aplicación
 
@@ -107,7 +107,7 @@ docker compose up -d
 | Swagger | [http://localhost:8080/api/docs](http://localhost:8080/api/docs) |
 | API desde el navegador | `http://localhost:8080/api/...` |
 | Archivo de entrada | `data/CatalogoServicios.xlsx` |
-| Archivo actual | Catálogo ampliado con 5 niveles 1 y 5 servicios nivel 2 adicionales |
+| Archivo oficial | Excel original del parcial, sin modificaciones |
 
 La interfaz es una SPA: sus pantallas se navegan desde `/` usando el menú lateral. Las rutas principales de la API son:
 
@@ -165,10 +165,10 @@ docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
 
-La salida esperada de la verificación para el archivo ampliado actual es equivalente a:
+La salida esperada de la verificación para el Excel original es equivalente a:
 
 ~~~json
-{"ok":true,"level1":17,"level2":51,"duplicates":0,"review":3,"expected":{"level1":17,"level2":51,"review":3}}
+{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3,"expected":{"level1":12,"level2":46,"review":3}}
 ~~~
 
 El API ejecuta la migración automáticamente al iniciar. La ejecución explícita de seed-demo.js crea o actualiza las cuentas, la organización mínima y los datos de demostración. La validación se ejecuta antes de importar. La importación puede repetirse: los servicios modificados se actualizan, los idénticos se ignoran y los nuevos se agregan, sin duplicar códigos.
@@ -204,7 +204,7 @@ Las credenciales anteriores son datos locales de demostración. Se definen media
 ## 8. Recorrido recomendado para evaluar la interfaz
 
 1. Ingresar como admin.demo.
-2. Abrir Resumen y confirmar los indicadores 51 servicios, 47 activos, 3 en revisión y 17 familias.
+2. Abrir Resumen y confirmar los indicadores 46 servicios, 42 activos, 3 en revisión y 12 familias.
 3. Abrir Servicios, buscar SE.12 y comprobar los tres registros en revisión.
 4. Abrir una fila para revisar código, nivel 1, clase, criticidad, tipo, métrica, umbrales, sección, responsable y descripción.
 5. Abrir Organización y revisar las cinco entidades de la jerarquía.
@@ -216,12 +216,12 @@ Las credenciales anteriores son datos locales de demostración. Se definen media
 
 ## 9. Controles de datos importados
 
-El archivo de referencia inicial tenía 12 niveles 1 y 46 servicios. El archivo actual conserva esos datos y agrega 5 niveles 1 y 5 servicios, por lo que el resultado esperado actual es:
+El archivo oficial del parcial contiene 12 niveles 1 y 46 servicios. El sistema conserva esos datos y los sincroniza sin modificar el Excel fuente:
 
 | Control | Resultado |
 |---|---:|
-| Códigos distintos de nivel 1 | 17 |
-| Códigos explícitos de nivel 2 | 51 |
+| Códigos distintos de nivel 1 | 12 |
+| Códigos explícitos de nivel 2 | 46 |
 | Duplicados de nivel 2 | 0 |
 | Servicios con datos incompletos | 3 |
 | Código especial | SE.12.1, SE.12.2, SE.12.3 |

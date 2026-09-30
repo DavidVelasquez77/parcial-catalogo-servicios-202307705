@@ -13,12 +13,10 @@ Este contexto explica cómo se interpretó el workbook real antes de diseñar la
 | Hoja obligatoria | `Servicios Externos` |
 | Encabezados | fila 4, columnas A:L |
 | Primera fila de datos | fila 5 |
-| Última fila detectada en el archivo ampliado actual | fila 106 |
-| Servicios identificados actualmente | 51 códigos `COD.N2` |
+| Última fila detectada en el Excel original | fila 101 |
+| Servicios identificados | 46 códigos `COD.N2` |
 | Filas de continuación | 51 |
-| Niveles 1 actuales | 17 códigos distintos |
-
-La línea base del parcial, antes de la ampliación solicitada, era de 12 niveles 1 y 46 niveles 2. Los cinco registros adicionales son `SE.13.01` a `SE.17.01` bajo los padres `SE.13` a `SE.17`.
+| Niveles 1 | 12 códigos distintos |
 
 ## 3. Encabezados esperados
 
@@ -53,7 +51,7 @@ La regla implementada es:
 4. mantener la fila de continuación como información observada, no como servicio;
 5. conservar la fila de origen en `source_rows`.
 
-En el archivo base, esto explicaba por qué había 101 filas de datos físicas y 46 servicios importables. Después de agregar los cinco servicios, el bloque llega a la fila 106 y contiene 51 servicios importables.
+En el Excel original, esto explica por qué hay 101 filas de datos físicas y 46 servicios importables.
 
 ## 5. Caso SE.12
 
@@ -125,7 +123,7 @@ Cada ejecución conserva sus contadores en `import_runs`. Las incidencias espec�
 El contexto de importación se considera correctamente aplicado cuando:
 
 - `validate-import.js` devuelve hoja y rango correctos;
-- el archivo ampliado actual produce 17 niveles 1 y 51 niveles 2;
+- el Excel original produce 12 niveles 1 y 46 niveles 2;
 - `verify-import.js` confirma 0 duplicados y 3 servicios en revisión;
 - una segunda importación idéntica no genera actualizaciones innecesarias;
 - un cambio de Excel actualiza el código correspondiente;

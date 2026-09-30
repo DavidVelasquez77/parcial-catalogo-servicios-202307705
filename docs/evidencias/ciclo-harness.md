@@ -42,7 +42,7 @@ HARNESS_RUN_SMOKE=1 npm run harness
 | 5 | import-validation | Excel legible, hoja, encabezados A4:L4, rango, códigos, tipos y umbrales | el archivo no cumple el contrato estructural |
 | 6 | acceptance | P01–P11: autenticación, roles, organización, duplicados, importación, SE.12, umbrales y responsables | un contrato funcional no coincide |
 | 7 | smoke opcional | recorrido corto P01, P02, P03 y P10 | un estado HTTP no coincide |
-| 8 | persistence | reinicio controlado de db y api y verificación 17/51/0/3 | se pierden datos o cambia el conteo |
+| 8 | persistence | reinicio controlado de db y api y verificación 12/46/0/3 | se pierden datos o cambia el conteo |
 
 Cada control hereda el código de salida del proceso. Un control fallido detiene el harness y reporta el paso responsable. La aceptación usa datos temporales con prefijo `ACC-`, prueba primero las bajas lógicas mediante la API y, si termina correctamente, elimina únicamente las filas que creó mediante una transacción de limpieza acotada. Una ejecución fallida conserva los datos para poder diagnosticarla.
 
@@ -60,7 +60,7 @@ La validación del Excel es deliberadamente anterior a la creación de `import_r
 |---|---|---|---|
 | validate-import | data/CatalogoServicios.xlsx | reporte de estructura y advertencias | ninguna |
 | import-catalog | Excel validado + DB | created, updated, skipped, observed | sincronización transaccional |
-| verify-import | DB | conteos 17/51/0/3 actuales | solo lectura |
+| verify-import | DB | conteos 12/46/0/3 | solo lectura |
 | acceptance | API + datos temporales ACC- | checks P01–P11 | datos temporales, limpiados al terminar |
 | persistence-check | Compose + volumen | verify después del reinicio | reinicio, no borrado |
 
@@ -148,7 +148,7 @@ Resultado:
 
 ### Success
 
-El API inició, la migración se aplicó, la validación aceptó el archivo ampliado, la importación conservó 17 niveles 1 y 51 niveles 2, no hubo duplicados y los controles de autenticación finalizaron correctamente.
+El API inició, la migración se aplicó, la validación aceptó el Excel original, la importación conservó 12 niveles 1 y 46 niveles 2, no hubo duplicados y los controles de autenticación finalizaron correctamente.
 
 ## 7. Segunda observación corregida
 
@@ -176,7 +176,7 @@ Después se incorporó la comparación incremental. La reejecución con el mismo
 
 Esta salida demuestra la regla solicitada: sin cambios no se sobrescribe nada; con cambios solo se actualiza el servicio afectado; con códigos nuevos se agregan registros.
 
-Con el archivo ampliado actual, la misma comprobación produce `level1: 17`, `level2: 51` y `skipped: 51` cuando los 51 servicios ya existen.
+Con el Excel original, la misma comprobación produce `level1: 12`, `level2: 46` y `skipped: 46` cuando los 46 servicios ya existen.
 
 ## 8. Reemplazo y validación de un Excel nuevo
 
@@ -203,7 +203,7 @@ npm run persistence:check
 El resultado conservó:
 
 ~~~json
-{"ok":true,"level1":17,"level2":51,"duplicates":0,"review":3,"expected":{"level1":17,"level2":51,"review":3}}
+{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3,"expected":{"level1":12,"level2":46,"review":3}}
 ~~~
 
 No se ejecutó docker compose down -v durante esta comprobación.
