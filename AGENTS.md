@@ -4,7 +4,7 @@
 
 Este repositorio implementa el parcial práctico de Software Avanzado para el carné 202307705. El objetivo es crear un catálogo web de servicios externos de TI a partir de CatalogoServicios.xlsx.
 
-La rama de entrega es main y el commit etiquetado como parcial-v2.0 es 6cb925c.
+La rama de entrega es main y el commit etiquetado como parcial-v2.0 es 9841233.
 
 ## 2. Precedencia de instrucciones
 
