@@ -14,6 +14,7 @@
     "db:migrate": "npm run db:migrate --workspace apps/api",
     "db:seed": "npm run db:seed --workspace apps/api",
     "import:catalog": "npm run import:catalog --workspace apps/api",
+    "validate:import": "npm run validate:import --workspace apps/api",
     "verify:import": "npm run verify:import --workspace apps/api",
     "audit:secrets": "node scripts/audit-secrets.mjs",
     "harness": "node scripts/harness.mjs"

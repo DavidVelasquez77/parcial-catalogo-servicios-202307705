@@ -68,6 +68,9 @@ async function main() {
   const adminCookie = await login(process.env.DEMO_ADMIN_USERNAME ?? 'admin.demo', process.env.DEMO_ADMIN_PASSWORD ?? 'Admin123!');
   checks.push('P01', 'P02');
 
+  const validation = await request('/imports/validate', { method: 'POST' }, adminCookie);
+  await expectStatus(validation, 201, 'P06 validación del Excel');
+  if (validation.body.serviceRows !== 46 || validation.body.sheet !== 'Servicios Externos') throw new Error('P06: la validación no reconoció el bloque esperado del Excel.');
   const firstImport = await request('/imports/run', { method: 'POST' }, adminCookie);
   await expectStatus(firstImport, 201, 'P06 importación');
   const firstServices = await request('/services?pageSize=100', {}, adminCookie);

@@ -15,6 +15,6 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/database ./database
 RUN mkdir -p /app/data
-COPY CatalogoServicios.xlsx /app/data/CatalogoServicios.xlsx
+COPY data/CatalogoServicios.xlsx /app/data/CatalogoServicios.xlsx
 EXPOSE 3000
 CMD ["sh", "-c", "node apps/api/dist/scripts/migrate.js && node apps/api/dist/main.js"]

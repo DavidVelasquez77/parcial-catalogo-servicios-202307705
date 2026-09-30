@@ -33,7 +33,7 @@ services:
         condition: service_healthy
     command: ["sh", "-c", "node apps/api/dist/scripts/migrate.js && node apps/api/dist/main.js"]
     volumes:
-      - ./CatalogoServicios.xlsx:/app/data/CatalogoServicios.xlsx:ro
+      - ./data/CatalogoServicios.xlsx:/app/data/CatalogoServicios.xlsx:ro
 
   web:
     build:

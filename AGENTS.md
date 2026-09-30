@@ -2,7 +2,7 @@
 
 ## 1. Identidad
 
-Este repositorio implementa el parcial práctico de Software Avanzado para el carné 202307705. El objetivo es crear un catálogo web de servicios externos de TI a partir de CatalogoServicios.xlsx.
+Este repositorio implementa el parcial práctico de Software Avanzado para el carné 202307705. El objetivo es crear un catálogo web de servicios externos de TI a partir de data/CatalogoServicios.xlsx.
 
 La rama de entrega es main y el commit funcional documentado para parcial-v2.0 es aa1bae7.
 
@@ -39,7 +39,8 @@ No agregar tickets, facturación ni consumo de servicios sin una solicitud expl�
 
 - No usar Prisma.
 - Usar PostgreSQL con pg, SQL parametrizado y migraciones versionadas.
-- No modificar CatalogoServicios.xlsx.
+- No modificar data/CatalogoServicios.xlsx durante una importación normal.
+- Un Excel nuevo debe reemplazarse de forma controlada en data/CatalogoServicios.xlsx, validarse y solo después importarse.
 - No incluir archivos .env reales, contraseñas reales, node_modules, dist ni coverage.
 - Mantener cambios compatibles con Docker Compose.
 - Preferir bajas lógicas en vez de borrar información.
@@ -78,6 +79,7 @@ Desde la raíz:
 ~~~bash
 docker compose up --build -d
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
+docker compose exec api node apps/api/dist/scripts/validate-import.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 docker compose exec api node apps/api/dist/scripts/smoke.js
@@ -118,6 +120,8 @@ No ejecutar docker compose down -v salvo que el usuario solicite reiniciar de fo
 - `npm test` termina con P01–P11 en `ok: true`.
 - `npm run persistence:check` conserva 12 niveles 1, 46 niveles 2, 0 duplicados y 3 servicios REVIEW.
 - documentación describe comandos y resultados reales.
+- la validación del Excel termina antes de modificar datos cuando la estructura no es válida.
+- una reimportación distingue registros nuevos, modificados y sin cambios.
 
 ## 9. Método de trabajo
 

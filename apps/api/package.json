@@ -14,6 +14,7 @@
     "db:migrate": "node dist/scripts/migrate.js",
     "db:seed": "node dist/scripts/seed-demo.js",
     "import:catalog": "node dist/scripts/import-catalog.js",
+    "validate:import": "node dist/scripts/validate-import.js",
     "verify:import": "node dist/scripts/verify-import.js"
   },
   "dependencies": {

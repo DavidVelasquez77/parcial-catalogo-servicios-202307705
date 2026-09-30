@@ -1,4 +1,4 @@
-# Evidencia del ciclo Harness + Loop
+# Evidencia del harness y ciclo de corrección
 
 ## 1. Qué se considera harness en este proyecto
 
@@ -9,7 +9,7 @@ El harness no es únicamente Docker. Es el conjunto coordinado de:
 - archivo Excel controlado;
 - Dockerfiles y compose.yaml;
 - migración SQL;
-- scripts de seed, importación, verificación, aceptación y smoke;
+- scripts de seed, validación, importación, verificación, aceptación y smoke;
 - comprobación de persistencia después de reiniciar PostgreSQL;
 - auditoría de secretos;
 - comandos de logs y recuperación;
@@ -39,13 +39,32 @@ HARNESS_RUN_SMOKE=1 npm run harness
 | 2 | build | NestJS y Vite generan artefactos | falla el build |
 | 3 | secret-audit | no hay secretos obvios en fuentes o documentación | encuentra patrones prohibidos |
 | 4 | compose-config | Compose es sintácticamente válido | Docker no puede resolver la configuración |
-| 5 | acceptance | P01–P11: autenticación, roles, organización, duplicados, importación, SE.12, umbrales y responsables | un contrato funcional no coincide |
-| 6 | smoke opcional | recorrido corto P01, P02, P03 y P10 | un estado HTTP no coincide |
-| 7 | persistence | reinicio controlado de db y verificación 12/46/0/3 | se pierden datos o cambia el conteo |
+| 5 | import-validation | Excel legible, hoja, encabezados A4:L4, rango, códigos, tipos y umbrales | el archivo no cumple el contrato estructural |
+| 6 | acceptance | P01–P11: autenticación, roles, organización, duplicados, importación, SE.12, umbrales y responsables | un contrato funcional no coincide |
+| 7 | smoke opcional | recorrido corto P01, P02, P03 y P10 | un estado HTTP no coincide |
+| 8 | persistence | reinicio controlado de db y api y verificación 12/46/0/3 | se pierden datos o cambia el conteo |
 
 Cada control hereda el código de salida del proceso. Un control fallido detiene el harness y reporta el paso responsable. La aceptación usa datos temporales con prefijo `ACC-`, prueba primero las bajas lógicas mediante la API y, si termina correctamente, elimina únicamente las filas que creó mediante una transacción de limpieza acotada. Una ejecución fallida conserva los datos para poder diagnosticarla.
 
-## 4. Datos de evaluación
+El harness distingue tres clases de resultado:
+
+- **éxito:** el proceso devuelve código 0 y una salida `ok: true`;
+- **advertencia:** el proceso termina correctamente pero reporta observaciones de calidad, como nombres alternativos de SE.12;
+- **fallo bloqueante:** el proceso devuelve código distinto de cero y no permite continuar con una etapa que podría contaminar la evidencia.
+
+La validación del Excel es deliberadamente anterior a la creación de `import_runs`. De esta manera un archivo mal formado no deja una falsa ejecución iniciada ni toca servicios existentes.
+
+## 4. Contrato de cada control
+
+| Control | Entrada | Salida observable | Persistencia permitida |
+|---|---|---|---|
+| validate-import | data/CatalogoServicios.xlsx | reporte de estructura y advertencias | ninguna |
+| import-catalog | Excel validado + DB | created, updated, skipped, observed | sincronización transaccional |
+| verify-import | DB | conteos 12/46/0/3 | solo lectura |
+| acceptance | API + datos temporales ACC- | checks P01–P11 | datos temporales, limpiados al terminar |
+| persistence-check | Compose + volumen | verify después del reinicio | reinicio, no borrado |
+
+## 5. Datos de evaluación
 
 Las cuentas y la organización mínima se crean con:
 
@@ -61,11 +80,11 @@ La salida esperada incluye:
 
 El seed es repetible: actualiza los registros demo sin crear otra cuenta demo en cada ejecución.
 
-## 5. Ciclo ejecutado y fallo real corregido
+## 6. Ciclo ejecutado y fallo real corregido
 
 ### Plan
 
-Levantar PostgreSQL, API y frontend mediante Compose. Luego ejecutar typecheck, build, auditoría, aceptación P01–P11, smoke y persistencia.
+Levantar PostgreSQL, API y frontend mediante Compose. Luego validar el Excel, ejecutar typecheck, build, auditoría, aceptación P01–P11, smoke y persistencia.
 
 ### Act
 
@@ -110,6 +129,7 @@ Se repitieron:
 
 ~~~text
 docker compose up -d
+docker compose exec api node apps/api/dist/scripts/validate-import.js
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
@@ -128,9 +148,9 @@ Resultado:
 
 ### Success
 
-El API inició, la migración se aplicó, la importación conservó 12 niveles 1 y 46 niveles 2, no hubo duplicados y los controles de autenticación finalizaron correctamente.
+El API inició, la migración se aplicó, la validación aceptó el archivo, la importación conservó 12 niveles 1 y 46 niveles 2, no hubo duplicados y los controles de autenticación finalizaron correctamente.
 
-## 6. Segunda observación corregida
+## 7. Segunda observación corregida
 
 Durante la implementación del importador se observó que la librería inicialmente utilizada tenía una vulnerabilidad de severidad alta y además no era la mejor opción para inspeccionar celdas combinadas en este entorno.
 
@@ -142,20 +162,40 @@ La decisión fue:
 4. reconstruir la imagen Docker;
 5. repetir importación, verify-import y smoke.
 
-La ejecución final con exceljs produjo:
+La ejecución histórica con exceljs produjo:
 
 ~~~json
 {"runId":3,"created":0,"updated":46,"skipped":49,"observed":5,"level1":12,"level2":46}
 ~~~
 
-## 7. Persistencia
+Después se incorporó la comparación incremental. La reejecución con el mismo archivo produjo:
+
+~~~json
+{"runId":24,"created":0,"updated":0,"skipped":46,"observed":5,"level1":12,"level2":46}
+~~~
+
+Esta salida demuestra la regla solicitada: sin cambios no se sobrescribe nada; con cambios solo se actualiza el servicio afectado; con códigos nuevos se agregan registros.
+
+## 8. Reemplazo y validación de un Excel nuevo
+
+El archivo de entrada no está codificado como una verdad inmutable. Está configurado por IMPORT_FILE y, en Compose, se reemplaza desde data/CatalogoServicios.xlsx. El procedimiento es:
+
+1. guardar una copia del archivo anterior;
+2. copiar el nuevo archivo al mismo nombre;
+3. ejecutar `docker compose up --build -d api`;
+4. ejecutar `docker compose exec api node apps/api/dist/scripts/validate-import.js`;
+5. revisar errores, rango, códigos y advertencias;
+6. ejecutar la importación solo con validación exitosa;
+7. verificar conteos e historial.
+
+La sincronización no hace una limpieza destructiva. Un código nuevo se agrega, un código modificado se actualiza, un código igual se ignora y un código ausente permanece en la base. Esta última regla protege contra un Excel incompleto o parcialmente reemplazado.
+
+## 9. Persistencia
 
 Para verificar que el harness no depende de una base efímera:
 
 ~~~bash
-docker compose restart db api
-docker compose up -d web
-docker compose exec api node apps/api/dist/scripts/verify-import.js
+npm run persistence:check
 ~~~
 
 El resultado conservó:
@@ -166,7 +206,7 @@ El resultado conservó:
 
 No se ejecutó docker compose down -v durante esta comprobación.
 
-## 8. Límites de seguridad del harness
+## 10. Límites de seguridad del harness
 
 - No publica archivos .env.
 - No lee ni modifica el Excel original.

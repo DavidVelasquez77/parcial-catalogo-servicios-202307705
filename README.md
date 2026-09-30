@@ -14,7 +14,7 @@ Este repositorio corresponde al parcial práctico de Software Avanzado, carné 2
 | Etiqueta | parcial-v2.0 |
 | Integrante | 202307705 |
 | Colaborador solicitado | maldanap-usac |
-| Archivo de entrada | CatalogoServicios.xlsx |
+| Archivo de entrada | data/CatalogoServicios.xlsx |
 
 La etiqueta parcial-v2.0 apunta al commit entregado. El archivo Excel incluido es el original y no se modifica durante la importación.
 
@@ -77,7 +77,7 @@ En el equipo de desarrollo utilizado para esta entrega, la raíz del proyecto es
 C:\Users\Vela\Desktop\SA\MAGISTRAL\LECCIONES\2 parcial\parcial-catalogo-servicios-202307705
 ~~~
 
-En otro equipo se debe usar la carpeta donde se clonó el repositorio. Todos los comandos siguientes deben ejecutarse desde esa raíz, donde están `compose.yaml` y `CatalogoServicios.xlsx`.
+En otro equipo se debe usar la carpeta donde se clonó el repositorio. Todos los comandos siguientes deben ejecutarse desde esa raíz, donde están `compose.yaml` y `data/CatalogoServicios.xlsx`.
 
 ### Encender desde Windows PowerShell
 
@@ -87,6 +87,7 @@ Copy-Item .env.example .env -ErrorAction SilentlyContinue
 docker compose up --build -d
 docker compose ps
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
+docker compose exec api node apps/api/dist/scripts/validate-import.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
@@ -105,7 +106,7 @@ docker compose up -d
 | Login | `http://localhost:8080/` |
 | Swagger | [http://localhost:8080/api/docs](http://localhost:8080/api/docs) |
 | API desde el navegador | `http://localhost:8080/api/...` |
-| Archivo original | `CatalogoServicios.xlsx` en la raíz del proyecto |
+| Archivo original | `data/CatalogoServicios.xlsx` |
 
 La interfaz es una SPA: sus pantallas se navegan desde `/` usando el menú lateral. Las rutas principales de la API son:
 
@@ -117,7 +118,7 @@ La interfaz es una SPA: sus pantallas se navegan desde `/` usando el menú later
 | Organización | `/api/organization/companies`, `/areas`, `/departments`, `/sections`, `/positions` |
 | Usuarios | `/api/users` |
 | Catálogos | `/api/catalogs/classes`, `/criticalities`, `/types` |
-| Importaciones | `/api/imports`, `/api/imports/run`, `/api/imports/:id/observations` |
+| Importaciones | `/api/imports`, `/api/imports/validate`, `/api/imports/run`, `/api/imports/:id/observations` |
 
 El puerto `3000` de la API es interno de Docker y no se publica directamente al host; desde fuera se debe utilizar el prefijo `http://localhost:8080/api` mediante Nginx.
 
@@ -147,6 +148,7 @@ Copy-Item .env.example .env
 docker compose up --build -d
 docker compose ps
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
+docker compose exec api node apps/api/dist/scripts/validate-import.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
@@ -168,7 +170,7 @@ La salida esperada de la verificación es equivalente a:
 {"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
 ~~~
 
-El API ejecuta la migración automáticamente al iniciar. La ejecución explícita de seed-demo.js crea o actualiza las cuentas, la organización mínima y los datos de demostración. La importación puede repetirse: en una segunda ejecución los servicios existentes se actualizan, pero no se duplican.
+El API ejecuta la migración automáticamente al iniciar. La ejecución explícita de seed-demo.js crea o actualiza las cuentas, la organización mínima y los datos de demostración. La validación se ejecuta antes de importar. La importación puede repetirse: los servicios modificados se actualizan, los idénticos se ignoran y los nuevos se agregan, sin duplicar códigos.
 
 ## 7. URLs y cuentas de evaluación
 
@@ -240,7 +242,7 @@ npm run audit:secrets
 npm run harness
 ~~~
 
-El harness ejecuta typecheck, build, auditoría de secretos y validación de compose.yaml. Para incluir el smoke test contra el API que ya está levantado:
+El harness ejecuta typecheck, build, auditoría de secretos, validación de Compose y validación estructural del Excel. Para incluir aceptación, smoke y persistencia contra el entorno Docker:
 
 ~~~powershell
 $env:HARNESS_RUN_SMOKE='1'
@@ -306,7 +308,7 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 ~~~text
 .
 ├── AGENTS.md                         # contexto operativo para el asistente
-├── CatalogoServicios.xlsx            # fuente original, sin modificar
+├── data/CatalogoServicios.xlsx       # fuente original, sin modificar
 ├── compose.yaml                      # PostgreSQL + API + frontend
 ├── database/migrations/              # esquema SQL versionado
 ├── apps/api/
@@ -316,7 +318,7 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 │   ├── src/organization/             # jerarquía organizacional
 │   ├── src/services/                 # catálogo de servicios
 │   ├── src/users/                    # usuarios y roles
-│   └── src/scripts/                  # migrar, seed, importar, verificar, aceptación, smoke
+│   └── src/scripts/                  # migrar, seed, validar, importar, verificar, aceptación, smoke
 ├── apps/web/src/                     # interfaz React y estilos
 ├── scripts/harness.mjs               # rutina de verificación reproducible
 ├── docs/RESOLUCION.md                # explicación técnica completa
@@ -325,7 +327,7 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 ├── docs/GUIA_EVALUACION.md           # recorrido y matriz de pruebas
 ├── docs/contexto/                    # actualizaciones de contexto
 ├── docs/prompts/                     # prompts y criterios de aceptación
-└── docs/evidencias/                  # ciclo Harness + Loop
+└── docs/evidencias/                  # evidencia del harness y ciclo de corrección
 ~~~
 
 ## 13. Decisiones y limitaciones conocidas
@@ -344,4 +346,4 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 - [API y reglas de autorización](docs/API.md)
 - [Context engineering](docs/contexto/)
 - [Prompt engineering](docs/prompts/)
-- [Harness y Loop engineering](docs/evidencias/ciclo-harness.md)
+- [Harness y ciclo de corrección](docs/evidencias/ciclo-harness.md)

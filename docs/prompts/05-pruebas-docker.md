@@ -12,12 +12,13 @@ Crear una rutina que permita a otra persona levantar, verificar y repetir el pro
 - Migraciones automáticas.
 - Seed e importación ejecutables.
 - Escenarios P01–P12.
+- Validación previa de un Excel reemplazado.
 - Necesidad de conservar el volumen durante pruebas.
 
 ## Prompt utilizado
 
 ~~~text
-Define un harness para este proyecto con Docker Compose, migración, seed, importación, typecheck, build, auditoría de secretos, smoke tests y verificación de persistencia. Cada control debe tener comando, salida observable, código de salida y no destruir el volumen automáticamente. Documenta un ciclo PLAN → ACT → OBSERVE → EVALUATE → CORRECT con un fallo real y su corrección.
+Define un harness para este proyecto con Docker Compose, migración, seed, validación estructural del Excel, importación incremental, typecheck, build, auditoría de secretos, smoke tests y verificación de persistencia. Cada control debe tener comando, salida observable, código de salida y no destruir el volumen automáticamente. Documenta el ciclo de corrección exigido dentro del harness: tarea, cambio propuesto por IA, controles, fallo, corrección y nueva ejecución satisfactoria.
 ~~~
 
 ## Restricciones
@@ -31,6 +32,7 @@ Define un harness para este proyecto con Docker Compose, migración, seed, impor
 ## Salida esperada
 
 - scripts/harness.mjs;
+- validate-import.js;
 - AGENTS.md;
 - compose.yaml;
 - Dockerfiles;
@@ -44,4 +46,4 @@ El harness debe detenerse en el primer fallo, mostrar el paso responsable y fina
 
 ## Resultado aplicado
 
-El harness ejecuta typecheck, build, secret-audit, compose-config, aceptación funcional P01–P11, smoke opcional y persistencia. La evidencia de la ruta de migración corregida y de la verificación final está en docs/evidencias/ciclo-harness.md.
+El harness ejecuta typecheck, build, secret-audit, compose-config, validación del Excel, aceptación funcional P01–P11, smoke opcional y persistencia. La evidencia de la ruta de migración corregida, la validación del archivo y la verificación final está en docs/evidencias/ciclo-harness.md.

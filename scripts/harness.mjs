@@ -8,6 +8,7 @@ const steps = [
   ['compose-config', ['docker', 'compose', 'config']],
 ];
 if (process.env.HARNESS_RUN_SMOKE === '1') {
+  steps.push(['import-validation', ['docker', 'compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/validate-import.js']]);
   steps.push(['acceptance', ['docker', 'compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/acceptance.js']]);
   steps.push(['smoke', ['docker', 'compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/smoke.js']]);
   steps.push(['persistence', [npm, 'run', 'persistence:check']]);

@@ -81,8 +81,8 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 | P03 | Consulta modifica | Ingresar como consulta e intentar crear servicio | 403 en servidor | acceptance.js + smoke.js |
 | P04 | Crear jerarquía y usuario | ADMIN crea empresa, área, departamento, sección, puesto y usuario temporal | Relaciones visibles y recuperables; limpieza lógica | acceptance.js |
 | P05 | Código o referencia inválida | Crear registro duplicado o usar padre inexistente | HTTP 409/400 y no se crea información inválida | acceptance.js |
-| P06 | Importar Excel | Ejecutar import-catalog.js y verify-import.js | 12, 46, 0 y observaciones | acceptance.js + verify-import.js |
-| P07 | Repetir importación | Ejecutar importador dos veces | No aparecen duplicados; sube updated | acceptance.js + import_runs |
+| P06 | Importar Excel | Ejecutar validate-import.js, import-catalog.js y verify-import.js | Archivo aceptado; 12, 46, 0 y observaciones | acceptance.js + validate-import.js + verify-import.js |
+| P07 | Repetir importación | Ejecutar importador dos veces y revisar el resumen | No aparecen duplicados; los cambios suben updated y los datos idénticos quedan skipped | acceptance.js + import_runs |
 | P08 | SE.12 y ausencias | Filtrar SE.12 y abrir fichas | 3 registros REVIEW y valores desconocidos | acceptance.js + interfaz |
 | P09 | Mínimo mayor que máximo | Crear o editar con minimum 10 y maximum 5 | API rechaza la operación con HTTP 400 | acceptance.js |
 | P10 | Búsqueda y filtros | Buscar SE.12 y seleccionar REVIEW | Resultado de tres servicios | acceptance.js + smoke.js |
@@ -106,7 +106,7 @@ $env:HARNESS_RUN_SMOKE='1'
 npm run harness
 ~~~
 
-Comprueba typecheck, build, secretos, Compose, aceptación funcional P01–P11, smoke y persistencia P12.
+Comprueba typecheck, build, secretos, Compose, validación estructural del Excel, aceptación funcional P01–P11, smoke y persistencia P12.
 
 ### Prueba de aceptación completa
 
@@ -134,11 +134,12 @@ Salida esperada:
 npm run persistence:check
 ~~~
 
-El script reinicia únicamente el servicio de base de datos, vuelve a levantar la API cuando PostgreSQL está disponible y repite la verificación de importación. No ejecuta `down -v` y por eso no destruye el volumen `postgres_data`.
+El script reinicia PostgreSQL, espera su estado healthy, reinicia la API y repite la verificación de importación. No ejecuta `down -v` y por eso no destruye el volumen `postgres_data`.
 
 ### Importación
 
 ~~~bash
+docker compose exec api node apps/api/dist/scripts/validate-import.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
 

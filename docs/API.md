@@ -206,9 +206,20 @@ Los catálogos se usan en los formularios para evitar texto libre en las clasifi
 | Método | Ruta | Requisito |
 |---|---|---|
 | GET | /api/imports | ADMIN |
+| POST | /api/imports/validate | ADMIN |
 | POST | /api/imports/run | ADMIN |
 
 La ruta de ejecución utiliza IMPORT_FILE, que dentro de Docker apunta a /app/data/CatalogoServicios.xlsx.
+
+POST /api/imports/validate inspecciona el archivo configurado sin insertar, actualizar ni crear un import_run. Comprueba que el archivo sea legible, que exista la hoja Servicios Externos, que la fila 4 tenga las columnas A:L esperadas, que haya códigos de servicio y que los campos numéricos y umbrales sean válidos.
+
+La importación es una sincronización incremental por código:
+
+- un código que no existe se inserta;
+- un código existente con cambios se actualiza;
+- un código existente sin cambios se cuenta como skipped y no recibe un UPDATE innecesario;
+- un código que desapareció del Excel no se elimina ni se desactiva automáticamente, para evitar pérdida silenciosa de trazabilidad;
+- las asignaciones de responsable no se reemplazan por valores vacíos del Excel.
 
 ## Matriz de autorización
 

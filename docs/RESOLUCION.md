@@ -42,7 +42,7 @@ La aplicación atiende estas necesidades con un frontend web, una API, PostgreSQ
 - Tratamiento explícito de SE.12 y de datos faltantes.
 - Historial de importaciones y observaciones.
 - Docker Compose, migraciones y scripts reproducibles.
-- Documentación de context, prompt, harness y loop engineering.
+- Documentación de context engineering, prompt engineering y harness engineering.
 
 ### Fuera de alcance
 
@@ -71,7 +71,7 @@ flowchart LR
     B[ navegador ] -->|HTTP + cookie de sesión| W[Nginx / frontend]
     W -->|/api| A[NestJS API]
     A -->|SQL parametrizado| D[(PostgreSQL 16)]
-    A -->|solo lectura| X[CatalogoServicios.xlsx]
+    A -->|solo lectura| X[data/CatalogoServicios.xlsx]
     A --> V[seed, import, verify, smoke]
     V --> D
 ~~~
@@ -113,7 +113,7 @@ Ubicación: database/migrations/001_init.sql.
 - La API espera a que PostgreSQL esté healthy.
 - El contenedor API migra antes de iniciar NestJS.
 - Nginx entrega el build de React y reenvía /api al backend.
-- CatalogoServicios.xlsx se monta en el API en modo de solo lectura.
+- data/CatalogoServicios.xlsx se monta en el API en modo de solo lectura.
 
 ## 6. Modelo de datos
 
@@ -203,20 +203,22 @@ Las listas de opciones ubicadas fuera del bloque principal se consideran catálo
 El importador realiza las siguientes etapas:
 
 1. Abre el archivo indicado por IMPORT_FILE.
-2. Busca la hoja Servicios Externos.
-3. Lee los encabezados y recorre el rango de datos.
-4. Para cada celda, obtiene el valor de la celda principal si pertenece a un rango combinado.
-5. Normaliza espacios sin alterar el contenido semántico.
-6. Si no existe COD.N2, registra la fila como omitida u observada y no crea un servicio.
-7. Si aparece un COD.N1 nuevo, crea el nivel 1.
-8. Si el nivel 1 ya existe con otro nombre, conserva el primero y registra la diferencia.
-9. Convierte campos vacíos a NULL.
-10. Calcula el estado a partir de ACTIVO y de la presencia de datos.
-11. Inserta o actualiza el nivel 2 por su código.
-12. Guarda hoja, fila y transformaciones.
-13. Registra contadores en import_runs.
-14. Registra incidencias en import_observations.
-15. Confirma la transacción solo si la ejecución termina correctamente.
+2. Valida que el archivo sea un XLSX legible.
+3. Busca la hoja Servicios Externos.
+4. Valida los encabezados A4:L4, códigos, nombres, tipos numéricos y umbrales antes de modificar la base.
+5. Detecta el bloque de datos y recorre únicamente sus filas.
+6. Para cada celda, obtiene el valor de la celda principal si pertenece a un rango combinado.
+7. Normaliza espacios sin alterar el contenido semántico.
+8. Si no existe COD.N2, registra la fila como omitida u observada y no crea un servicio.
+9. Si aparece un COD.N1 nuevo, crea el nivel 1.
+10. Si el nivel 1 ya existe con otro nombre, conserva el primero y registra la diferencia.
+11. Convierte campos vacíos a NULL.
+12. Calcula el estado a partir de ACTIVO y de la presencia de datos.
+13. Compara cada nivel 2 por código: inserta nuevos, actualiza modificados y omite iguales.
+14. Guarda hoja, fila y transformaciones.
+15. Registra contadores en import_runs.
+16. Registra incidencias en import_observations.
+17. Confirma la transacción solo si la ejecución termina correctamente.
 
 ### Celdas combinadas
 
@@ -236,7 +238,7 @@ El código SE.12 presenta información conflictiva o incompleta en el archivo. L
 
 ### Idempotencia
 
-La segunda importación identifica servicios por código y ejecuta actualización en lugar de inserción duplicada. Por esto una segunda carga puede reportar updated, skipped y observed, pero no aumenta el número de servicios.
+La segunda importación identifica servicios por código. Compara los campos importables antes de escribir: un servicio modificado se actualiza, uno idéntico se omite y uno nuevo se inserta. Por esto una segunda carga no aumenta el número de servicios y evita actualizaciones innecesarias.
 
 ## 9. Autenticación y autorización
 
@@ -362,6 +364,7 @@ El harness es la combinación de:
 - migración SQL;
 - seed-demo.js;
 - import-catalog.js;
+- validate-import.js;
 - verify-import.js;
 - smoke.js;
 - acceptance.js;
@@ -379,13 +382,14 @@ La rutina no depende de una suscripción de IA. Tiene entradas, controles observ
 2. build de API y frontend;
 3. auditoría de secretos;
 4. validación de compose.yaml;
-5. aceptación funcional P01–P11;
-6. smoke opcional si HARNESS_RUN_SMOKE=1;
-7. comprobación de persistencia después del reinicio.
+5. validación del Excel;
+6. aceptación funcional P01–P11;
+7. smoke opcional si HARNESS_RUN_SMOKE=1;
+8. comprobación de persistencia después del reinicio.
 
-## 15. Loop engineering
+## 15. Ciclo de corrección del harness
 
-El ciclo aplicado fue:
+El enunciado no exige una disciplina independiente llamada Loop Engineering. El ciclo siguiente se documenta como el método usado dentro de Harness Engineering para detectar y corregir fallos:
 
 ~~~text
 PLAN → ACT → OBSERVE → EVALUATE → CORRECT → RE-EVALUATE
@@ -413,6 +417,7 @@ npm run persistence:check
 docker compose build api web
 docker compose up -d db api web
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
+docker compose exec api node apps/api/dist/scripts/validate-import.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 docker compose exec api node apps/api/dist/scripts/smoke.js
@@ -430,7 +435,8 @@ docker compose up -d web
 | Migración | Aplicada automáticamente |
 | Seed | Cuentas y organización demo creadas |
 | Importación | 12 nivel 1, 46 nivel 2, 0 duplicados |
-| Reimportación | 46 actualizados, sin duplicados |
+| Reimportación sin cambios | 0 actualizados, 46 omitidos por igualdad, sin duplicados |
+| Validación del Excel | Hoja, encabezados A4:L4, 46 servicios y 51 filas de continuación aceptados |
 | Revisión | 3 servicios en REVIEW |
 | Login inválido | HTTP 401 |
 | Login válido | HTTP 201 |
@@ -467,7 +473,7 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | Context engineering | AGENTS y contexto versionado | revisión de actualizaciones | docs/contexto |
 | Prompt engineering | cinco prompts e iteraciones | revisión documental | docs/prompts |
 | Harness engineering | scripts y controles | harness, aceptación y persistencia en verde | scripts/harness.mjs, acceptance.ts |
-| Loop engineering | evidencia de corrección | fallo y re-ejecución | docs/evidencias |
+| Ciclo de corrección del harness | evidencia de corrección | fallo y re-ejecución | docs/evidencias |
 
 ## 18. Limitaciones conocidas
 
