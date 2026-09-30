@@ -56,4 +56,3 @@ Estos prompts documentan cómo se dividió el trabajo por riesgo. Cada prompt tu
 ## Criterio de calidad
 
 Un prompt se considera útil cuando produce una decisión que puede señalarse en el código, ejecutarse con un comando y compararse contra una salida observable.
-

@@ -176,4 +176,3 @@ Por esto la aplicación no reemplaza silenciosamente un valor conflictivo. La de
 6. Ejecutar nuevamente la importación.
 7. Confirmar que duplicates continúa en 0.
 8. Revisar Importaciones para comparar created, updated, skipped y observed.
-

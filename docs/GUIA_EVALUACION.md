@@ -197,4 +197,3 @@ La solución está lista para evaluación cuando:
 - ADMIN puede mantener datos;
 - CONSULTA puede consultar y recibe 403 al escribir;
 - reiniciar contenedores no elimina los datos.
-

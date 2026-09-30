@@ -40,4 +40,3 @@ Después de completar la primera versión funcional se necesitaba un contexto m�
 ## Resultado
 
 Este contexto convirtió los requisitos del enunciado en controles observables y permitió documentar el fallo de ruta de migración, la sustitución del lector de Excel y la verificación final.
-

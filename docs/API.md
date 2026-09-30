@@ -210,4 +210,3 @@ POST /api/services
 ~~~
 
 El resultado esperado es HTTP 403. Esto verifica que la autorización está en el backend y no solo en los botones del navegador.
-
