@@ -10,7 +10,7 @@ Este repositorio corresponde al parcial práctico de Software Avanzado, carné 2
 |---|---|
 | Repositorio | [DavidVelasquez77/parcial-catalogo-servicios-202307705](https://github.com/DavidVelasquez77/parcial-catalogo-servicios-202307705) |
 | Rama | main |
-| Commit de entrega | 29da2dc |
+| Commit de entrega | aa1bae7 |
 | Etiqueta | parcial-v2.0 |
 | Integrante | 202307705 |
 | Colaborador solicitado | maldanap-usac |
