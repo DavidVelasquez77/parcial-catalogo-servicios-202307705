@@ -54,7 +54,7 @@ No agregar tickets, facturación ni consumo de servicios sin una solicitud expl�
 - apps/web: React, Vite, interfaz y tokens CSS.
 - database/migrations: SQL aplicado por el script de migración.
 - compose.yaml: db, api y web.
-- scripts/harness.mjs: typecheck, build, auditoría y compose-config.
+- scripts/harness.mjs: typecheck, build, auditoría, compose-config, aceptación, smoke y persistencia.
 - docs: decisiones, prompts, contexto, API, importación, pruebas y evidencias.
 
 ## 6. Reglas de importación
@@ -90,6 +90,8 @@ npm run typecheck
 npm run build
 npm run audit:secrets
 npm run harness
+npm test
+npm run persistence:check
 ~~~
 
 Smoke dentro de harness en PowerShell:
@@ -113,6 +115,8 @@ No ejecutar docker compose down -v salvo que el usuario solicite reiniciar de fo
 - minimum no supera maximum.
 - responsable pertenece a la sección elegida.
 - reiniciar db y api conserva los datos.
+- `npm test` termina con P01–P11 en `ok: true`.
+- `npm run persistence:check` conserva 12 niveles 1, 46 niveles 2, 0 duplicados y 3 servicios REVIEW.
 - documentación describe comandos y resultados reales.
 
 ## 9. Método de trabajo

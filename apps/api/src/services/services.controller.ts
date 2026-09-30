@@ -10,6 +10,9 @@ export class ServicesController {
   constructor(private readonly service: ServicesService) {}
   @Get('dashboard') dashboard() { return this.service.dashboard(); }
   @Get('level1') level1List() { return this.service.level1List(); }
+  @Post('level1') @Roles('ADMIN') level1Create(@Body() body: Record<string, unknown>) { return this.service.level1Create(body); }
+  @Patch('level1/:id') @Roles('ADMIN') level1Update(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) { return this.service.level1Update(id, body); }
+  @Delete('level1/:id') @Roles('ADMIN') level1Deactivate(@Param('id', ParseIntPipe) id: number) { return this.service.level1Deactivate(id); }
   @Get() list(@Query() query: Record<string, string | undefined>) { return this.service.list(query); }
   @Get(':id') findOne(@Param('id', ParseIntPipe) id: number) { return this.service.findOne(id); }
   @Post() @Roles('ADMIN') create(@Body() body: Record<string, unknown>) { return this.service.create(body); }

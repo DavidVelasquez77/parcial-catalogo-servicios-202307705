@@ -24,7 +24,9 @@ Después de completar la primera versión funcional se necesitaba un contexto m�
 5. seed;
 6. import;
 7. verify-import;
-8. smoke;
+8. aceptación funcional P01–P11;
+9. smoke;
+10. persistencia después de reiniciar PostgreSQL;
 9. revisión visual;
 10. reinicio sin eliminar volumen.
 

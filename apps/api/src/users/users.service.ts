@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { DatabaseService } from '../database/database.service';
 
@@ -24,6 +24,8 @@ export class UsersService {
     if (!name || !username || password.length < 8 || !Number.isInteger(positionId)) {
       throw new BadRequestException('Nombre, usuario, contraseña de 8 caracteres y puesto son obligatorios.');
     }
+    const duplicate = await this.db.query(`SELECT id FROM users WHERE username = $1 OR email = NULLIF($2, '')`, [username, String(body.email ?? '').trim()]);
+    if (duplicate.rows[0]) throw new ConflictException('El usuario o correo ya está registrado.');
     const position = await this.db.query(`SELECT p.id, p.active, s.active AS section_active FROM positions p JOIN sections s ON s.id = p.section_id WHERE p.id = $1`, [positionId]);
     if (!position.rows[0] || !position.rows[0].active || !position.rows[0].section_active) throw new BadRequestException('El puesto o su sección no están activos.');
     const passwordHash = await bcrypt.hash(password, 12);

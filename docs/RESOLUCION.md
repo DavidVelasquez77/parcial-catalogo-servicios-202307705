@@ -34,6 +34,7 @@ La aplicación atiende estas necesidades con un frontend web, una API, PostgreSQ
 - Mantenimiento de empresas, áreas, departamentos, secciones y puestos.
 - Mantenimiento de usuarios.
 - Mantenimiento de servicios y catálogos.
+- Mantenimiento administrativo de servicios de nivel 1.
 - Búsqueda, filtros, paginación equivalente y ficha de servicio.
 - Asignación de sección y usuario responsable.
 - Importación de CatalogoServicios.xlsx.
@@ -363,6 +364,8 @@ El harness es la combinación de:
 - import-catalog.js;
 - verify-import.js;
 - smoke.js;
+- acceptance.js;
+- persistence-check.mjs;
 - audit-secrets.mjs;
 - harness.mjs;
 - comandos de logs, reinicio y recuperación;
@@ -376,7 +379,9 @@ La rutina no depende de una suscripción de IA. Tiene entradas, controles observ
 2. build de API y frontend;
 3. auditoría de secretos;
 4. validación de compose.yaml;
-5. smoke opcional si HARNESS_RUN_SMOKE=1.
+5. aceptación funcional P01–P11;
+6. smoke opcional si HARNESS_RUN_SMOKE=1;
+7. comprobación de persistencia después del reinicio.
 
 ## 15. Loop engineering
 
@@ -403,6 +408,8 @@ El ciclo evita considerar una implementación terminada solo porque compila. Cad
 npm run typecheck
 npm run build
 npm run harness con HARNESS_RUN_SMOKE=1
+npm test
+npm run persistence:check
 docker compose build api web
 docker compose up -d db api web
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
@@ -431,6 +438,7 @@ docker compose up -d web
 | Escritura como Consulta | HTTP 403 |
 | Logout | Sesión invalidada; /auth/me devuelve 401 |
 | Persistencia | Conteos conservados después de reiniciar |
+| Aceptación P01–P11 | Todos los contratos funcionales en `ok: true` |
 
 ### Incidencia corregida durante el desarrollo
 
@@ -449,7 +457,8 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | Organización | tablas y OrganizationService | Listados y formularios CRUD | organization/ |
 | Usuarios | UsersService | Seed y mantenimiento ADMIN | users/ |
 | Catálogos | CatalogService | Listado y mantenimiento | catalog/ |
-| Servicios | ServicesService | búsqueda, ficha y CRUD | services/ |
+| Servicios | ServicesService | búsqueda, ficha, filtros, paginación y CRUD | services/ |
+| Servicios nivel 1 | ServicesService y Level1Page | creación, edición y baja lógica ADMIN | services/, Level1Page.tsx |
 | Umbrales | CHECK SQL y validación API | mínimo mayor que máximo rechazado | migration, services.service.ts |
 | Importación | ImportService con exceljs | conteos 12/46/0 | import-catalog.js, verify-import.js |
 | SE.12 | regla canónica y observaciones | tres servicios REVIEW | docs/IMPORTACION.md |
@@ -457,7 +466,7 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | Docker | Dockerfiles y Compose | build y ps | compose.yaml |
 | Context engineering | AGENTS y contexto versionado | revisión de actualizaciones | docs/contexto |
 | Prompt engineering | cinco prompts e iteraciones | revisión documental | docs/prompts |
-| Harness engineering | scripts y controles | harness en verde | scripts/harness.mjs |
+| Harness engineering | scripts y controles | harness, aceptación y persistencia en verde | scripts/harness.mjs, acceptance.ts |
 | Loop engineering | evidencia de corrección | fallo y re-ejecución | docs/evidencias |
 
 ## 18. Limitaciones conocidas

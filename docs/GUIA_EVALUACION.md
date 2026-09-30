@@ -76,18 +76,18 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 
 | ID | Escenario | Procedimiento | Resultado esperado | Evidencia |
 |---|---|---|---|---|
-| P01 | Login válido e inválido | Intentar contraseña incorrecta y luego credencial demo | 401 en el primer caso y acceso en el segundo | smoke.js |
-| P02 | Sin sesión y logout | Abrir ruta sin cookie; cerrar sesión; consultar /auth/me | 401 sin sesión y después de logout | smoke.js |
-| P03 | Consulta modifica | Ingresar como consulta e intentar crear servicio | 403 en servidor | smoke.js |
-| P04 | Crear jerarquía y usuario | ADMIN crea unidad padre, puesto y usuario desde Organización/Usuarios | Relaciones visibles y recuperables | interfaz + API |
-| P05 | Código o referencia inválida | Crear registro duplicado o usar padre inexistente | Rechazo con respuesta de validación | restricciones SQL + API |
-| P06 | Importar Excel | Ejecutar import-catalog.js y verify-import.js | 12, 46, 0 y observaciones | verify-import.js |
-| P07 | Repetir importación | Ejecutar importador dos veces | No aparecen duplicados; sube updated | import_runs |
-| P08 | SE.12 y ausencias | Filtrar SE.12 y abrir fichas | 3 registros REVIEW y valores desconocidos | interfaz + observaciones |
-| P09 | Mínimo mayor que máximo | Crear o editar con minimum 10 y maximum 5 | API rechaza la operación | validación API + CHECK |
-| P10 | Búsqueda y filtros | Buscar SE.12 y seleccionar REVIEW | Resultado de tres servicios | smoke.js |
-| P11 | Responsable incorrecto | Seleccionar usuario que no pertenece a la sección | API rechaza la asignación | validateAssignment |
-| P12 | Persistencia | Ejecutar docker compose restart db api | Datos se conservan | verify-import después del reinicio |
+| P01 | Login válido e inválido | Intentar contraseña incorrecta y luego credencial demo | 401 en el primer caso y acceso en el segundo | acceptance.js |
+| P02 | Sin sesión y logout | Abrir ruta sin cookie; cerrar sesión; consultar /auth/me | 401 sin sesión y después de logout | acceptance.js |
+| P03 | Consulta modifica | Ingresar como consulta e intentar crear servicio | 403 en servidor | acceptance.js + smoke.js |
+| P04 | Crear jerarquía y usuario | ADMIN crea empresa, área, departamento, sección, puesto y usuario temporal | Relaciones visibles y recuperables; limpieza lógica | acceptance.js |
+| P05 | Código o referencia inválida | Crear registro duplicado o usar padre inexistente | HTTP 409/400 y no se crea información inválida | acceptance.js |
+| P06 | Importar Excel | Ejecutar import-catalog.js y verify-import.js | 12, 46, 0 y observaciones | acceptance.js + verify-import.js |
+| P07 | Repetir importación | Ejecutar importador dos veces | No aparecen duplicados; sube updated | acceptance.js + import_runs |
+| P08 | SE.12 y ausencias | Filtrar SE.12 y abrir fichas | 3 registros REVIEW y valores desconocidos | acceptance.js + interfaz |
+| P09 | Mínimo mayor que máximo | Crear o editar con minimum 10 y maximum 5 | API rechaza la operación con HTTP 400 | acceptance.js |
+| P10 | Búsqueda y filtros | Buscar SE.12 y seleccionar REVIEW | Resultado de tres servicios | acceptance.js + smoke.js |
+| P11 | Responsable incorrecto | Seleccionar usuario que no pertenece a la sección | API rechaza la asignación | acceptance.js |
+| P12 | Persistencia | Reiniciar PostgreSQL y volver a levantar API | Datos se conservan: 12/46/0/3 | persistence-check.mjs |
 
 ## Pruebas automatizadas disponibles
 
@@ -98,7 +98,15 @@ $env:HARNESS_RUN_SMOKE='1'
 npm run harness
 ~~~
 
-Comprueba typecheck, build, secretos, Compose y smoke.
+Comprueba typecheck, build, secretos, Compose, aceptación funcional P01–P11, smoke y persistencia P12.
+
+### Prueba de aceptación completa
+
+~~~powershell
+npm test
+~~~
+
+Ejecuta dentro del contenedor API `acceptance.js`. Crea datos temporales con prefijo `ACC-`, verifica reglas positivas y negativas, restaura las asignaciones tocadas y desactiva sus registros temporales. La salida esperada contiene `"ok":true` y los checks P01 a P11.
 
 ### Smoke
 
@@ -111,6 +119,14 @@ Salida esperada:
 ~~~json
 {"ok":true,"checks":["P01","P02","P03","P10"]}
 ~~~
+
+### Persistencia después de reinicio
+
+~~~powershell
+npm run persistence:check
+~~~
+
+El script reinicia únicamente el servicio de base de datos, vuelve a levantar la API cuando PostgreSQL está disponible y repite la verificación de importación. No ejecuta `down -v` y por eso no destruye el volumen `postgres_data`.
 
 ### Importación
 

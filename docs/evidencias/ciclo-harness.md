@@ -9,7 +9,8 @@ El harness no es únicamente Docker. Es el conjunto coordinado de:
 - archivo Excel controlado;
 - Dockerfiles y compose.yaml;
 - migración SQL;
-- scripts de seed, importación, verificación y smoke;
+- scripts de seed, importación, verificación, aceptación y smoke;
+- comprobación de persistencia después de reiniciar PostgreSQL;
 - auditoría de secretos;
 - comandos de logs y recuperación;
 - códigos de salida;
@@ -38,9 +39,11 @@ HARNESS_RUN_SMOKE=1 npm run harness
 | 2 | build | NestJS y Vite generan artefactos | falla el build |
 | 3 | secret-audit | no hay secretos obvios en fuentes o documentación | encuentra patrones prohibidos |
 | 4 | compose-config | Compose es sintácticamente válido | Docker no puede resolver la configuración |
-| 5 | smoke opcional | autenticación, filtros, permisos y logout | un estado HTTP no coincide |
+| 5 | acceptance | P01–P11: autenticación, roles, organización, duplicados, importación, SE.12, umbrales y responsables | un contrato funcional no coincide |
+| 6 | smoke opcional | recorrido corto P01, P02, P03 y P10 | un estado HTTP no coincide |
+| 7 | persistence | reinicio controlado de db y verificación 12/46/0/3 | se pierden datos o cambia el conteo |
 
-Cada control hereda el código de salida del proceso. Un control fallido detiene el harness y reporta el paso responsable.
+Cada control hereda el código de salida del proceso. Un control fallido detiene el harness y reporta el paso responsable. La aceptación usa datos temporales con prefijo `ACC-` y los limpia mediante bajas lógicas o eliminación acotada de filas creadas por la propia prueba.
 
 ## 4. Datos de evaluación
 
@@ -62,7 +65,7 @@ El seed es repetible: actualiza los registros demo sin crear otra cuenta demo en
 
 ### Plan
 
-Levantar PostgreSQL, API y frontend mediante Compose. Luego ejecutar migración, seed, importación, verificación y smoke.
+Levantar PostgreSQL, API y frontend mediante Compose. Luego ejecutar typecheck, build, auditoría, aceptación P01–P11, smoke y persistencia.
 
 ### Act
 
@@ -111,13 +114,16 @@ docker compose exec api node apps/api/dist/scripts/seed-demo.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 docker compose exec api node apps/api/dist/scripts/smoke.js
+npm test
+npm run persistence:check
 ~~~
 
 Resultado:
 
 ~~~json
 {"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
-{"ok":true,"checks":["P01","P02","P03","P10"]}
+{"ok":true,"checks":["P01","P02","P06","P07","P08","P10","P04","P05","P09","P11","P03"]}
+{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
 ~~~
 
 ### Success

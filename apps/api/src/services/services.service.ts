@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 type ServicePayload = Record<string, unknown>;
@@ -55,6 +55,7 @@ export class ServicesService {
       SELECT s2.id, s2.code, s2.name, s2.status, s2.active_code AS "activeCode",
         s2.description, s2.metric, s2.minimum, s2.maximum,
         s2.class_id AS "classId", s2.criticality_id AS "criticalityId", s2.type_id AS "typeId",
+        s2.source_sheet AS "sourceSheet", s2.source_rows AS "sourceRows", s2.source_transformations AS "sourceTransformations",
         s1.id AS "level1Id", s1.code AS "level1Code", s1.name AS "level1Name",
         c.label AS "classLabel", cr.label AS "criticalityLabel", t.label AS "typeLabel",
         s2.responsible_section_id AS "responsibleSectionId", sec.name AS "responsibleSectionName",
@@ -109,6 +110,8 @@ export class ServicesService {
     const code = String(body.code ?? '').trim();
     const name = String(body.name ?? '').trim();
     if (!code || !name) throw new BadRequestException('Código y nombre son obligatorios.');
+    const duplicate = await this.db.query(`SELECT id FROM service_level_2 WHERE code = $1`, [code]);
+    if (duplicate.rows[0]) throw new ConflictException('Ya existe un servicio con ese código.');
     const refs = await this.validateReferences(body);
     const result = await this.db.query(`INSERT INTO service_level_2(code, name, level_1_id, active_code, status, class_id, criticality_id, type_id, description, metric, minimum, maximum, responsible_section_id, responsible_user_id, source_sheet, source_rows, source_transformations)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,'Aplicación',NULL,'Registro manual') RETURNING *`,
@@ -120,6 +123,8 @@ export class ServicesService {
     const current = await this.db.query(`SELECT * FROM service_level_2 WHERE id = $1`, [id]);
     if (!current.rows[0]) throw new NotFoundException('Servicio no encontrado.');
     const value: ServicePayload = { ...current.rows[0], ...body, code: body.code ?? current.rows[0].code, name: body.name ?? current.rows[0].name, activeCode: body.activeCode ?? current.rows[0].active_code, status: body.status ?? current.rows[0].status, level1Id: body.level1Id ?? current.rows[0].level_1_id, responsibleSectionId: body.responsibleSectionId ?? current.rows[0].responsible_section_id, responsibleUserId: body.responsibleUserId ?? current.rows[0].responsible_user_id, minimum: body.minimum ?? current.rows[0].minimum, maximum: body.maximum ?? current.rows[0].maximum };
+    const duplicate = await this.db.query(`SELECT id FROM service_level_2 WHERE code = $1 AND id <> $2`, [String(value.code).trim(), id]);
+    if (duplicate.rows[0]) throw new ConflictException('Ya existe otro servicio con ese código.');
     const refs = await this.validateReferences(value);
     const result = await this.db.query(`UPDATE service_level_2 SET code=$1,name=$2,level_1_id=$3,active_code=$4,status=$5,class_id=$6,criticality_id=$7,type_id=$8,description=$9,metric=$10,minimum=$11,maximum=$12,responsible_section_id=$13,responsible_user_id=$14,updated_at=NOW() WHERE id=$15 RETURNING *`,
       [String(value.code), String(value.name), refs.level1Id, value.activeCode ?? null, this.statusFrom(value.activeCode, value.status), value.classId ?? null, value.criticalityId ?? null, value.typeId ?? null, value.description ?? null, value.metric ?? null, refs.minimum, refs.maximum, refs.sectionId, refs.userId, id]);
@@ -140,5 +145,34 @@ export class ServicesService {
     const levels = await this.db.query(`SELECT COUNT(*)::INTEGER AS total FROM service_level_1`);
     const imports = await this.db.query(`SELECT id, file_name AS "fileName", status, created_count AS "createdCount", updated_count AS "updatedCount", skipped_count AS "skippedCount", observed_count AS "observedCount", started_at AS "startedAt", finished_at AS "finishedAt" FROM import_runs ORDER BY id DESC LIMIT 5`);
     return { services: result.rows[0], level1Count: Number(levels.rows[0]?.total ?? 0), recentImports: imports.rows };
+  }
+
+  async level1Create(body: ServicePayload) {
+    const code = String(body.code ?? '').trim();
+    const name = String(body.name ?? '').trim();
+    if (!code || !name) throw new BadRequestException('Código y nombre son obligatorios.');
+    const duplicate = await this.db.query(`SELECT id FROM service_level_1 WHERE code = $1`, [code]);
+    if (duplicate.rows[0]) throw new ConflictException('Ya existe un servicio de nivel 1 con ese código.');
+    const result = await this.db.query(`INSERT INTO service_level_1(code, name) VALUES($1, $2) RETURNING id, code, name, active`, [code, name]);
+    return result.rows[0];
+  }
+
+  async level1Update(id: number, body: ServicePayload) {
+    const current = await this.db.query(`SELECT * FROM service_level_1 WHERE id = $1`, [id]);
+    if (!current.rows[0]) throw new NotFoundException('Servicio de nivel 1 no encontrado.');
+    const code = String(body.code ?? current.rows[0].code).trim();
+    const name = String(body.name ?? current.rows[0].name).trim();
+    if (!code || !name) throw new BadRequestException('Código y nombre son obligatorios.');
+    const duplicate = await this.db.query(`SELECT id FROM service_level_1 WHERE code = $1 AND id <> $2`, [code, id]);
+    if (duplicate.rows[0]) throw new ConflictException('Ya existe otro servicio de nivel 1 con ese código.');
+    const active = body.active === undefined ? current.rows[0].active : Boolean(body.active);
+    const result = await this.db.query(`UPDATE service_level_1 SET code=$1, name=$2, active=$3, updated_at=NOW() WHERE id=$4 RETURNING id, code, name, active`, [code, name, active, id]);
+    return result.rows[0];
+  }
+
+  async level1Deactivate(id: number) {
+    const children = await this.db.query(`SELECT COUNT(*)::INTEGER AS total FROM service_level_2 WHERE level_1_id = $1 AND status <> 'INACTIVE'`, [id]);
+    if (Number(children.rows[0]?.total ?? 0) > 0) throw new BadRequestException('No puedes desactivar el nivel 1 mientras tenga servicios activos o en revisión.');
+    return this.level1Update(id, { active: false });
   }
 }

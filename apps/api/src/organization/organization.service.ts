@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 type Kind = 'companies' | 'areas' | 'departments' | 'sections' | 'positions';
@@ -11,6 +11,7 @@ const META: Record<Kind, Meta> = {
   sections: { table: 'sections', parentTable: 'departments', parentColumn: 'department_id', parentKey: 'departmentId' },
   positions: { table: 'positions', parentTable: 'sections', parentColumn: 'section_id', parentKey: 'sectionId' },
 };
+const CHILDREN: Record<Kind, Kind | null> = { companies: 'areas', areas: 'departments', departments: 'sections', sections: 'positions', positions: null };
 
 @Injectable()
 export class OrganizationService {
@@ -34,6 +35,10 @@ export class OrganizationService {
     const code = String(body.code ?? '').trim();
     const name = String(body.name ?? '').trim();
     if (!code || !name) throw new BadRequestException('Código y nombre son obligatorios.');
+    const duplicate = meta.parentColumn && meta.parentKey
+      ? await this.db.query(`SELECT id FROM ${meta.table} WHERE ${meta.parentColumn} = $1 AND code = $2`, [Number(body[meta.parentKey]), code])
+      : await this.db.query(`SELECT id FROM ${meta.table} WHERE code = $1`, [code]);
+    if (duplicate.rows[0]) throw new ConflictException('Ya existe un registro con ese código en el mismo padre.');
     const values: unknown[] = [code, name];
     let columns = 'code, name';
     let placeholders = '$1, $2';
@@ -45,7 +50,7 @@ export class OrganizationService {
       if (!parent.rows[0].active) throw new BadRequestException('No puedes asociar un registro a un padre inactivo.');
       values.unshift(parentId);
       columns = `${meta.parentColumn}, ${columns}`;
-      placeholders = `$1, ${placeholders.replace('$1', '$2').replace('$2', '$3')}`;
+      placeholders = '$1, $2, $3';
     }
     const result = await this.db.query(`INSERT INTO ${meta.table} (${columns}) VALUES (${placeholders}) RETURNING *`, values);
     return result.rows[0];
@@ -58,6 +63,11 @@ export class OrganizationService {
     const code = String(body.code ?? current.rows[0].code).trim();
     const name = String(body.name ?? current.rows[0].name).trim();
     const active = body.active === undefined ? current.rows[0].active : Boolean(body.active);
+    const parentId = meta.parentColumn && meta.parentKey ? Number(body[meta.parentKey] ?? current.rows[0][meta.parentColumn]) : null;
+    const duplicate = meta.parentColumn
+      ? await this.db.query(`SELECT id FROM ${meta.table} WHERE ${meta.parentColumn} = $1 AND code = $2 AND id <> $3`, [parentId, code, id])
+      : await this.db.query(`SELECT id FROM ${meta.table} WHERE code = $1 AND id <> $2`, [code, id]);
+    if (duplicate.rows[0]) throw new ConflictException('Ya existe otro registro con ese código en el mismo padre.');
     const values: unknown[] = [code, name, active];
     let sql = `UPDATE ${meta.table} SET code = $1, name = $2, active = $3, updated_at = NOW()`;
     if (meta.parentColumn && meta.parentKey && body[meta.parentKey] !== undefined) {
@@ -73,6 +83,13 @@ export class OrganizationService {
   }
 
   async deactivate(kind: string, id: number) {
+    const meta = this.meta(kind);
+    const childKind = CHILDREN[kind as Kind];
+    if (childKind) {
+      const childMeta = this.meta(childKind);
+      const childCount = await this.db.query(`SELECT COUNT(*)::INTEGER AS total FROM ${childMeta.table} WHERE ${childMeta.parentColumn} = $1 AND active`, [id]);
+      if (Number(childCount.rows[0]?.total ?? 0) > 0) throw new BadRequestException('No puedes desactivar este registro mientras tenga dependientes activos. Desactiva primero sus hijos.');
+    }
     return this.update(kind, id, { active: false });
   }
 }

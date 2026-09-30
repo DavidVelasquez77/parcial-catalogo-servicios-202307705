@@ -44,4 +44,4 @@ El harness debe detenerse en el primer fallo, mostrar el paso responsable y fina
 
 ## Resultado aplicado
 
-El harness ejecuta typecheck, build, secret-audit, compose-config y smoke opcional. La evidencia de la ruta de migración corregida está en docs/evidencias/ciclo-harness.md.
+El harness ejecuta typecheck, build, secret-audit, compose-config, aceptación funcional P01–P11, smoke opcional y persistencia. La evidencia de la ruta de migración corregida y de la verificación final está en docs/evidencias/ciclo-harness.md.

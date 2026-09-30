@@ -126,6 +126,28 @@ Requiere ADMIN. Aplica las mismas validaciones de creación.
 
 Requiere ADMIN. No elimina físicamente: cambia el estado del servicio a INACTIVE.
 
+### Servicios de nivel 1
+
+Los niveles 1 representan las familias o agrupadores del catálogo. También tienen mantenimiento administrativo para que el catálogo no dependa únicamente de la importación del Excel.
+
+| Método | Ruta | Requisito | Uso |
+|---|---|---|---|
+| GET | /api/services/level1 | Sesión | Listar niveles 1 activos y en revisión |
+| POST | /api/services/level1 | ADMIN | Crear un nivel 1 |
+| PATCH | /api/services/level1/:id | ADMIN | Editar código, nombre o estado |
+| DELETE | /api/services/level1/:id | ADMIN | Bajar lógicamente un nivel 1 |
+
+Reglas adicionales:
+
+- el código de nivel 1 es único;
+- no se permite duplicar códigos y la API responde HTTP 409;
+- no se puede desactivar un nivel 1 que todavía tenga servicios nivel 2 activos o en revisión;
+- la baja es lógica para conservar referencias y trazabilidad.
+
+### Respuestas de conflicto
+
+Las operaciones de creación y edición validan duplicados antes de insertar o actualizar. Cuando el código, username, correo o etiqueta de catálogo ya existe, la API responde HTTP 409 con un mensaje comprensible. Esto evita que la interfaz tenga que interpretar un error SQL genérico.
+
 ## Organización
 
 Los valores de kind son:

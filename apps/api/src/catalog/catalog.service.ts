@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 
 type CatalogKind = 'classes' | 'criticalities' | 'types';
@@ -22,6 +22,8 @@ export class CatalogService {
   async create(kind: string, body: Record<string, unknown>) {
     const label = String(body.label ?? '').trim();
     if (!label) throw new BadRequestException('La etiqueta es obligatoria.');
+    const duplicate = await this.db.query(`SELECT id FROM ${this.table(kind)} WHERE label = $1`, [label]);
+    if (duplicate.rows[0]) throw new ConflictException('Ya existe esa opción en el catálogo.');
     const result = await this.db.query(`INSERT INTO ${this.table(kind)}(label) VALUES($1) RETURNING *`, [label]);
     return result.rows[0];
   }

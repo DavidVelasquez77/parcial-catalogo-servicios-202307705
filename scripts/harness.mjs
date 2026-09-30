@@ -7,7 +7,11 @@ const steps = [
   ['secret-audit', [npm, 'run', 'audit:secrets']],
   ['compose-config', ['docker', 'compose', 'config']],
 ];
-if (process.env.HARNESS_RUN_SMOKE === '1') steps.push(['smoke', ['docker', 'compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/smoke.js']]);
+if (process.env.HARNESS_RUN_SMOKE === '1') {
+  steps.push(['acceptance', ['docker', 'compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/acceptance.js']]);
+  steps.push(['smoke', ['docker', 'compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/smoke.js']]);
+  steps.push(['persistence', [npm, 'run', 'persistence:check']]);
+}
 
 const results = [];
 for (const [name, command] of steps) {

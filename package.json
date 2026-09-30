@@ -6,7 +6,9 @@
   "scripts": {
     "install:all": "npm install --workspaces",
     "build": "npm run build --workspace apps/api && npm run build --workspace apps/web",
-    "test": "npm run test --workspace apps/api",
+    "test": "npm run test:acceptance",
+    "test:acceptance": "docker compose exec -T api node apps/api/dist/scripts/acceptance.js",
+    "persistence:check": "node scripts/persistence-check.mjs",
     "lint": "npm run lint --workspace apps/api && npm run lint --workspace apps/web",
     "typecheck": "npm run typecheck --workspace apps/api && npm run typecheck --workspace apps/web",
     "db:migrate": "npm run db:migrate --workspace apps/api",
