@@ -91,6 +91,14 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 
 ## Pruebas automatizadas disponibles
 
+### Tipo de pruebas
+
+- `verify-import.js` es una comprobación de integración con PostgreSQL y el modelo importado.
+- `acceptance.js` es una prueba de integración/extremo a extremo de la API: usa HTTP, sesión, guards, reglas de negocio y base de datos real dentro de Docker.
+- `smoke.js` es un recorrido corto de integración para login, logout, permisos y filtros.
+- `persistence-check.mjs` es una prueba operativa de integración que reinicia los servicios y verifica el volumen persistente.
+- No se presenta una suite unitaria aislada como sustituto de estos escenarios; los criterios del parcial se comprueban con datos reales y resultados observables.
+
 ### Harness
 
 ~~~powershell

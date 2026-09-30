@@ -7,7 +7,8 @@ Estos prompts documentan cómo se dividió el trabajo por riesgo. Cada prompt tu
 ## Herramienta y fecha
 
 - Herramienta: asistente Codex dentro del entorno de trabajo.
-- Fecha de ejecución documentada: septiembre de 2026.
+- Modelo disponible: Codex basado en GPT-5; la versión menor exacta del runtime no se expone al repositorio.
+- Fecha de ejecución documentada: 30 de septiembre de 2026.
 - Repositorio usado: parcial-catalogo-servicios-202307705.
 - Modelo exacto: depende de la configuración del entorno de Codex; el proyecto no depende de un modelo para ejecutarse.
 
