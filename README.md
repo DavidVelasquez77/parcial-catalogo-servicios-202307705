@@ -67,7 +67,76 @@ Para ejecutar la aplicación no es necesario instalar Node.js, PostgreSQL ni Nes
 
 Para ejecutar npm run typecheck, npm run build o npm run harness desde Windows se necesita Node.js 22 o compatible y npm. La base de datos y la aplicación pueden seguir ejecutándose en Docker.
 
-## 5. Inicio desde un clon limpio
+## 5. Rutas y encendido de la aplicación
+
+### Ruta local del proyecto
+
+En el equipo de desarrollo utilizado para esta entrega, la raíz del proyecto es:
+
+~~~text
+C:\Users\Vela\Desktop\SA\MAGISTRAL\LECCIONES\2 parcial\parcial-catalogo-servicios-202307705
+~~~
+
+En otro equipo se debe usar la carpeta donde se clonó el repositorio. Todos los comandos siguientes deben ejecutarse desde esa raíz, donde están `compose.yaml` y `CatalogoServicios.xlsx`.
+
+### Encender desde Windows PowerShell
+
+~~~powershell
+Set-Location -LiteralPath 'C:\Users\Vela\Desktop\SA\MAGISTRAL\LECCIONES\2 parcial\parcial-catalogo-servicios-202307705'
+Copy-Item .env.example .env -ErrorAction SilentlyContinue
+docker compose up --build -d
+docker compose ps
+docker compose exec api node apps/api/dist/scripts/seed-demo.js
+docker compose exec api node apps/api/dist/scripts/import-catalog.js
+docker compose exec api node apps/api/dist/scripts/verify-import.js
+~~~
+
+Si `.env` ya existe, el primer comando `Copy-Item` puede omitirse. La migración SQL se ejecuta automáticamente cuando inicia la API. Después de una primera construcción, para volver a encender los servicios normalmente basta con:
+
+~~~powershell
+docker compose up -d
+~~~
+
+### URLs y rutas disponibles
+
+| Uso | URL o ruta |
+|---|---|
+| Aplicación web | [http://localhost:8080/](http://localhost:8080/) |
+| Login | `http://localhost:8080/` |
+| Swagger | [http://localhost:8080/api/docs](http://localhost:8080/api/docs) |
+| API desde el navegador | `http://localhost:8080/api/...` |
+| Archivo original | `CatalogoServicios.xlsx` en la raíz del proyecto |
+
+La interfaz es una SPA: sus pantallas se navegan desde `/` usando el menú lateral. Las rutas principales de la API son:
+
+| Recurso | Rutas |
+|---|---|
+| Sesión | `/api/auth/login`, `/api/auth/me`, `/api/auth/logout` |
+| Servicios | `/api/services`, `/api/services/:id`, `/api/services/dashboard` |
+| Nivel 1 | `/api/services/level1`, `/api/services/level1/:id` |
+| Organización | `/api/organization/companies`, `/areas`, `/departments`, `/sections`, `/positions` |
+| Usuarios | `/api/users` |
+| Catálogos | `/api/catalogs/classes`, `/criticalities`, `/types` |
+| Importaciones | `/api/imports`, `/api/imports/run`, `/api/imports/:id/observations` |
+
+El puerto `3000` de la API es interno de Docker y no se publica directamente al host; desde fuera se debe utilizar el prefijo `http://localhost:8080/api` mediante Nginx.
+
+### Apagar y reiniciar
+
+~~~powershell
+# Apagar sin borrar la base de datos
+docker compose down
+
+# Volver a iniciar conservando el volumen postgres_data
+docker compose up -d
+
+# Reiniciar db y API para comprobar persistencia
+npm run persistence:check
+~~~
+
+No ejecutar `docker compose down -v` durante la evaluación: elimina los datos persistidos.
+
+## 6. Inicio desde un clon limpio
 
 Los siguientes comandos son el procedimiento de evaluación recomendado. Ejecutarlos desde la raíz del repositorio.
 
@@ -101,13 +170,13 @@ La salida esperada de la verificación es equivalente a:
 
 El API ejecuta la migración automáticamente al iniciar. La ejecución explícita de seed-demo.js crea o actualiza las cuentas, la organización mínima y los datos de demostración. La importación puede repetirse: en una segunda ejecución los servicios existentes se actualizan, pero no se duplican.
 
-## 6. URLs y cuentas de evaluación
+## 7. URLs y cuentas de evaluación
 
 Con los contenedores activos:
 
 - Aplicación web: [http://localhost:8080](http://localhost:8080)
 - Documentación Swagger: [http://localhost:8080/api/docs](http://localhost:8080/api/docs)
-- API interna directa: http://localhost:3000/api dentro de Compose; el frontend la consume mediante /api en Nginx.
+- API desde el host: `http://localhost:8080/api`; el servicio NestJS escucha en `3000` únicamente dentro de Compose.
 
 | Rol | Usuario | Contraseña | Permisos |
 |---|---|---|---|
@@ -116,7 +185,7 @@ Con los contenedores activos:
 
 Las credenciales anteriores son datos locales de demostración. Se definen mediante variables de entorno y no representan secretos reales.
 
-## 7. Recorrido recomendado para evaluar la interfaz
+## 8. Recorrido recomendado para evaluar la interfaz
 
 1. Ingresar como admin.demo.
 2. Abrir Resumen y confirmar los indicadores 46, 42, 3 y 12.
@@ -129,7 +198,7 @@ Las credenciales anteriores son datos locales de demostración. Se definen media
 9. Cerrar sesión e ingresar como consulta.demo.
 10. Confirmar que Consulta puede leer servicios, pero no ve las pantallas de mantenimiento ni puede escribir mediante la API.
 
-## 8. Controles de datos importados
+## 9. Controles de datos importados
 
 El resultado esperado del archivo original es:
 
@@ -154,7 +223,7 @@ Reglas importantes:
 
 La explicación completa se encuentra en [docs/RESOLUCION.md](docs/RESOLUCION.md) y en [docs/IMPORTACION.md](docs/IMPORTACION.md).
 
-## 9. Comandos de validación
+## 10. Comandos de validación
 
 ### Verificación local de código
 
@@ -209,7 +278,7 @@ docker compose logs --tail=100 web
 docker compose logs --tail=100 db
 ~~~
 
-## 10. Apagar, reiniciar y reiniciar desde cero
+## 11. Apagar, reiniciar y reiniciar desde cero
 
 Apagar sin borrar los datos:
 
@@ -232,7 +301,7 @@ docker compose up --build -d
 
 El comando down -v es destructivo para los datos locales del proyecto. No forma parte del flujo normal de evaluación.
 
-## 11. Estructura del repositorio
+## 12. Estructura del repositorio
 
 ~~~text
 .
@@ -259,7 +328,7 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 └── docs/evidencias/                  # ciclo Harness + Loop
 ~~~
 
-## 12. Decisiones y limitaciones conocidas
+## 13. Decisiones y limitaciones conocidas
 
 - No se usa Prisma. El proyecto usa pg, SQL parametrizado y una migración SQL explícita.
 - La organización y los responsables son datos creados por seed-demo.js; no se presentan como si provinieran del Excel.
@@ -267,7 +336,7 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 - Existen advertencias moderadas transitorias reportadas por npm audit en dependencias indirectas de Swagger y ExcelJS. No se ejecutó npm audit fix --force, porque propone degradar ExcelJS a una versión incompatible; no hay vulnerabilidades altas en la auditoría usada para la entrega.
 - El proyecto no necesita suscripción, clave de API ni modelo de IA en tiempo de ejecución.
 
-## 13. Documentación adicional
+## 14. Documentación adicional
 
 - [Resolución técnica](docs/RESOLUCION.md)
 - [Guía de evaluación y pruebas](docs/GUIA_EVALUACION.md)
