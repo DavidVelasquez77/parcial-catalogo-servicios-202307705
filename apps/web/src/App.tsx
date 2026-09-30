@@ -1,12 +1,15 @@
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
-import { BarChart3, Building2, ChevronRight, Database, FileSpreadsheet, LayoutDashboard, LogOut, Menu, Plus, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
+import { BarChart3, Building2, CheckCircle2, ChevronRight, Database, Eye, FileSpreadsheet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
 import { api, del, patch, post } from './api';
 import Level1Page from './Level1Page';
 
 type User = { id: number; name: string; username: string; email: string | null; role: 'ADMIN' | 'CONSULTA'; active: boolean; positionId?: number; positionName?: string; sectionName?: string };
 type Service = { id: number; code: string; name: string; status: 'ACTIVE' | 'INACTIVE' | 'REVIEW'; activeCode: string | null; level1Id?: number; level1Code: string; level1Name: string; classId?: number | null; criticalityId?: number | null; typeId?: number | null; classLabel: string | null; criticalityLabel: string | null; typeLabel: string | null; metric?: string | null; description?: string | null; minimum?: number | null; maximum?: number | null; responsibleSectionId?: number | null; responsibleSectionName?: string | null; responsibleUserId?: number | null; responsibleUserName?: string | null; sourceSheet?: string | null; sourceRows?: string | null; sourceTransformations?: string | null };
 type Dashboard = { services: { total: number; active: number; inactive: number; review: number }; level1Count: number; recentImports: ImportRun[] };
-type ImportRun = { id: number; fileName: string; status: string; createdCount: number; updatedCount: number; skippedCount: number; observedCount: number; startedAt: string; finishedAt?: string };
+type ImportRun = { id: number; fileName: string; status: string; createdCount: number; updatedCount: number; skippedCount: number; observedCount: number; startedAt: string; finishedAt?: string; errorMessage?: string | null };
+type ImportValidation = { file: string; sheet: string; headerRow: number; dataStartRow: number; dataEndRow: number; serviceRows: number; continuationRows: number; warnings: { code: string; message: string; rows?: string }[] };
+type ImportSummary = { runId: number; created: number; updated: number; skipped: number; observed: number; level1: number; level2: number; validation: { dataEndRow: number; serviceRows: number; continuationRows: number; warnings: { code: string; message: string; rows?: string }[] } };
+type ImportObservation = { id: number; severity: string; code: string | null; message: string; sourceSheet: string; sourceRows: string; createdAt: string };
 type Option = { id: number; label: string; active: boolean };
 type OrgRow = { id: number; code: string; name: string; active: boolean; companyId?: number; areaId?: number; departmentId?: number; sectionId?: number };
 type Level1 = { id: number; code: string; name: string; active: boolean };
@@ -94,7 +97,80 @@ function CatalogsPage() {
   return <div className="page"><div className="page-heading"><div><p className="eyebrow">CONFIGURACIÓN</p><h1>Catálogos</h1><p className="muted">Valores reutilizables para clasificar servicios.</p></div></div><div className="segmented">{configs.map((x) => <button key={x.id} className={kind === x.id ? 'selected' : ''} onClick={() => setKind(x.id)}>{x.label}</button>)}</div><section className="panel"><form className="inline-form" onSubmit={create}><input placeholder="Nueva etiqueta" value={label} onChange={(e) => setLabel(e.target.value)} required /><button className="primary"><Plus size={16} />Agregar</button></form>{error && <div className="alert error">{error}</div>}<div className="table-wrap"><table><thead><tr><th>Etiqueta</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td><strong>{row.label}</strong></td><td><Badge value={row.active ? 'Activo' : 'Inactivo'} type={row.active ? 'ACTIVE' : 'INACTIVE'} /></td><td><button className="text-button" onClick={() => void toggle(row)}>{row.active ? 'Desactivar' : 'Activar'}</button></td></tr>)}</tbody></table></div></section></div>;
 }
 
-function ImportsPage() { const [runs, setRuns] = useState<ImportRun[]>([]); const [message, setMessage] = useState(''); const [loading, setLoading] = useState(false); async function load() { setRuns(await api<ImportRun[]>('/imports')); } useEffect(() => { void load(); }, []); async function run() { setLoading(true); setMessage(''); try { await post('/imports/run', {}); setMessage('Importación completada correctamente.'); await load(); } catch (err) { setMessage(err instanceof Error ? err.message : 'La importación falló.'); } finally { setLoading(false); } } return <div className="page"><div className="page-heading"><div><p className="eyebrow">CALIDAD DE DATOS</p><h1>Importaciones</h1><p className="muted">Carga repetible y trazable del archivo original.</p></div><button className="primary" onClick={() => void run()} disabled={loading}><FileSpreadsheet size={17} />{loading ? 'Procesando...' : 'Importar Excel'}</button></div>{message && <div className="alert info">{message}</div>}<section className="panel"><div className="table-wrap"><table><thead><tr><th>Archivo</th><th>Estado</th><th>Creado</th><th>Actualizado</th><th>Omitido</th><th>Observado</th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td>{run.fileName}</td><td><Badge value={run.status} type={run.status} /></td><td>{run.createdCount}</td><td>{run.updatedCount}</td><td>{run.skippedCount}</td><td>{run.observedCount}</td></tr>)}</tbody></table>{runs.length === 0 && <div className="empty">No hay ejecuciones registradas.</div>}</div></section></div>; }
+function ImportsPage() {
+  const [runs, setRuns] = useState<ImportRun[]>([]);
+  const [validation, setValidation] = useState<ImportValidation | null>(null);
+  const [lastResult, setLastResult] = useState<ImportSummary | null>(null);
+  const [observations, setObservations] = useState<ImportObservation[]>([]);
+  const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  async function load() {
+    try {
+      setRuns(await api<ImportRun[]>('/imports'));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No fue posible cargar el historial de importaciones.');
+    }
+  }
+
+  useEffect(() => { void load(); }, []);
+
+  async function validate() {
+    setLoading(true);
+    setMessage('');
+    setError('');
+    try {
+      const report = await post<ImportValidation>('/imports/validate', {});
+      setValidation(report);
+      setMessage('Validación completada. El archivo cumple la estructura requerida y todavía no se modificó la base de datos.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'La validación del Excel falló.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function run() {
+    setLoading(true);
+    setMessage('');
+    setError('');
+    try {
+      const report = await post<ImportValidation>('/imports/validate', {});
+      setValidation(report);
+      const result = await post<ImportSummary>('/imports/run', {});
+      setLastResult(result);
+      setMessage(`Importación #${result.runId} completada. El resumen diferencia registros creados, actualizados, omitidos y observados.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'La importación falló.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function showObservations(runId: number) {
+    setSelectedRunId(runId);
+    setError('');
+    try {
+      setObservations(await api<ImportObservation[]>(`/imports/${runId}/observations`));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'No fue posible cargar las observaciones.');
+    }
+  }
+
+  return <div className="page">
+    <div className="page-heading"><div><p className="eyebrow">CALIDAD DE DATOS</p><h1>Importaciones</h1><p className="muted">Valida y sincroniza <code>data/CatalogoServicios.xlsx</code> sin duplicar registros.</p></div><div className="button-row"><button className="secondary" onClick={() => void validate()} disabled={loading}><RefreshCw size={17} />Validar Excel</button><button className="primary" onClick={() => void run()} disabled={loading}><FileSpreadsheet size={17} />{loading ? 'Procesando...' : 'Importar y sincronizar'}</button></div></div>
+    <div className="import-help"><strong>Flujo seguro:</strong> primero se revisan hoja, encabezados, tipos, códigos y umbrales. Solo si la validación es correcta se ejecuta la sincronización; los registros iguales se cuentan como omitidos, los cambios como actualizados y las incidencias como observados.</div>
+    {message && <div className="alert info">{message}</div>}
+    {error && <div className="alert error">{error}</div>}
+    {validation && <section className="panel import-validation"><div className="panel-heading"><div><h2>Validación del archivo</h2><p className="muted">Resultado previo a la escritura en la base de datos.</p></div><Badge value="Válido" type="ACTIVE" /></div><div className="import-facts"><span><strong>{validation.sheet}</strong><small>Hoja</small></span><span><strong>A{validation.headerRow}:L{validation.headerRow}</strong><small>Encabezados</small></span><span><strong>{validation.serviceRows}</strong><small>Servicios detectados</small></span><span><strong>{validation.continuationRows}</strong><small>Continuaciones</small></span><span><strong>{validation.dataStartRow}–{validation.dataEndRow}</strong><small>Filas de datos</small></span></div>{validation.warnings.length > 0 && <div className="warning-list"><strong>Advertencias de estructura</strong>{validation.warnings.map((warning, index) => <p key={`${warning.code}-${index}`}>{warning.message}{warning.rows ? ` Filas: ${warning.rows}.` : ''}</p>)}</div>}</section>}
+    {lastResult && <section className="panel import-summary"><div className="panel-heading"><div><h2>Resumen de la última ejecución</h2><p className="muted">Ejecución #{lastResult.runId}; la operación fue transaccional.</p></div><CheckCircle2 className="success-icon" size={22} /></div><div className="summary-grid"><div><strong>{lastResult.created}</strong><span>Creados</span></div><div><strong>{lastResult.updated}</strong><span>Actualizados</span></div><div><strong>{lastResult.skipped}</strong><span>Omitidos</span></div><div><strong>{lastResult.observed}</strong><span>Observados</span></div><div><strong>{lastResult.level1}</strong><span>Niveles 1</span></div><div><strong>{lastResult.level2}</strong><span>Niveles 2</span></div></div></section>}
+    <section className="panel"><div className="panel-heading"><div><h2>Historial de importaciones</h2><p className="muted">Cada ejecución conserva sus contadores y observaciones para auditoría.</p></div></div><div className="table-wrap"><table><thead><tr><th>Archivo</th><th>Estado</th><th>Creado</th><th>Actualizado</th><th>Omitido</th><th>Observado</th><th>Detalle</th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td>{run.fileName}</td><td><Badge value={run.status} type={run.status} /></td><td>{run.createdCount}</td><td>{run.updatedCount}</td><td>{run.skippedCount}</td><td>{run.observedCount}</td><td><button className="text-button" onClick={() => void showObservations(run.id)}><Eye size={15} />Ver observaciones</button></td></tr>)}</tbody></table>{runs.length === 0 && <div className="empty">No hay ejecuciones registradas.</div>}</div></section>
+    {selectedRunId !== null && <section className="panel observations-panel"><div className="panel-heading"><div><h2>Observaciones de la ejecución #{selectedRunId}</h2><p className="muted">Incidencias, transformaciones y filas que requieren trazabilidad.</p></div><button className="secondary" onClick={() => setSelectedRunId(null)}>Cerrar</button></div>{observations.length === 0 ? <div className="empty">Esta ejecución no tiene observaciones registradas.</div> : <div className="observation-list">{observations.map((observation) => <article key={observation.id}><div><Badge value={observation.severity} type={observation.severity} /><strong>{observation.code ?? 'GENERAL'}</strong></div><p>{observation.message}</p><small>{observation.sourceSheet} · filas {observation.sourceRows}</small></article>)}</div>}</section>}
+  </div>;
+}
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null); const [checking, setChecking] = useState(true); const [page, setPage] = useState('dashboard');

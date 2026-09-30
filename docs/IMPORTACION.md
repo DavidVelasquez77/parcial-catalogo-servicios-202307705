@@ -216,6 +216,17 @@ Ese resultado es histórico: aquella versión actualizaba todos los servicios ex
 
 Por tanto, si el Excel cambia, solo se actualizan los códigos modificados; si no cambia, se ignoran los 51 servicios; y si aparecen códigos nuevos, se crean. Los controles level1, level2 y duplicates son los invariantes importantes.
 
+## Importar desde la aplicación
+
+El importador también está disponible para un administrador en la pantalla **Importaciones** de `http://localhost:8080`:
+
+1. **Validar Excel** ejecuta `POST /api/imports/validate` y muestra hoja, encabezados, filas de datos, servicios detectados, continuaciones y advertencias. Esta operación es de solo lectura.
+2. **Importar y sincronizar** valida de nuevo y ejecuta `POST /api/imports/run` únicamente si el archivo cumple el contrato.
+3. El panel **Resumen de la última ejecución** muestra `created`, `updated`, `skipped`, `observed`, `level1` y `level2`.
+4. Cada registro del historial ofrece **Ver observaciones**, que consulta `GET /api/imports/:id/observations` y muestra severidad, código, mensaje, hoja y filas de origen.
+
+La pantalla está disponible solo para `ADMIN`. El rol `CONSULTA` no recibe el menú ni autorización para listar, validar o ejecutar importaciones; la protección se aplica también en el controlador del servidor.
+
 ## Trazabilidad
 
 La trazabilidad responde cuatro preguntas:

@@ -10,13 +10,13 @@ Este repositorio corresponde al parcial práctico de Software Avanzado, carné 2
 |---|---|
 | Repositorio | [DavidVelasquez77/parcial-catalogo-servicios-202307705](https://github.com/DavidVelasquez77/parcial-catalogo-servicios-202307705) |
 | Rama | main |
-| Commit de entrega | aa1bae7 |
+| Commit de entrega | HEAD de `main`, señalado por `parcial-v2.0` |
 | Etiqueta | parcial-v2.0 |
 | Integrante | 202307705 |
 | Colaborador solicitado | maldanap-usac |
 | Archivo de entrada | data/CatalogoServicios.xlsx |
 
-La etiqueta parcial-v2.0 apunta al commit entregado. El archivo Excel incluido es el original y no se modifica durante la importación.
+La etiqueta `parcial-v2.0` apunta al commit entregado. El archivo de entrada actual conserva los registros base del parcial y agrega los servicios de ejemplo documentados; la importación no modifica el Excel, solo sincroniza la base de datos.
 
 ## 2. Qué resuelve la aplicación
 
@@ -172,6 +172,19 @@ La salida esperada de la verificación para el archivo ampliado actual es equiva
 ~~~
 
 El API ejecuta la migración automáticamente al iniciar. La ejecución explícita de seed-demo.js crea o actualiza las cuentas, la organización mínima y los datos de demostración. La validación se ejecuta antes de importar. La importación puede repetirse: los servicios modificados se actualizan, los idénticos se ignoran y los nuevos se agregan, sin duplicar códigos.
+
+### Importar desde la aplicación
+
+También se puede ejecutar el importador desde la interfaz web, sin entrar al contenedor:
+
+1. Iniciar sesión con `admin.demo`.
+2. Abrir **Importaciones** en el menú lateral.
+3. Pulsar **Validar Excel** para revisar hoja, encabezados, tipos, códigos, umbrales y filas detectadas. Esta acción no modifica la base de datos.
+4. Pulsar **Importar y sincronizar**. La aplicación valida nuevamente antes de abrir la transacción.
+5. Revisar el resumen de la última ejecución: **Creados**, **Actualizados**, **Omitidos**, **Observados**, niveles 1 y niveles 2.
+6. Usar **Ver observaciones** en cualquier ejecución para consultar el código, mensaje, hoja y filas de origen.
+
+El usuario `consulta.demo` no ve ni puede ejecutar el mantenimiento de importaciones. La autorización también se comprueba en el servidor.
 
 ## 7. URLs y cuentas de evaluación
 

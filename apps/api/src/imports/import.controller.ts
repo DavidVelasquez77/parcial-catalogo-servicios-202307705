@@ -8,8 +8,8 @@ import { ImportService } from './import.service';
 @UseGuards(AuthGuard, RolesGuard)
 export class ImportController {
   constructor(private readonly service: ImportService) {}
-  @Get() list() { return this.service.listRuns(); }
-  @Get(':id/observations') observations(@Param('id', ParseIntPipe) id: number) { return this.service.observations(id); }
+  @Get() @Roles('ADMIN') list() { return this.service.listRuns(); }
+  @Get(':id/observations') @Roles('ADMIN') observations(@Param('id', ParseIntPipe) id: number) { return this.service.observations(id); }
   @Post('validate') @Roles('ADMIN') validate() { return this.service.validateFile(); }
   @Post('run') @Roles('ADMIN') run() { return this.service.run(); }
 }

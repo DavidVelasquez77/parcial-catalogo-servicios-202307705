@@ -29,10 +29,21 @@ Ingresar como administrador y abrir Resumen.
 Verificar:
 
 - Servicios de nivel 2: 51 en el archivo ampliado actual.
-- Servicios activos: 42.
+- Servicios activos: 47.
 - En revisión: 3.
 - Nivel 1: 17 en el archivo ampliado actual.
 - Historial de importaciones visible.
+
+### 1.1 Importación desde la interfaz
+
+En el menú **Importaciones**, el administrador puede:
+
+1. Pulsar **Validar Excel** y comprobar la hoja, encabezados, filas y cantidad de servicios detectados.
+2. Pulsar **Importar y sincronizar** para ejecutar la carga repetible.
+3. Revisar el resumen con los contadores **Creados**, **Actualizados**, **Omitidos** y **Observados**.
+4. Abrir **Ver observaciones** para consultar las incidencias con su código, mensaje, hoja y filas de origen.
+
+La ejecución desde la interfaz usa el mismo servicio transaccional que `import-catalog.js`; no existe una lógica paralela que pueda producir resultados distintos.
 
 ### 2. Servicios
 
