@@ -1,0 +1,19 @@
+{
+  "name": "catalogo-servicios-ti",
+  "private": true,
+  "version": "2.0.0",
+  "workspaces": ["apps/api", "apps/web"],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "build": "npm run build --workspace apps/api && npm run build --workspace apps/web",
+    "test": "npm run test --workspace apps/api",
+    "lint": "npm run lint --workspace apps/api && npm run lint --workspace apps/web",
+    "typecheck": "npm run typecheck --workspace apps/api && npm run typecheck --workspace apps/web",
+    "db:migrate": "npm run db:migrate --workspace apps/api",
+    "db:seed": "npm run db:seed --workspace apps/api",
+    "import:catalog": "npm run import:catalog --workspace apps/api",
+    "verify:import": "npm run verify:import --workspace apps/api",
+    "audit:secrets": "node scripts/audit-secrets.mjs",
+    "harness": "node scripts/harness.mjs"
+  }
+}

@@ -1,0 +1,50 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-catalogo}
+      POSTGRES_USER: ${POSTGRES_USER:-catalogo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-catalogo_demo_change_me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:-postgres://catalogo:catalogo_demo_change_me@db:5432/catalogo}
+      API_PORT: 3000
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
+      SESSION_SECRET: ${SESSION_SECRET:-change_this_local_demo_secret}
+      IMPORT_FILE: /app/data/CatalogoServicios.xlsx
+      DEMO_ADMIN_USERNAME: ${DEMO_ADMIN_USERNAME:-admin.demo}
+      DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-Admin123!}
+      DEMO_QUERY_USERNAME: ${DEMO_QUERY_USERNAME:-consulta.demo}
+      DEMO_QUERY_PASSWORD: ${DEMO_QUERY_PASSWORD:-Consulta123!}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "node apps/api/dist/scripts/migrate.js && node apps/api/dist/main.js"]
+    volumes:
+      - ./CatalogoServicios.xlsx:/app/data/CatalogoServicios.xlsx:ro
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+volumes:
+  postgres_data:
