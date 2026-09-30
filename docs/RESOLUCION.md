@@ -435,9 +435,9 @@ docker compose up -d web
 | Docker | API, web y db en ejecución |
 | Migración | Aplicada automáticamente |
 | Seed | Cuentas y organización demo creadas |
-| Importación | 12 nivel 1, 46 nivel 2, 0 duplicados |
-| Reimportación sin cambios | 0 actualizados, 46 omitidos por igualdad, sin duplicados |
-| Validación del Excel | Hoja, encabezados A4:L4, 46 servicios y 51 filas de continuación aceptados |
+| Importación | 17 nivel 1, 51 nivel 2, 0 duplicados; la línea base original era 12/46 |
+| Reimportación sin cambios | 0 actualizados, 51 omitidos por igualdad, sin duplicados |
+| Validación del Excel | Hoja, encabezados A4:L4, 51 servicios y 51 filas de continuación aceptados |
 | Revisión | 3 servicios en REVIEW |
 | Login inválido | HTTP 401 |
 | Login válido | HTTP 201 |
@@ -467,7 +467,7 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | Servicios | ServicesService | búsqueda, ficha, filtros, paginación y CRUD | services/ |
 | Servicios nivel 1 | ServicesService y Level1Page | creación, edición y baja lógica ADMIN | services/, Level1Page.tsx |
 | Umbrales | CHECK SQL y validación API | mínimo mayor que máximo rechazado | migration, services.service.ts |
-| Importación | ImportService con exceljs | conteos 12/46/0 | import-catalog.js, verify-import.js |
+| Importación | ImportService con exceljs | conteos 17/51/0 en el archivo ampliado | import-catalog.js, verify-import.js |
 | SE.12 | regla canónica y observaciones | tres servicios REVIEW | docs/IMPORTACION.md |
 | Persistencia | volumen postgres_data | reinicio sin pérdida | compose.yaml |
 | Docker | Dockerfiles y Compose | build y ps | compose.yaml |

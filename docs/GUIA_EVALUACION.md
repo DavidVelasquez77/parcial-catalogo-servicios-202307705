@@ -28,10 +28,10 @@ Ingresar como administrador y abrir Resumen.
 
 Verificar:
 
-- Servicios de nivel 2: 46.
+- Servicios de nivel 2: 51 en el archivo ampliado actual.
 - Servicios activos: 42.
 - En revisión: 3.
-- Nivel 1: 12.
+- Nivel 1: 17 en el archivo ampliado actual.
 - Historial de importaciones visible.
 
 ### 2. Servicios
@@ -81,13 +81,13 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 | P03 | Consulta modifica | Ingresar como consulta e intentar crear servicio | 403 en servidor | acceptance.js + smoke.js |
 | P04 | Crear jerarquía y usuario | ADMIN crea empresa, área, departamento, sección, puesto y usuario temporal | Relaciones visibles y recuperables; limpieza lógica | acceptance.js |
 | P05 | Código o referencia inválida | Crear registro duplicado o usar padre inexistente | HTTP 409/400 y no se crea información inválida | acceptance.js |
-| P06 | Importar Excel | Ejecutar validate-import.js, import-catalog.js y verify-import.js | Archivo aceptado; 12, 46, 0 y observaciones | acceptance.js + validate-import.js + verify-import.js |
+| P06 | Importar Excel | Ejecutar validate-import.js, import-catalog.js y verify-import.js | Archivo aceptado; 17, 51, 0 y observaciones | acceptance.js + validate-import.js + verify-import.js |
 | P07 | Repetir importación | Ejecutar importador dos veces y revisar el resumen | No aparecen duplicados; los cambios suben updated y los datos idénticos quedan skipped | acceptance.js + import_runs |
 | P08 | SE.12 y ausencias | Filtrar SE.12 y abrir fichas | 3 registros REVIEW y valores desconocidos | acceptance.js + interfaz |
 | P09 | Mínimo mayor que máximo | Crear o editar con minimum 10 y maximum 5 | API rechaza la operación con HTTP 400 | acceptance.js |
 | P10 | Búsqueda y filtros | Buscar SE.12 y seleccionar REVIEW | Resultado de tres servicios | acceptance.js + smoke.js |
 | P11 | Responsable incorrecto | Seleccionar usuario que no pertenece a la sección | API rechaza la asignación | acceptance.js |
-| P12 | Persistencia | Reiniciar PostgreSQL y volver a levantar API | Datos se conservan: 12/46/0/3 | persistence-check.mjs |
+| P12 | Persistencia | Reiniciar PostgreSQL y volver a levantar API | Datos se conservan: 17/51/0/3 | persistence-check.mjs |
 
 ## Pruebas automatizadas disponibles
 
@@ -146,7 +146,7 @@ docker compose exec api node apps/api/dist/scripts/verify-import.js
 Salida esperada:
 
 ~~~json
-{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
+{"ok":true,"level1":17,"level2":51,"duplicates":0,"review":3,"expected":{"level1":17,"level2":51,"review":3}}
 ~~~
 
 ## Validaciones negativas recomendadas
@@ -216,7 +216,7 @@ La revisión visual debe comprobar:
 La solución está lista para evaluación cuando:
 
 - los tres servicios de Compose están activos;
-- verify-import devuelve 12, 46, 0 y 3;
+- verify-import devuelve 17, 51, 0 y 3 con el archivo ampliado actual;
 - smoke termina con ok true;
 - ambos roles pueden iniciar sesión;
 - ADMIN puede mantener datos;

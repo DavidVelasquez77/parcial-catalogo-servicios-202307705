@@ -118,7 +118,7 @@ La base del proyecto se considera correcta cuando:
 3. el seed crea o actualiza datos demo sin duplicarlos;
 4. existe autenticación y el rol Consulta no puede escribir;
 5. el Excel puede validarse e importarse;
-6. se conservan 12 niveles 1, 46 niveles 2, 0 duplicados y 3 servicios en `REVIEW`;
+6. se conservan 17 niveles 1, 51 niveles 2, 0 duplicados y 3 servicios en `REVIEW`; la línea base original era 12/46;
 7. la base conserva los datos después de reiniciar los servicios;
 8. cada resultado está respaldado por un comando o prueba.
 

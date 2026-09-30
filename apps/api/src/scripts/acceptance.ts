@@ -70,18 +70,19 @@ async function main() {
 
   const validation = await request('/imports/validate', { method: 'POST' }, adminCookie);
   await expectStatus(validation, 201, 'P06 validación del Excel');
-  if (validation.body.serviceRows !== 46 || validation.body.sheet !== 'Servicios Externos') throw new Error('P06: la validación no reconoció el bloque esperado del Excel.');
+  const expectedLevel2 = Number(process.env.EXPECTED_LEVEL2_COUNT ?? 46);
+  if (validation.body.serviceRows !== expectedLevel2 || validation.body.sheet !== 'Servicios Externos') throw new Error(`P06: la validación no reconoció el bloque esperado del Excel (${expectedLevel2} servicios).`);
   const firstImport = await request('/imports/run', { method: 'POST' }, adminCookie);
   await expectStatus(firstImport, 201, 'P06 importación');
   const firstServices = await request('/services?pageSize=100', {}, adminCookie);
   await expectStatus(firstServices, 200, 'P06 catálogo');
-  if (firstServices.body.total !== 46) throw new Error('P06: esperaba 46 servicios y recibió ' + firstServices.body.total + '.');
+  if (firstServices.body.total !== expectedLevel2) throw new Error(`P06: esperaba ${expectedLevel2} servicios y recibió ${firstServices.body.total}.`);
   const secondImport = await request('/imports/run', { method: 'POST' }, adminCookie);
   await expectStatus(secondImport, 201, 'P07 reimportación');
   const secondServices = await request('/services?pageSize=100', {}, adminCookie);
   await expectStatus(secondServices, 200, 'P07 catálogo');
   const codes = secondServices.body.data.map((item: { code: string }) => item.code);
-  if (secondServices.body.total !== 46 || new Set(codes).size !== 46) throw new Error('P07: la reimportación alteró el conteo o creó duplicados.');
+  if (secondServices.body.total !== expectedLevel2 || new Set(codes).size !== expectedLevel2) throw new Error(`P07: la reimportación alteró el conteo esperado de ${expectedLevel2} o creó duplicados.`);
   checks.push('P06', 'P07');
 
   const review = await request('/services?search=SE.12&status=REVIEW&pageSize=100', {}, adminCookie);

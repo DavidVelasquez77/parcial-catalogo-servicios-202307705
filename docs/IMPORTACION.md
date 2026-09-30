@@ -4,7 +4,7 @@
 
 Este documento explica cómo se transforma data/CatalogoServicios.xlsx en registros de PostgreSQL, qué decisiones se toman ante información ambigua, cómo se valida un Excel nuevo y cómo se verifica que la sincronización sea repetible.
 
-El archivo original se conserva en data/CatalogoServicios.xlsx y se monta en el contenedor API como solo lectura.
+El archivo de entrada se conserva en `data/CatalogoServicios.xlsx` y se monta en el contenedor API como solo lectura. Actualmente contiene la línea base del parcial más cinco niveles 1 y cinco servicios nivel 2 adicionales.
 
 ## Archivo de entrada
 
@@ -12,9 +12,11 @@ El archivo original se conserva en data/CatalogoServicios.xlsx y se monta en el 
 - Archivo del repositorio: data/CatalogoServicios.xlsx
 - Hoja procesada: Servicios Externos
 - Encabezados: A4:L4
-- Bloque principal: filas 5 a 101
+- Bloque principal del archivo ampliado actual: filas 5 a 106
 - Listas de referencia: E112:H122
-- Resultado esperado: 12 códigos de nivel 1 y 46 códigos de nivel 2
+- Resultado esperado actual: 17 códigos de nivel 1 y 51 códigos de nivel 2
+
+El archivo inicial del parcial tenía 12 niveles 1 y 46 niveles 2. El archivo actual conserva esos registros y agrega `SE.13` a `SE.17`, cada uno con un servicio nivel 2.
 
 Las listas de referencia no se importan como servicios. Se usan para conocer las opciones válidas de clase, criticidad y tipo.
 
@@ -178,13 +180,13 @@ docker compose exec api node apps/api/dist/scripts/verify-import.js
 Resultado esperado de validate-import.js:
 
 ~~~json
-{"ok":true,"file":"/app/data/CatalogoServicios.xlsx","sheet":"Servicios Externos","dataStartRow":5,"dataEndRow":101,"serviceRows":46,"continuationRows":51,"warnings":[]}
+{"ok":true,"file":"/app/data/CatalogoServicios.xlsx","sheet":"Servicios Externos","dataStartRow":5,"dataEndRow":106,"serviceRows":51,"continuationRows":51,"warnings":[]}
 ~~~
 
 Resultado esperado de verify-import.js:
 
 ~~~json
-{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
+{"ok":true,"level1":17,"level2":51,"duplicates":0,"review":3,"expected":{"level1":17,"level2":51,"review":3}}
 ~~~
 
 ## Qué significa cada contador
@@ -212,7 +214,7 @@ Ese resultado es histórico: aquella versión actualizaba todos los servicios ex
 {"runId":24,"created":0,"updated":0,"skipped":46,"observed":5,"level1":12,"level2":46,"validation":{"serviceRows":46,"continuationRows":51,"warnings":[]}}
 ~~~
 
-Por tanto, si el Excel cambia, solo se actualizan los códigos modificados; si no cambia, se ignoran los 46 servicios; y si aparecen códigos nuevos, se crean. Los controles level1, level2 y duplicates son los invariantes importantes.
+Por tanto, si el Excel cambia, solo se actualizan los códigos modificados; si no cambia, se ignoran los 51 servicios; y si aparecen códigos nuevos, se crean. Los controles level1, level2 y duplicates son los invariantes importantes.
 
 ## Trazabilidad
 

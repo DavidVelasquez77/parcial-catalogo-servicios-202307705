@@ -106,7 +106,8 @@ docker compose up -d
 | Login | `http://localhost:8080/` |
 | Swagger | [http://localhost:8080/api/docs](http://localhost:8080/api/docs) |
 | API desde el navegador | `http://localhost:8080/api/...` |
-| Archivo original | `data/CatalogoServicios.xlsx` |
+| Archivo de entrada | `data/CatalogoServicios.xlsx` |
+| Archivo actual | Catálogo ampliado con 5 niveles 1 y 5 servicios nivel 2 adicionales |
 
 La interfaz es una SPA: sus pantallas se navegan desde `/` usando el menú lateral. Las rutas principales de la API son:
 
@@ -164,10 +165,10 @@ docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
 
-La salida esperada de la verificación es equivalente a:
+La salida esperada de la verificación para el archivo ampliado actual es equivalente a:
 
 ~~~json
-{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
+{"ok":true,"level1":17,"level2":51,"duplicates":0,"review":3,"expected":{"level1":17,"level2":51,"review":3}}
 ~~~
 
 El API ejecuta la migración automáticamente al iniciar. La ejecución explícita de seed-demo.js crea o actualiza las cuentas, la organización mínima y los datos de demostración. La validación se ejecuta antes de importar. La importación puede repetirse: los servicios modificados se actualizan, los idénticos se ignoran y los nuevos se agregan, sin duplicar códigos.
@@ -190,7 +191,7 @@ Las credenciales anteriores son datos locales de demostración. Se definen media
 ## 8. Recorrido recomendado para evaluar la interfaz
 
 1. Ingresar como admin.demo.
-2. Abrir Resumen y confirmar los indicadores 46, 42, 3 y 12.
+2. Abrir Resumen y confirmar los indicadores 51 servicios, 47 activos, 3 en revisión y 17 familias.
 3. Abrir Servicios, buscar SE.12 y comprobar los tres registros en revisión.
 4. Abrir una fila para revisar código, nivel 1, clase, criticidad, tipo, métrica, umbrales, sección, responsable y descripción.
 5. Abrir Organización y revisar las cinco entidades de la jerarquía.
@@ -202,12 +203,12 @@ Las credenciales anteriores son datos locales de demostración. Se definen media
 
 ## 9. Controles de datos importados
 
-El resultado esperado del archivo original es:
+El archivo de referencia inicial tenía 12 niveles 1 y 46 servicios. El archivo actual conserva esos datos y agrega 5 niveles 1 y 5 servicios, por lo que el resultado esperado actual es:
 
 | Control | Resultado |
 |---|---:|
-| Códigos distintos de nivel 1 | 12 |
-| Códigos explícitos de nivel 2 | 46 |
+| Códigos distintos de nivel 1 | 17 |
+| Códigos explícitos de nivel 2 | 51 |
 | Duplicados de nivel 2 | 0 |
 | Servicios con datos incompletos | 3 |
 | Código especial | SE.12.1, SE.12.2, SE.12.3 |
@@ -215,7 +216,7 @@ El resultado esperado del archivo original es:
 Reglas importantes:
 
 - Se procesa la hoja Servicios Externos.
-- Los encabezados están en A4:L4 y los datos se revisan entre las filas 5 y 101.
+- Los encabezados están en A4:L4 y los datos se revisan entre las filas 5 y 106; las listas de opciones siguen en E112:H122.
 - Las celdas combinadas se resuelven usando el valor de su celda principal.
 - Una fila sin código de nivel 2 no crea un servicio.
 - SE.12 conserva como nombre canónico Suministrar Analitica, tomado de la primera ocurrencia; las diferencias se registran como observaciones.

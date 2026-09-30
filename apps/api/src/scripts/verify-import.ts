@@ -10,8 +10,11 @@ async function main() {
       (SELECT COUNT(*) - COUNT(DISTINCT code) FROM service_level_2)::INTEGER AS duplicates,
       (SELECT COUNT(*) FROM service_level_2 WHERE status='REVIEW')::INTEGER AS review`);
     const result = counts.rows[0];
-    const ok = result.level1 === 12 && result.level2 === 46 && result.duplicates === 0;
-    console.log(JSON.stringify({ ok, ...result }));
+    const expectedLevel1 = Number(process.env.EXPECTED_LEVEL1_COUNT ?? 12);
+    const expectedLevel2 = Number(process.env.EXPECTED_LEVEL2_COUNT ?? 46);
+    const expectedReview = Number(process.env.EXPECTED_REVIEW_COUNT ?? 3);
+    const ok = result.level1 === expectedLevel1 && result.level2 === expectedLevel2 && result.duplicates === 0 && result.review === expectedReview;
+    console.log(JSON.stringify({ ok, ...result, expected: { level1: expectedLevel1, level2: expectedLevel2, review: expectedReview } }));
     if (!ok) process.exitCode = 1;
   } finally {
     await pool.end();

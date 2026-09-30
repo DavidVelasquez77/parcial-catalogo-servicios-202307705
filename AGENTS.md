@@ -61,7 +61,7 @@ No agregar tickets, facturación ni consumo de servicios sin una solicitud expl�
 ## 6. Reglas de importación
 
 - Procesar la hoja Servicios Externos.
-- Revisar encabezados A4:L4 y datos principales entre filas 5 y 101.
+- Revisar encabezados A4:L4 y detectar dinámicamente el bloque de datos, que actualmente llega a la fila 106.
 - Resolver una celda combinada desde su celda principal.
 - Crear servicio nivel 2 solo cuando exista COD.N2.
 - Crear un solo nivel 1 por código.
@@ -69,7 +69,7 @@ No agregar tickets, facturación ni consumo de servicios sin una solicitud expl�
 - Conservar SE.12.1, SE.12.2 y SE.12.3 como texto.
 - Guardar valores vacíos como NULL.
 - Dejar datos incompletos en REVIEW.
-- Verificar 12 niveles 1, 46 niveles 2 y 0 duplicados.
+- Verificar 17 niveles 1, 51 niveles 2 y 0 duplicados en el archivo ampliado actual; la línea base original era 12/46.
 - Registrar created, updated, skipped y observed.
 
 ## 7. Comandos de operación
@@ -109,7 +109,7 @@ No ejecutar docker compose down -v salvo que el usuario solicite reiniciar de fo
 
 - Docker inicia db, api y web.
 - PostgreSQL queda healthy.
-- verify-import devuelve 12, 46, 0 y 3.
+- verify-import devuelve 17, 51, 0 y 3 para el archivo ampliado actual.
 - Login inválido devuelve 401.
 - Login válido funciona para ambas cuentas demo.
 - CONSULTA lee y recibe 403 al intentar escribir.
@@ -118,7 +118,7 @@ No ejecutar docker compose down -v salvo que el usuario solicite reiniciar de fo
 - responsable pertenece a la sección elegida.
 - reiniciar db y api conserva los datos.
 - `npm test` termina con P01–P11 en `ok: true`.
-- `npm run persistence:check` conserva 12 niveles 1, 46 niveles 2, 0 duplicados y 3 servicios REVIEW.
+- `npm run persistence:check` conserva 17 niveles 1, 51 niveles 2, 0 duplicados y 3 servicios REVIEW.
 - documentación describe comandos y resultados reales.
 - la validación del Excel termina antes de modificar datos cuando la estructura no es válida.
 - una reimportación distingue registros nuevos, modificados y sin cambios.
