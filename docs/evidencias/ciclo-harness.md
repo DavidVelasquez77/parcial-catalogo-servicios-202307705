@@ -1,26 +1,171 @@
-# Evidencia de ciclo Harness + Loop
+# Evidencia del ciclo Harness + Loop
 
-## Ciclo real ejecutado
+## 1. Qué se considera harness en este proyecto
 
-1. Plan: levantar PostgreSQL, API y frontend mediante Compose.
-2. Act: ejecutar `docker compose up -d`.
-3. Observe: el API falló inicialmente porque el runner buscaba migraciones en `/app/apps/database/migrations`.
-4. Evaluate: los logs mostraron `ENOENT` y el contenedor API no inició.
-5. Correct: se corrigió la ruta a `/app/database/migrations`.
-6. Re-evaluate: la migración `001_init.sql` se aplicó y Nest inició correctamente.
-7. Success: seed, importación y verificación devolvieron 12 niveles 1, 46 niveles 2 y 0 duplicados.
+El harness no es únicamente Docker. Es el conjunto coordinado de:
 
-## Controles
+- instrucciones operativas en AGENTS.md;
+- código de la aplicación;
+- archivo Excel controlado;
+- Dockerfiles y compose.yaml;
+- migración SQL;
+- scripts de seed, importación, verificación y smoke;
+- auditoría de secretos;
+- comandos de logs y recuperación;
+- códigos de salida;
+- documentación de los resultados.
 
-```text
+Con estas piezas otra persona puede levantar el entorno, cargar datos, ejecutar controles, observar fallos y repetir la validación.
+
+## 2. Comando principal
+
+~~~powershell
+$env:HARNESS_RUN_SMOKE='1'
+npm run harness
+~~~
+
+En Linux o macOS:
+
+~~~bash
+HARNESS_RUN_SMOKE=1 npm run harness
+~~~
+
+## 3. Controles que ejecuta harness.mjs
+
+| Orden | Control | Qué verifica | Falla si |
+|---:|---|---|---|
+| 1 | typecheck | API y frontend compilan en TypeScript | existen errores de tipos |
+| 2 | build | NestJS y Vite generan artefactos | falla el build |
+| 3 | secret-audit | no hay secretos obvios en fuentes o documentación | encuentra patrones prohibidos |
+| 4 | compose-config | Compose es sintácticamente válido | Docker no puede resolver la configuración |
+| 5 | smoke opcional | autenticación, filtros, permisos y logout | un estado HTTP no coincide |
+
+Cada control hereda el código de salida del proceso. Un control fallido detiene el harness y reporta el paso responsable.
+
+## 4. Datos de evaluación
+
+Las cuentas y la organización mínima se crean con:
+
+~~~bash
+docker compose exec api node apps/api/dist/scripts/seed-demo.js
+~~~
+
+La salida esperada incluye:
+
+~~~json
+{"ok":true,"companyId":1,"areaId":1,"departmentId":1,"sectionId":1,"demoUsers":["admin.demo","consulta.demo"]}
+~~~
+
+El seed es repetible: actualiza los registros demo sin crear otra cuenta demo en cada ejecución.
+
+## 5. Ciclo ejecutado y fallo real corregido
+
+### Plan
+
+Levantar PostgreSQL, API y frontend mediante Compose. Luego ejecutar migración, seed, importación, verificación y smoke.
+
+### Act
+
+Se ejecutó:
+
+~~~text
 docker compose build
+docker compose up -d
+~~~
+
+### Observe
+
+El API no inició porque el script de migración buscaba los archivos en una ruta inexistente dentro del contenedor. El log mostró un error de archivo no encontrado para:
+
+~~~text
+/app/apps/database/migrations
+~~~
+
+### Evaluate
+
+Se comparó el error con apps/api/Dockerfile. El Dockerfile copia la carpeta database en:
+
+~~~text
+/app/database
+~~~
+
+Por tanto, la ruta usada por el script no coincidía con la ruta real del contenedor.
+
+### Correct
+
+Se corrigió el script de migración para resolver:
+
+~~~text
+/app/database/migrations
+~~~
+
+Luego se reconstruyó la imagen API.
+
+### Re-evaluate
+
+Se repitieron:
+
+~~~text
 docker compose up -d
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
+docker compose exec api node apps/api/dist/scripts/smoke.js
+~~~
+
+Resultado:
+
+~~~json
+{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
+{"ok":true,"checks":["P01","P02","P03","P10"]}
+~~~
+
+### Success
+
+El API inició, la migración se aplicó, la importación conservó 12 niveles 1 y 46 niveles 2, no hubo duplicados y los controles de autenticación finalizaron correctamente.
+
+## 6. Segunda observación corregida
+
+Durante la implementación del importador se observó que la librería inicialmente utilizada tenía una vulnerabilidad de severidad alta y además no era la mejor opción para inspeccionar celdas combinadas en este entorno.
+
+La decisión fue:
+
+1. retirar la dependencia inicial;
+2. usar exceljs;
+3. leer workbook, worksheet y valores de la celda master;
+4. reconstruir la imagen Docker;
+5. repetir importación, verify-import y smoke.
+
+La ejecución final con exceljs produjo:
+
+~~~json
+{"runId":3,"created":0,"updated":46,"skipped":49,"observed":5,"level1":12,"level2":46}
+~~~
+
+## 7. Persistencia
+
+Para verificar que el harness no depende de una base efímera:
+
+~~~bash
 docker compose restart db api
 docker compose up -d web
 docker compose exec api node apps/api/dist/scripts/verify-import.js
-```
+~~~
 
-La ejecución no eliminó el volumen de PostgreSQL.
+El resultado conservó:
+
+~~~json
+{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
+~~~
+
+No se ejecutó docker compose down -v durante esta comprobación.
+
+## 8. Límites de seguridad del harness
+
+- No publica archivos .env.
+- No lee ni modifica el Excel original.
+- No ejecuta comandos recibidos desde las celdas del Excel.
+- No elimina volúmenes automáticamente.
+- No exige una clave de proveedor de IA.
+- Usa únicamente datos demo controlados.
+- Detiene el proceso cuando una validación falla.

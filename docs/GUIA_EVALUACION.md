@@ -1,0 +1,200 @@
+# Guía de evaluación y pruebas
+
+## Objetivo
+
+Esta guía permite evaluar la solución desde cero y relacionar cada escenario del enunciado con un comando, una acción de interfaz y un resultado esperado.
+
+## Preparación
+
+~~~bash
+docker compose up --build -d
+docker compose exec api node apps/api/dist/scripts/seed-demo.js
+docker compose exec api node apps/api/dist/scripts/import-catalog.js
+docker compose exec api node apps/api/dist/scripts/verify-import.js
+~~~
+
+Abrir http://localhost:8080.
+
+## Cuentas
+
+- Administrador: admin.demo / Admin123!
+- Consulta: consulta.demo / Consulta123!
+
+## Recorrido funcional
+
+### 1. Resumen
+
+Ingresar como administrador y abrir Resumen.
+
+Verificar:
+
+- Servicios de nivel 2: 46.
+- Servicios activos: 42.
+- En revisión: 3.
+- Nivel 1: 12.
+- Historial de importaciones visible.
+
+### 2. Servicios
+
+Abrir Servicios.
+
+Verificar:
+
+- la tabla muestra código, nombre, nivel 1, criticidad, tipo y estado;
+- la búsqueda por SE.12 encuentra los tres servicios especiales;
+- el filtro En revisión muestra los tres;
+- al seleccionar una fila se abre la ficha;
+- la ficha muestra clasificación, medición, responsabilidad y descripción;
+- ADMIN ve Nuevo servicio y las acciones de edición;
+- CONSULTA solo puede leer.
+
+### 3. Organización
+
+Revisar las pestañas:
+
+1. Empresas.
+2. Áreas.
+3. Departamentos.
+4. Secciones.
+5. Puestos.
+
+ADMIN puede crear, editar y desactivar. CONSULTA puede consultar sin botones de escritura.
+
+### 4. Usuarios
+
+ADMIN puede crear y editar usuarios, cambiar rol y activar o desactivar cuentas. Cada usuario debe tener puesto.
+
+### 5. Catálogos
+
+ADMIN puede agregar una etiqueta y cambiar su estado en:
+
+- Clases.
+- Criticidades.
+- Tipos.
+
+## Matriz P01–P12
+
+| ID | Escenario | Procedimiento | Resultado esperado | Evidencia |
+|---|---|---|---|---|
+| P01 | Login válido e inválido | Intentar contraseña incorrecta y luego credencial demo | 401 en el primer caso y acceso en el segundo | smoke.js |
+| P02 | Sin sesión y logout | Abrir ruta sin cookie; cerrar sesión; consultar /auth/me | 401 sin sesión y después de logout | smoke.js |
+| P03 | Consulta modifica | Ingresar como consulta e intentar crear servicio | 403 en servidor | smoke.js |
+| P04 | Crear jerarquía y usuario | ADMIN crea unidad padre, puesto y usuario desde Organización/Usuarios | Relaciones visibles y recuperables | interfaz + API |
+| P05 | Código o referencia inválida | Crear registro duplicado o usar padre inexistente | Rechazo con respuesta de validación | restricciones SQL + API |
+| P06 | Importar Excel | Ejecutar import-catalog.js y verify-import.js | 12, 46, 0 y observaciones | verify-import.js |
+| P07 | Repetir importación | Ejecutar importador dos veces | No aparecen duplicados; sube updated | import_runs |
+| P08 | SE.12 y ausencias | Filtrar SE.12 y abrir fichas | 3 registros REVIEW y valores desconocidos | interfaz + observaciones |
+| P09 | Mínimo mayor que máximo | Crear o editar con minimum 10 y maximum 5 | API rechaza la operación | validación API + CHECK |
+| P10 | Búsqueda y filtros | Buscar SE.12 y seleccionar REVIEW | Resultado de tres servicios | smoke.js |
+| P11 | Responsable incorrecto | Seleccionar usuario que no pertenece a la sección | API rechaza la asignación | validateAssignment |
+| P12 | Persistencia | Ejecutar docker compose restart db api | Datos se conservan | verify-import después del reinicio |
+
+## Pruebas automatizadas disponibles
+
+### Harness
+
+~~~powershell
+$env:HARNESS_RUN_SMOKE='1'
+npm run harness
+~~~
+
+Comprueba typecheck, build, secretos, Compose y smoke.
+
+### Smoke
+
+~~~bash
+docker compose exec api node apps/api/dist/scripts/smoke.js
+~~~
+
+Salida esperada:
+
+~~~json
+{"ok":true,"checks":["P01","P02","P03","P10"]}
+~~~
+
+### Importación
+
+~~~bash
+docker compose exec api node apps/api/dist/scripts/verify-import.js
+~~~
+
+Salida esperada:
+
+~~~json
+{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}
+~~~
+
+## Validaciones negativas recomendadas
+
+### Mínimo mayor que máximo
+
+Desde Swagger o una herramienta HTTP autenticada, enviar un servicio con:
+
+~~~json
+{
+  "code": "TEST.MINMAX",
+  "name": "Prueba de umbral",
+  "level1Id": 1,
+  "minimum": 10,
+  "maximum": 5
+}
+~~~
+
+Debe recibirse un error de validación y no debe quedar el registro.
+
+### Padre inexistente
+
+Intentar crear un área con companyId inexistente. Debe rechazarse porque el servicio consulta el padre antes de insertar.
+
+### Responsable de otra sección
+
+Intentar asignar un usuario de una sección distinta a responsibleSectionId. validateAssignment verifica la pertenencia y rechaza la operación.
+
+## Persistencia
+
+Para comprobar persistencia sin destruir datos:
+
+~~~bash
+docker compose restart db api
+docker compose up -d web
+docker compose exec api node apps/api/dist/scripts/verify-import.js
+~~~
+
+No ejecutar docker compose down -v durante esta prueba.
+
+## Evidencia visual
+
+La revisión visual debe comprobar:
+
+- foco visible en campos;
+- etiquetas en español;
+- badges para estados;
+- badge En revisión;
+- tablas desplazables en pantallas angostas;
+- ausencia de controles administrativos para CONSULTA;
+- ficha lateral del servicio;
+- mensajes de error comprensibles.
+
+## Interpretación de fallos
+
+| Síntoma | Revisión |
+|---|---|
+| web no abre | docker compose ps, logs web y docker compose up -d web |
+| API no responde | logs api y estado de db |
+| verify devuelve 0 | revisar que seed e import se ejecutaron |
+| login falla | revisar .env, seed-demo.js y logs api |
+| no hay datos después de reinicio | confirmar que no se usó down -v |
+| importación falla | revisar nombre de archivo, hoja y logs api |
+
+## Criterio de aprobación operativa
+
+La solución está lista para evaluación cuando:
+
+- los tres servicios de Compose están activos;
+- verify-import devuelve 12, 46, 0 y 3;
+- smoke termina con ok true;
+- ambos roles pueden iniciar sesión;
+- ADMIN puede mantener datos;
+- CONSULTA puede consultar y recibe 403 al escribir;
+- reiniciar contenedores no elimina los datos.
+
