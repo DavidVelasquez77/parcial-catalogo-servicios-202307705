@@ -325,6 +325,7 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 ├── docs/IMPORTACION.md               # reglas del Excel y trazabilidad
 ├── docs/API.md                       # rutas y payloads principales
 ├── docs/GUIA_EVALUACION.md           # recorrido y matriz de pruebas
+├── docs/ia/                           # fases Context, Prompt y Harness Engineering
 ├── docs/contexto/                    # actualizaciones de contexto
 ├── docs/prompts/                     # prompts y criterios de aceptación
 └── docs/evidencias/                  # evidencia del harness y ciclo de corrección
@@ -346,4 +347,5 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 - [API y reglas de autorización](docs/API.md)
 - [Context engineering](docs/contexto/)
 - [Prompt engineering](docs/prompts/)
+- [Fases de IA: contexto, prompts y harness](docs/ia/)
 - [Harness y ciclo de corrección](docs/evidencias/ciclo-harness.md)

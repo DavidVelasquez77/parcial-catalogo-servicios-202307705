@@ -43,6 +43,7 @@ La aplicación atiende estas necesidades con un frontend web, una API, PostgreSQ
 - Historial de importaciones y observaciones.
 - Docker Compose, migraciones y scripts reproducibles.
 - Documentación de context engineering, prompt engineering y harness engineering.
+- Registro ampliado de las tres fases en `docs/ia/`, con prompts finales en XML.
 
 ### Fuera de alcance
 
@@ -346,14 +347,14 @@ Se documentaron cinco prompts realmente utilizados:
 4. importador repetible;
 5. pruebas, Docker y harness.
 
-Cada archivo documenta objetivo, contexto, restricciones, salida esperada y criterio de aceptación.
+Cada archivo documenta objetivo, contexto, restricciones, salida esperada, criterio de aceptación y un bloque `Prompt final` en XML con la instrucción consolidada.
 
 Las iteraciones más importantes fueron:
 
 - sustituir el supuesto inicial de una fila igual a un servicio por una regla basada en código y celda ancla;
 - sustituir la idea de ocultar botones por autorización real mediante AuthGuard y RolesGuard.
 
-La evidencia completa está en docs/prompts.
+La evidencia completa está en `docs/prompts` y la explicación metodológica está en `docs/ia`.
 
 ## 14. Harness engineering
 
@@ -470,8 +471,8 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | SE.12 | regla canónica y observaciones | tres servicios REVIEW | docs/IMPORTACION.md |
 | Persistencia | volumen postgres_data | reinicio sin pérdida | compose.yaml |
 | Docker | Dockerfiles y Compose | build y ps | compose.yaml |
-| Context engineering | AGENTS y contexto versionado | revisión de actualizaciones | docs/contexto |
-| Prompt engineering | cinco prompts e iteraciones | revisión documental | docs/prompts |
+| Context engineering | AGENTS, contexto versionado y guía de fase | revisión de actualizaciones | docs/contexto, docs/ia/01-context-engineering.md |
+| Prompt engineering | cinco prompts finales XML e iteraciones | revisión documental | docs/prompts, docs/ia/02-prompt-engineering.md |
 | Harness engineering | scripts y controles | harness, aceptación y persistencia en verde | scripts/harness.mjs, acceptance.ts |
 | Ciclo de corrección del harness | evidencia de corrección | fallo y re-ejecución | docs/evidencias |
 

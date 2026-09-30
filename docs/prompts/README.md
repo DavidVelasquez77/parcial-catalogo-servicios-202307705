@@ -4,7 +4,7 @@
 
 Estos prompts documentan cómo se dividió el trabajo por riesgo. Cada prompt tuvo contexto, restricciones, resultado esperado y una forma de verificación. No se incluyen conversaciones completas: se conservan instrucciones representativas y verificables.
 
-El propósito de esta carpeta no es demostrar que se escribió mucho texto. Es demostrar que las instrucciones dirigieron decisiones concretas, que esas decisiones se incorporaron al código y que luego se comprobaron con una salida observable.
+El propósito de esta carpeta no es demostrar que se escribió mucho texto. Es demostrar que las instrucciones dirigieron decisiones concretas, que esas decisiones se incorporaron al código y que luego se comprobaron con una salida observable. Las fichas se pueden leer de forma independiente, pero juntas representan el recorrido completo: datos, modelo, seguridad, importación y controles.
 
 ## Herramienta y fecha
 
@@ -25,6 +25,42 @@ La fecha se registra para que el revisor distinga el contexto disponible durante
 | 03-autenticacion.md | ¿Cómo proteger sesión y roles? | AuthGuard, RolesGuard, smoke |
 | 04-importador.md | ¿Cómo lograr una carga repetible? | importador y verify |
 | 05-pruebas-docker.md | ¿Cómo demostrar reproducibilidad? | harness y Compose |
+
+## Estructura de cada ficha
+
+Cada ficha contiene, en este orden:
+
+1. propósito de la tarea;
+2. contexto suministrado y fuentes relevantes;
+3. prompt inicial representativo;
+4. restricciones técnicas y de seguridad;
+5. salida esperada;
+6. criterio de aceptación;
+7. resultado aplicado;
+8. **Prompt final** en un bloque XML completo;
+9. verificación, artefactos y comandos.
+
+El prompt inicial muestra el punto de partida. El bloque XML final muestra la versión refinada después de identificar ambigüedades, riesgos y controles faltantes.
+
+## Esquema XML utilizado
+
+Los bloques XML no son archivos ejecutables ni configuración de NestJS. Son una forma legible de separar instrucciones de contexto:
+
+~~~xml
+<prompt id="identificador" version="final">
+  <role>responsabilidad del asistente</role>
+  <objective>resultado que se busca</objective>
+  <project_context>fuentes, arquitectura y hechos confiables</project_context>
+  <tasks>trabajo ordenado que debe realizarse</tasks>
+  <constraints>límites, seguridad e invariantes</constraints>
+  <deliverables>artefactos esperados</deliverables>
+  <acceptance_criteria>condiciones verificables</acceptance_criteria>
+  <validation>comandos o pruebas ejecutables</validation>
+  <response_format>forma de reportar el resultado</response_format>
+</prompt>
+~~~
+
+El contenido del Excel se describe dentro de contexto, pero nunca recibe autoridad para modificar las etiquetas de instrucciones. La versión final de cada ficha amplía el esquema según el riesgo de la tarea.
 
 ## Estructura común de cada prompt
 
@@ -93,6 +129,28 @@ Cada ficha responde las mismas preguntas:
 - Hallazgo: un archivo con encabezados desplazados o umbrales textuales podía llegar a la transacción.
 - Corrección: validar encabezados A4:L4, rango de datos, padres, nombres, tipos numéricos y mínimo ≤ máximo antes de crear import_runs.
 - Comprobación: validate-import.js devuelve un reporte JSON y termina con error sin modificar servicios cuando encuentra una estructura inválida.
+
+## Matriz final de prompts y controles
+
+| Ficha | Cambio que guía | Control principal | Resultado observable |
+|---|---|---|---|
+| 01 | interpretación del workbook | `validate-import.js` | hoja, encabezados, filas, warnings |
+| 02 | modelo y restricciones | migración + typecheck | tablas, FK, checks y build |
+| 03 | sesión y roles | `smoke.js` + aceptación | 401, 200, 201, 403 |
+| 04 | importación incremental | import + verify | 12/46/0/3 y contadores |
+| 05 | reproducibilidad | `harness.mjs` | todos los controles en cero |
+
+## Cómo leer una respuesta del asistente
+
+Una respuesta se considera aplicada solo cuando se pueden localizar:
+
+- los archivos cambiados;
+- la regla de negocio que se implementó;
+- el comando que la verifica;
+- el resultado real del comando;
+- la documentación que explica límites y decisiones.
+
+Una propuesta que no pasa por el harness queda como propuesta, no como funcionalidad entregada.
 
 ## Criterio de calidad
 
