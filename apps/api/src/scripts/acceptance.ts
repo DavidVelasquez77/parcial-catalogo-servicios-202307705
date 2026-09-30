@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { Pool } from 'pg';
 
 const base = process.env.SMOKE_BASE_URL ?? 'http://127.0.0.1:3000/api';
 
@@ -34,6 +35,28 @@ async function createOrg(kind: string, body: Record<string, unknown>, cookie: st
 async function deactivateOrg(kind: string, id: number, cookie: string) {
   const result = await request('/organization/' + kind + '/' + id, { method: 'DELETE' }, cookie);
   await expectStatus(result, 200, 'desactivar ' + kind);
+}
+
+async function cleanupTemporaryData(stamp: number) {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM audit_logs WHERE user_id IN (SELECT id FROM users WHERE username LIKE $1)', [`acc.%${stamp}`]);
+    await client.query('DELETE FROM users WHERE username LIKE $1', [`acc.%${stamp}`]);
+    await client.query('DELETE FROM positions WHERE code IN ($1, $2)', [`ACC-P1-${stamp}`, `ACC-P2-${stamp}`]);
+    await client.query('DELETE FROM sections WHERE code IN ($1, $2)', [`ACC-S1-${stamp}`, `ACC-S2-${stamp}`]);
+    await client.query('DELETE FROM departments WHERE code = $1', [`ACC-D-${stamp}`]);
+    await client.query('DELETE FROM areas WHERE code = $1', [`ACC-A-${stamp}`]);
+    await client.query('DELETE FROM companies WHERE code = $1', [`ACC-${stamp}`]);
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+    await pool.end();
+  }
 }
 
 async function main() {
@@ -132,6 +155,7 @@ async function main() {
   await deactivateOrg('departments', department.id, adminCookie).catch(() => undefined);
   await deactivateOrg('areas', area.id, adminCookie).catch(() => undefined);
   await deactivateOrg('companies', company.id, adminCookie).catch(() => undefined);
+  await cleanupTemporaryData(stamp);
 
   const logout = await request('/auth/logout', { method: 'POST' }, adminCookie);
   await expectStatus(logout, 201, 'P02 logout');

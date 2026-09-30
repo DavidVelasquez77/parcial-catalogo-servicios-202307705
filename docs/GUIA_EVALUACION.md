@@ -106,7 +106,7 @@ Comprueba typecheck, build, secretos, Compose, aceptación funcional P01–P11, 
 npm test
 ~~~
 
-Ejecuta dentro del contenedor API `acceptance.js`. Crea datos temporales con prefijo `ACC-`, verifica reglas positivas y negativas, restaura las asignaciones tocadas y desactiva sus registros temporales. La salida esperada contiene `"ok":true` y los checks P01 a P11.
+Ejecuta dentro del contenedor API `acceptance.js`. Crea datos temporales con prefijo `ACC-`, verifica reglas positivas y negativas, restaura las asignaciones tocadas y limpia exclusivamente las filas creadas por la prueba cuando termina correctamente. La salida esperada contiene `"ok":true` y los checks P01 a P11.
 
 ### Smoke
 

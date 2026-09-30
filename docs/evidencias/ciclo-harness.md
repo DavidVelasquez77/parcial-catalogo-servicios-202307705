@@ -43,7 +43,7 @@ HARNESS_RUN_SMOKE=1 npm run harness
 | 6 | smoke opcional | recorrido corto P01, P02, P03 y P10 | un estado HTTP no coincide |
 | 7 | persistence | reinicio controlado de db y verificación 12/46/0/3 | se pierden datos o cambia el conteo |
 
-Cada control hereda el código de salida del proceso. Un control fallido detiene el harness y reporta el paso responsable. La aceptación usa datos temporales con prefijo `ACC-` y los limpia mediante bajas lógicas o eliminación acotada de filas creadas por la propia prueba.
+Cada control hereda el código de salida del proceso. Un control fallido detiene el harness y reporta el paso responsable. La aceptación usa datos temporales con prefijo `ACC-`, prueba primero las bajas lógicas mediante la API y, si termina correctamente, elimina únicamente las filas que creó mediante una transacción de limpieza acotada. Una ejecución fallida conserva los datos para poder diagnosticarla.
 
 ## 4. Datos de evaluación
 
