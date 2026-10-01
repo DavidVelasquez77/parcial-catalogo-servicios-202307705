@@ -171,6 +171,12 @@ Una entidad subordinada recibe el padre correspondiente:
 - departmentId para sections;
 - sectionId para positions.
 
+Las altas y cambios de padre recorren la jerarquía completa y rechazan empresas,
+áreas, departamentos o secciones inactivas, aunque el padre directo permanezca
+activo. La desactivación es lógica. Tanto `DELETE` como `PATCH` con `active: false`
+verifican que no existan dependientes activos; esto evita que una modificación
+parcial de la interfaz deje registros huérfanos o una jerarquía inconsistente.
+
 En creación, el padre debe existir y estar activo.
 
 ## Usuarios
@@ -181,7 +187,12 @@ En creación, el padre debe existir y estar activo.
 | POST | /api/users | ADMIN |
 | PATCH | /api/users/:id | ADMIN |
 
-La creación exige nombre, username, contraseña de mínimo ocho caracteres, rol y puesto activo.
+La creación exige nombre, username, contraseña de mínimo ocho caracteres, rol y
+un puesto cuya cadena Empresa → Área → Departamento → Sección → Puesto esté
+activa. La edición permite actualizar nombre, correo, rol, puesto y estado; el
+correo se valida como único y un cambio de puesto vuelve a validar toda la
+jerarquía. El usuario puede tener el mismo puesto que otros usuarios, pero nunca
+se guarda una asociación nueva contra un antecesor inactivo.
 
 El password nunca se devuelve. El usuario se relaciona con un puesto, y la empresa se obtiene transitivamente mediante la jerarquía.
 

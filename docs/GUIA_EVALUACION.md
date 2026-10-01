@@ -70,10 +70,18 @@ Revisar las pestañas:
 5. Puestos.
 
 ADMIN puede crear, editar y desactivar. CONSULTA puede consultar sin botones de escritura.
+Para comprobar la política de dependencias, intenta desactivar una empresa que
+todavía tenga áreas: tanto la baja lógica por `DELETE` como una edición con estado
+inactivo deben ser rechazadas con un mensaje comprensible. La baja solo debe
+permitirse después de desactivar ordenadamente sus descendientes.
 
 ### 4. Usuarios
 
-ADMIN puede crear y editar usuarios, cambiar rol y activar o desactivar cuentas. Cada usuario debe tener puesto.
+ADMIN puede crear y editar usuarios, cambiar rol, correo y puesto, y activar o
+desactivar cuentas. Cada usuario debe tener puesto y la aplicación valida que
+toda la jerarquía organizacional del puesto esté activa. Para verificar la edición,
+mueve un usuario a otro puesto y cambia su correo; al recargar la lista ambos
+valores deben permanecer guardados. Varios usuarios pueden compartir un puesto.
 
 ### 5. Catálogos
 

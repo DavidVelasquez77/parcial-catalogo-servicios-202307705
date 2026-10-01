@@ -12,6 +12,7 @@ const META: Record<Kind, Meta> = {
   positions: { table: 'positions', parentTable: 'sections', parentColumn: 'section_id', parentKey: 'sectionId' },
 };
 const CHILDREN: Record<Kind, Kind | null> = { companies: 'areas', areas: 'departments', departments: 'sections', sections: 'positions', positions: null };
+const KIND_BY_TABLE: Record<string, Kind> = { companies: 'companies', areas: 'areas', departments: 'departments', sections: 'sections', positions: 'positions' };
 
 @Injectable()
 export class OrganizationService {
@@ -21,6 +22,32 @@ export class OrganizationService {
     const meta = META[kind as Kind];
     if (!meta) throw new BadRequestException('Entidad organizacional inválida.');
     return meta;
+  }
+
+  private async assertActiveAncestry(kind: Kind, id: number) {
+    let currentKind: Kind | undefined = kind;
+    let currentId = id;
+    while (currentKind) {
+      const meta = this.meta(currentKind);
+      const parentProjection = meta.parentColumn ? `, ${meta.parentColumn} AS "parentId"` : '';
+      const result = await this.db.query(`SELECT active${parentProjection} FROM ${meta.table} WHERE id = $1`, [currentId]);
+      const row = result.rows[0] as { active: boolean; parentId?: number } | undefined;
+      if (!row) throw new BadRequestException('El padre seleccionado no existe.');
+      if (!row.active) throw new BadRequestException('No puedes asociar un registro a una jerarquía inactiva.');
+      if (!meta.parentTable) break;
+      const parentKind = KIND_BY_TABLE[meta.parentTable];
+      if (!parentKind || !row.parentId) throw new BadRequestException('La jerarquía organizacional está incompleta.');
+      currentKind = parentKind;
+      currentId = Number(row.parentId);
+    }
+  }
+
+  private async assertNoActiveChildren(kind: Kind, id: number) {
+    const childKind = CHILDREN[kind];
+    if (!childKind) return;
+    const childMeta = this.meta(childKind);
+    const childCount = await this.db.query(`SELECT COUNT(*)::INTEGER AS total FROM ${childMeta.table} WHERE ${childMeta.parentColumn} = $1 AND active`, [id]);
+    if (Number(childCount.rows[0]?.total ?? 0) > 0) throw new BadRequestException('No puedes desactivar este registro mientras tenga dependientes activos. Desactiva primero sus hijos.');
   }
 
   async list(kind: string) {
@@ -45,9 +72,7 @@ export class OrganizationService {
     if (meta.parentColumn && meta.parentKey) {
       const parentId = Number(body[meta.parentKey]);
       if (!Number.isInteger(parentId)) throw new BadRequestException('Debes seleccionar un padre válido.');
-      const parent = await this.db.query(`SELECT active FROM ${meta.parentTable} WHERE id = $1`, [parentId]);
-      if (!parent.rows[0]) throw new BadRequestException('El padre seleccionado no existe.');
-      if (!parent.rows[0].active) throw new BadRequestException('No puedes asociar un registro a un padre inactivo.');
+      await this.assertActiveAncestry(KIND_BY_TABLE[meta.parentTable!], parentId);
       values.unshift(parentId);
       columns = `${meta.parentColumn}, ${columns}`;
       placeholders = '$1, $2, $3';
@@ -63,6 +88,7 @@ export class OrganizationService {
     const code = String(body.code ?? current.rows[0].code).trim();
     const name = String(body.name ?? current.rows[0].name).trim();
     const active = body.active === undefined ? current.rows[0].active : Boolean(body.active);
+    if (!active) await this.assertNoActiveChildren(kind as Kind, id);
     const parentId = meta.parentColumn && meta.parentKey ? Number(body[meta.parentKey] ?? current.rows[0][meta.parentColumn]) : null;
     const duplicate = meta.parentColumn
       ? await this.db.query(`SELECT id FROM ${meta.table} WHERE ${meta.parentColumn} = $1 AND code = $2 AND id <> $3`, [parentId, code, id])
@@ -72,8 +98,8 @@ export class OrganizationService {
     let sql = `UPDATE ${meta.table} SET code = $1, name = $2, active = $3, updated_at = NOW()`;
     if (meta.parentColumn && meta.parentKey && body[meta.parentKey] !== undefined) {
       const parentId = Number(body[meta.parentKey]);
-      const parent = await this.db.query(`SELECT active FROM ${meta.parentTable} WHERE id = $1`, [parentId]);
-      if (!parent.rows[0] || !parent.rows[0].active) throw new BadRequestException('El padre seleccionado no existe o está inactivo.');
+      if (!Number.isInteger(parentId)) throw new BadRequestException('Debes seleccionar un padre válido.');
+      await this.assertActiveAncestry(KIND_BY_TABLE[meta.parentTable!], parentId);
       values.push(parentId);
       sql += `, ${meta.parentColumn} = $4`;
     }
@@ -83,13 +109,6 @@ export class OrganizationService {
   }
 
   async deactivate(kind: string, id: number) {
-    const meta = this.meta(kind);
-    const childKind = CHILDREN[kind as Kind];
-    if (childKind) {
-      const childMeta = this.meta(childKind);
-      const childCount = await this.db.query(`SELECT COUNT(*)::INTEGER AS total FROM ${childMeta.table} WHERE ${childMeta.parentColumn} = $1 AND active`, [id]);
-      if (Number(childCount.rows[0]?.total ?? 0) > 0) throw new BadRequestException('No puedes desactivar este registro mientras tenga dependientes activos. Desactiva primero sus hijos.');
-    }
     return this.update(kind, id, { active: false });
   }
 }

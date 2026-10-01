@@ -270,8 +270,10 @@ La API nunca devuelve password_hash en los listados de usuarios. Las contraseña
 ### Organización
 
 - Toda entidad subordinada requiere un padre.
-- No se puede asociar un registro nuevo a un padre inexistente o inactivo.
+- No se puede asociar un registro nuevo o moverlo a una jerarquía con algún antecesor inexistente o inactivo.
 - Los códigos son únicos dentro de su padre.
+- La desactivación es lógica y se bloquea mientras existan dependientes activos, tanto desde `DELETE` como desde `PATCH` con `active: false`.
+- La edición de usuarios conserva correo y puesto, valida la unicidad del correo y permite varios usuarios en un mismo puesto.
 - Las bajas de organización son lógicas.
 - Un usuario requiere un puesto válido.
 - Un puesto pertenece a una sola sección.

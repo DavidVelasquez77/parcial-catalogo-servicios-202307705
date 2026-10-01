@@ -6,6 +6,29 @@ import { DatabaseService } from '../database/database.service';
 export class UsersService {
   constructor(private readonly db: DatabaseService) {}
 
+  private async assertActivePositionHierarchy(positionId: number) {
+    const result = await this.db.query(`SELECT p.id,
+      p.active AS "positionActive", s.active AS "sectionActive",
+      d.active AS "departmentActive", a.active AS "areaActive",
+      c.active AS "companyActive"
+      FROM positions p
+      JOIN sections s ON s.id = p.section_id
+      JOIN departments d ON d.id = s.department_id
+      JOIN areas a ON a.id = d.area_id
+      JOIN companies c ON c.id = a.company_id
+      WHERE p.id = $1`, [positionId]);
+    const row = result.rows[0] as {
+      positionActive: boolean;
+      sectionActive: boolean;
+      departmentActive: boolean;
+      areaActive: boolean;
+      companyActive: boolean;
+    } | undefined;
+    if (!row || !row.positionActive || !row.sectionActive || !row.departmentActive || !row.areaActive || !row.companyActive) {
+      throw new BadRequestException('El puesto o algún antecesor de su jerarquía no está activo.');
+    }
+  }
+
   async list() {
     const result = await this.db.query(`SELECT u.id, u.name, u.username, u.email, u.role, u.active,
       u.position_id AS "positionId", p.code AS "positionCode", p.name AS "positionName",
@@ -26,8 +49,7 @@ export class UsersService {
     }
     const duplicate = await this.db.query(`SELECT id FROM users WHERE username = $1 OR email = NULLIF($2, '')`, [username, String(body.email ?? '').trim()]);
     if (duplicate.rows[0]) throw new ConflictException('El usuario o correo ya está registrado.');
-    const position = await this.db.query(`SELECT p.id, p.active, s.active AS section_active FROM positions p JOIN sections s ON s.id = p.section_id WHERE p.id = $1`, [positionId]);
-    if (!position.rows[0] || !position.rows[0].active || !position.rows[0].section_active) throw new BadRequestException('El puesto o su sección no están activos.');
+    await this.assertActivePositionHierarchy(positionId);
     const passwordHash = await bcrypt.hash(password, 12);
     const result = await this.db.query(`INSERT INTO users(name, username, email, password_hash, role, position_id)
       VALUES($1, $2, NULLIF($3, ''), $4, $5, $6)
@@ -42,11 +64,17 @@ export class UsersService {
     const name = String(body.name ?? current.rows[0].name).trim();
     const role = body.role === 'ADMIN' || body.role === 'CONSULTA' ? body.role : current.rows[0].role;
     const active = body.active === undefined ? current.rows[0].active : Boolean(body.active);
+    const email = String(body.email ?? current.rows[0].email ?? '').trim();
+    const positionId = body.positionId === undefined ? Number(current.rows[0].position_id) : Number(body.positionId);
+    if (!Number.isInteger(positionId)) throw new BadRequestException('Debes seleccionar un puesto válido.');
+    const duplicate = await this.db.query(`SELECT id FROM users WHERE email = NULLIF($1, '') AND id <> $2`, [email, id]);
+    if (duplicate.rows[0]) throw new ConflictException('El correo ya está registrado.');
+    await this.assertActivePositionHierarchy(positionId);
     let passwordHash = current.rows[0].password_hash;
     if (body.password) passwordHash = await bcrypt.hash(String(body.password), 12);
-    const result = await this.db.query(`UPDATE users SET name = $1, role = $2, active = $3, password_hash = $4, updated_at = NOW()
-      WHERE id = $5 RETURNING id, name, username, email, role, active, position_id AS "positionId"`,
-      [name, role, active, passwordHash, id]);
+    const result = await this.db.query(`UPDATE users SET name = $1, email = NULLIF($2, ''), role = $3, position_id = $4, active = $5, password_hash = $6, updated_at = NOW()
+      WHERE id = $7 RETURNING id, name, username, email, role, active, position_id AS "positionId"`,
+      [name, email, role, positionId, active, passwordHash, id]);
     return result.rows[0];
   }
 }
