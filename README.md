@@ -247,6 +247,75 @@ La explicación completa se encuentra en [docs/RESOLUCION.md](docs/RESOLUCION.md
 
 ## 10. Comandos de validación
 
+Todos los comandos de esta sección deben ejecutarse desde la raíz del repositorio, donde se encuentran `compose.yaml`, `package.json` y la carpeta `scripts/`. La aplicación no requiere Node.js en el equipo anfitrión para los flujos Docker; los comandos `npm run` se incluyen como atajos opcionales de desarrollo local.
+
+### Ejecución de scripts por sistema operativo
+
+#### Windows PowerShell
+
+~~~powershell
+# Levantar el entorno y ejecutar el harness oficial sin Node en el host
+& .\scripts\harness-docker.ps1
+
+# Ejecutar la pirámide 70/20/10 por capa
+& .\scripts\test-pyramid.ps1 unit
+& .\scripts\test-pyramid.ps1 integration
+& .\scripts\test-pyramid.ps1 e2e
+& .\scripts\test-pyramid.ps1 all
+
+# Atajos opcionales: requieren Node.js 22 instalado
+npm install
+npm run typecheck
+npm run build
+npm run audit:secrets
+npm run harness
+npm run persistence:check
+~~~
+
+#### Linux
+
+~~~bash
+# Levantar el entorno y ejecutar el harness oficial sin Node en el host
+sh scripts/harness-docker.sh
+
+# Ejecutar la pirámide 70/20/10 por capa
+sh scripts/test-pyramid.sh unit
+sh scripts/test-pyramid.sh integration
+sh scripts/test-pyramid.sh e2e
+sh scripts/test-pyramid.sh all
+
+# Atajos opcionales: requieren Node.js 22 instalado
+npm install
+npm run typecheck
+npm run build
+npm run audit:secrets
+npm run harness
+npm run persistence:check
+~~~
+
+#### macOS
+
+~~~bash
+# Levantar el entorno y ejecutar el harness oficial sin Node en el host
+sh scripts/harness-docker.sh
+
+# Ejecutar la pirámide 70/20/10 por capa
+sh scripts/test-pyramid.sh unit
+sh scripts/test-pyramid.sh integration
+sh scripts/test-pyramid.sh e2e
+sh scripts/test-pyramid.sh all
+
+# Atajos opcionales: requieren Node.js 22 instalado
+npm install
+npm run typecheck
+npm run build
+npm run audit:secrets
+npm run harness
+npm run persistence:check
+~~~
+
+Los comandos `docker compose exec api node apps/api/dist/scripts/*.js` documentados más adelante son iguales en Windows, Linux y macOS. PowerShell utiliza `&` para invocar los archivos `.ps1`; Linux y macOS utilizan los equivalentes `.sh`.
+
 ### Verificación local de código
 
 ~~~bash
