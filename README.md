@@ -13,10 +13,10 @@ Este repositorio corresponde al parcial práctico de Software Avanzado, carné 2
 | Commit de entrega | HEAD de `main`, señalado por `parcial-v2.0` |
 | Etiqueta | parcial-v2.0 |
 | Integrante | 202307705 |
-| Colaborador solicitado | maldanap-usac |
+| Colaborador solicitado | `maldanap-usac` — invitación enviada |
 | Archivo de entrada | data/CatalogoServicios.xlsx |
 
-La etiqueta `parcial-v2.0` apunta al commit entregado. El archivo de entrada es el Excel original del parcial y no se modifica durante la importación; únicamente se sincroniza la base de datos.
+La etiqueta `parcial-v2.0` apunta al commit entregado. La invitación al colaborador `maldanap-usac` fue enviada desde la configuración de GitHub; el estado de aceptación puede verificarse en **Settings → Collaborators**. El archivo de entrada es el Excel original del parcial y no se modifica durante la importación; únicamente se sincroniza la base de datos.
 
 ## 2. Qué resuelve la aplicación
 

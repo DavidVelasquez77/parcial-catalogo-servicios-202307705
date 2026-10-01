@@ -486,7 +486,34 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | Harness engineering | scripts y controles | harness Docker-only, aceptación y persistencia en verde | scripts/harness-docker.ps1/.sh, acceptance.ts |
 | Ciclo de corrección del harness | evidencia de corrección | fallo y re-ejecución | docs/evidencias |
 
-## 18. Limitaciones conocidas
+## 18. Aportes individuales y reflexión sobre el uso de IA
+
+### Trabajo individual
+
+El proyecto fue realizado individualmente por el integrante con carné **202307705**. Los aportes principales fueron:
+
+- analizar el enunciado, la rúbrica y el Excel original antes de definir el modelo;
+- decidir la arquitectura NestJS + React + PostgreSQL sin Prisma;
+- definir las reglas de importación, el tratamiento de celdas combinadas, el conflicto de `SE.12` y la política de datos ausentes;
+- implementar autenticación local, roles, jerarquía organizacional, catálogo, importador, trazabilidad y bajas lógicas;
+- diseñar la interfaz, revisar la experiencia visual y solicitar el modal de observaciones del historial;
+- ejecutar y revisar los controles de Docker, importación, aceptación, pruebas unitarias, integración y E2E;
+- revisar los resultados, corregir fallos y mantener la documentación, los commits y la etiqueta de entrega.
+
+### Reflexión sobre errores y límites de la IA
+
+La IA se utilizó como apoyo para analizar, proponer, implementar y revisar; no se tomó ninguna respuesta como evidencia sin comprobarla en el código o mediante una ejecución. Durante el desarrollo se identificaron y corrigieron estos errores o supuestos iniciales:
+
+1. **Interpretación del Excel:** inicialmente era fácil tratar cada fila física como un servicio. El análisis mostró celdas combinadas y filas de continuación, por lo que se cambió la regla a crear servicios únicamente cuando existe `COD.N2` y a recuperar el valor de la celda principal.
+2. **Autorización:** una propuesta basada solo en ocultar botones no protegía la API. Se corrigió con `AuthGuard`, `RolesGuard` y comprobaciones de servidor, y se verificó el rechazo HTTP 403 para CONSULTA.
+3. **Importación repetible:** una carga ingenua podía actualizar registros idénticos. Se incorporó comparación por código para distinguir creados, actualizados, omitidos y observados.
+4. **Entorno Docker:** un error de ruta de migraciones dentro del contenedor impidió iniciar la API. El log permitió corregir la ruta real y repetir el harness.
+5. **Alcance académico:** se aclaró que Loop Engineering no era una cuarta técnica exigida; el ciclo PLAN → ACT → OBSERVE → EVALUATE → CORRECT → RE-EVALUATE se documentó dentro de Harness Engineering.
+6. **Interfaz:** las observaciones inicialmente aparecían debajo del historial. Se revisó la experiencia y se transformó en una tarjeta modal con estado de carga, cierre y prueba E2E.
+
+La decisión humana fue conservar solo las propuestas que respetaban el enunciado, la seguridad, el archivo original y los resultados verificables. Cuando la IA sugirió una interpretación incompleta o una documentación desactualizada, se corrigió antes de considerarla parte de la entrega.
+
+## 19. Limitaciones conocidas
 
 - El frontend presenta acciones de administración solo a ADMIN, pero la protección importante se mantiene en el servidor.
 - Los datos organizacionales son mínimos y demo; el Excel no los proporciona.
@@ -495,7 +522,7 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 - No se incluye despliegue en nube; la entrega se evalúa mediante Docker local.
 - No se modificó el Excel para corregir errores: las decisiones se implementan en la importación y se documentan.
 
-## 19. Cómo reproducir la entrega
+## 20. Cómo reproducir la entrega
 
 Desde un clon limpio:
 

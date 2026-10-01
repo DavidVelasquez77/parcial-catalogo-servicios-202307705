@@ -117,7 +117,7 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 - `acceptance.js` es una prueba de integración/extremo a extremo de la API: usa HTTP, sesión, guards, reglas de negocio y base de datos real dentro de Docker.
 - `smoke.js` es un recorrido corto de integración para login, logout, permisos y filtros.
 - `harness-docker.ps1/.sh` incluye la prueba operativa que reinicia los servicios y verifica el volumen persistente. `persistence-check.mjs` queda como atajo local opcional.
-- No se presenta una suite unitaria aislada como sustituto de estos escenarios; los criterios del parcial se comprueban con datos reales y resultados observables.
+- Además, la solución incluye una pirámide automatizada con Jest y ts-jest: 7 pruebas unitarias con dependencias simuladas y 2 pruebas de integración contra PostgreSQL y el Excel original. Playwright ejecuta 1 recorrido E2E del navegador. Estas 10 pruebas se distribuyen 70/20/10 y complementan, no sustituyen, los escenarios P01–P12 con datos reales y resultados observables.
 
 ### Harness
 
