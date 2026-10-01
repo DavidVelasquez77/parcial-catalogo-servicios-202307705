@@ -73,18 +73,18 @@ Los comandos `npm run typecheck`, `npm run build` y `npm run harness` son atajos
 
 ### Ruta local del proyecto
 
-En el equipo de desarrollo utilizado para esta entrega, la raíz del proyecto es:
+No se fija una ruta absoluta porque cada persona puede clonar el repositorio en una carpeta diferente. Después de clonar, entra a la carpeta del repositorio:
 
-~~~text
-C:\Users\Vela\Desktop\SA\MAGISTRAL\LECCIONES\2 parcial\parcial-catalogo-servicios-202307705
+~~~bash
+git clone https://github.com/DavidVelasquez77/parcial-catalogo-servicios-202307705.git
+cd parcial-catalogo-servicios-202307705
 ~~~
 
-En otro equipo se debe usar la carpeta donde se clonó el repositorio. Todos los comandos siguientes deben ejecutarse desde esa raíz, donde están `compose.yaml` y `data/CatalogoServicios.xlsx`.
+En Windows PowerShell, Linux o macOS se puede usar cualquier carpeta de destino. Todos los comandos siguientes deben ejecutarse desde la raíz clonada, donde están `compose.yaml` y `data/CatalogoServicios.xlsx`.
 
 ### Encender desde Windows PowerShell
 
 ~~~powershell
-Set-Location -LiteralPath 'C:\Users\Vela\Desktop\SA\MAGISTRAL\LECCIONES\2 parcial\parcial-catalogo-servicios-202307705'
 Copy-Item .env.example .env -ErrorAction SilentlyContinue
 docker compose up --build -d
 docker compose ps
