@@ -440,6 +440,23 @@ sh scripts/harness-docker.sh
 | Persistencia | Conteos conservados después de reiniciar |
 | Aceptación P01–P11 | Todos los contratos funcionales en `ok: true` |
 
+### Referencias reproducibles de ejecución
+
+Las siguientes referencias identifican los commits sobre los que se ejecutaron los controles. El commit final de entrega se consulta de forma inequívoca mediante la etiqueta `parcial-v2.0`.
+
+| Control | Comando | Fecha | Commit de ejecución | Resultado |
+|---|---|---|---|---|
+| Harness Docker-only | `scripts/harness-docker.ps1` / `scripts/harness-docker.sh` | 2026-09-30 | [`66a3d6bcd19b783fe9adccd62cc3ee0b0e7471e4`](https://github.com/DavidVelasquez77/parcial-catalogo-servicios-202307705/commit/66a3d6bcd19b783fe9adccd62cc3ee0b0e7471e4) | `ok: true`; persistencia, importación y aceptación en verde |
+| Pirámide 70/20/10 | `scripts/test-pyramid.ps1 all` / `scripts/test-pyramid.sh all` | 2026-09-30 | [`c2dbb6d829e3550295cd3c64b591ee75f1a92f4a`](https://github.com/DavidVelasquez77/parcial-catalogo-servicios-202307705/commit/c2dbb6d829e3550295cd3c64b591ee75f1a92f4a) | 7 unitarias, 2 integración y 1 E2E aprobadas |
+
+Para comprobar el SHA final publicado, ejecutar desde la raíz:
+
+~~~bash
+git rev-parse parcial-v2.0
+~~~
+
+La etiqueta `parcial-v2.0` se mantiene sobre el commit final y no depende de que el README memorice un hash que cambiaría al documentar una nueva corrección.
+
 ### Incidencia corregida durante el desarrollo
 
 En una primera ejecución, el API buscaba las migraciones en una ruta incorrecta dentro del contenedor y produjo un error de archivo no encontrado. El análisis del log mostró que la ruta esperaba /app/apps/database/migrations, mientras que el Dockerfile copia las migraciones en /app/database/migrations.
