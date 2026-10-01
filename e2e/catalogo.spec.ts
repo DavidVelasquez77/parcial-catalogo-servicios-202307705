@@ -15,6 +15,13 @@ test('login, consulta de servicios, filtro y cierre de sesión', async ({ page }
   await expect(page.getByText('SE.12.2', { exact: true })).toBeVisible();
   await expect(page.getByText('SE.12.3', { exact: true })).toBeVisible();
 
+  await page.getByRole('button', { name: 'Importaciones', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Importaciones', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Ver observaciones' }).first().click();
+  const observationsDialog = page.getByRole('dialog', { name: /Observaciones de la ejecución/ });
+  await expect(observationsDialog).toBeVisible();
+  await observationsDialog.getByRole('button', { name: 'Cerrar', exact: true }).click();
+
   await page.getByTitle('Cerrar sesión').click();
   await expect(page.getByRole('heading', { name: 'Catálogo de Servicios TI' })).toBeVisible();
 });

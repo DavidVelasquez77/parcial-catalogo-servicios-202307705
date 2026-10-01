@@ -24,7 +24,9 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
 }
 
 function Badge({ value, type = '' }: { value: string | null | undefined; type?: string }) { return <span className={`badge ${type.toLowerCase().replaceAll(' ', '-')}`}>{safeText(value)}</span>; }
-function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) { return <div className="modal-backdrop" onClick={onClose}><section className="modal-card" onClick={(event) => event.stopPropagation()}><div className="drawer-head"><h2>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Cerrar"><X size={18} /></button></div>{children}</section></div>; }
+function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+  return <div className="modal-backdrop" onClick={onClose}><section className="modal-card" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}><div className="drawer-head"><h2>{title}</h2><button className="icon-button" onClick={onClose} aria-label="Cerrar"><X size={18} /></button></div>{children}</section></div>;
+}
 function FormActions({ onCancel, loading = false }: { onCancel: () => void; loading?: boolean }) { return <div className="modal-actions"><button type="button" className="secondary" onClick={onCancel}>Cancelar</button><button className="primary" disabled={loading}>{loading ? 'Guardando...' : 'Guardar'}</button></div>; }
 
 function Layout({ user, onLogout, children, page, setPage }: { user: User; onLogout: () => void; children: ReactNode; page: string; setPage: (page: string) => void }) {
@@ -103,6 +105,7 @@ function ImportsPage() {
   const [lastResult, setLastResult] = useState<ImportSummary | null>(null);
   const [observations, setObservations] = useState<ImportObservation[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
+  const [observationsLoading, setObservationsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -152,11 +155,15 @@ function ImportsPage() {
 
   async function showObservations(runId: number) {
     setSelectedRunId(runId);
+    setObservations([]);
+    setObservationsLoading(true);
     setError('');
     try {
       setObservations(await api<ImportObservation[]>(`/imports/${runId}/observations`));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'No fue posible cargar las observaciones.');
+    } finally {
+      setObservationsLoading(false);
     }
   }
 
@@ -168,7 +175,7 @@ function ImportsPage() {
     {validation && <section className="panel import-validation"><div className="panel-heading"><div><h2>Validación del archivo</h2><p className="muted">Resultado previo a la escritura en la base de datos.</p></div><Badge value="Válido" type="ACTIVE" /></div><div className="import-facts"><span><strong>{validation.sheet}</strong><small>Hoja</small></span><span><strong>A{validation.headerRow}:L{validation.headerRow}</strong><small>Encabezados</small></span><span><strong>{validation.serviceRows}</strong><small>Servicios detectados</small></span><span><strong>{validation.continuationRows}</strong><small>Continuaciones</small></span><span><strong>{validation.dataStartRow}–{validation.dataEndRow}</strong><small>Filas de datos</small></span></div>{validation.warnings.length > 0 && <div className="warning-list"><strong>Advertencias de estructura</strong>{validation.warnings.map((warning, index) => <p key={`${warning.code}-${index}`}>{warning.message}{warning.rows ? ` Filas: ${warning.rows}.` : ''}</p>)}</div>}</section>}
     {lastResult && <section className="panel import-summary"><div className="panel-heading"><div><h2>Resumen de la última ejecución</h2><p className="muted">Ejecución #{lastResult.runId}; la operación fue transaccional.</p></div><CheckCircle2 className="success-icon" size={22} /></div><div className="summary-grid"><div><strong>{lastResult.created}</strong><span>Creados</span></div><div><strong>{lastResult.updated}</strong><span>Actualizados</span></div><div><strong>{lastResult.skipped}</strong><span>Omitidos</span></div><div><strong>{lastResult.observed}</strong><span>Observados</span></div><div><strong>{lastResult.level1}</strong><span>Niveles 1</span></div><div><strong>{lastResult.level2}</strong><span>Niveles 2</span></div></div></section>}
     <section className="panel"><div className="panel-heading"><div><h2>Historial de importaciones</h2><p className="muted">Cada ejecución conserva sus contadores y observaciones para auditoría.</p></div></div><div className="table-wrap"><table><thead><tr><th>Archivo</th><th>Estado</th><th>Creado</th><th>Actualizado</th><th>Omitido</th><th>Observado</th><th>Detalle</th></tr></thead><tbody>{runs.map((run) => <tr key={run.id}><td>{run.fileName}</td><td><Badge value={run.status} type={run.status} /></td><td>{run.createdCount}</td><td>{run.updatedCount}</td><td>{run.skippedCount}</td><td>{run.observedCount}</td><td><button className="text-button" onClick={() => void showObservations(run.id)}><Eye size={15} />Ver observaciones</button></td></tr>)}</tbody></table>{runs.length === 0 && <div className="empty">No hay ejecuciones registradas.</div>}</div></section>
-    {selectedRunId !== null && <section className="panel observations-panel"><div className="panel-heading"><div><h2>Observaciones de la ejecución #{selectedRunId}</h2><p className="muted">Incidencias, transformaciones y filas que requieren trazabilidad.</p></div><button className="secondary" onClick={() => setSelectedRunId(null)}>Cerrar</button></div>{observations.length === 0 ? <div className="empty">Esta ejecución no tiene observaciones registradas.</div> : <div className="observation-list">{observations.map((observation) => <article key={observation.id}><div><Badge value={observation.severity} type={observation.severity} /><strong>{observation.code ?? 'GENERAL'}</strong></div><p>{observation.message}</p><small>{observation.sourceSheet} · filas {observation.sourceRows}</small></article>)}</div>}</section>}
+    {selectedRunId !== null && <Modal title={`Observaciones de la ejecución #${selectedRunId}`} onClose={() => setSelectedRunId(null)}><p className="muted observations-intro">Incidencias, transformaciones y filas que requieren trazabilidad.</p>{observationsLoading ? <div className="loading">Cargando observaciones...</div> : observations.length === 0 ? <div className="empty">Esta ejecución no tiene observaciones registradas.</div> : <div className="observation-list">{observations.map((observation) => <article key={observation.id}><div><Badge value={observation.severity} type={observation.severity} /><strong>{observation.code ?? 'GENERAL'}</strong></div><p>{observation.message}</p><small>{observation.sourceSheet} · filas {observation.sourceRows}</small></article>)}</div>}</Modal>}
   </div>;
 }
 

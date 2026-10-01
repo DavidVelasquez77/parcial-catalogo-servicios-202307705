@@ -36,6 +36,7 @@
 .warning-list { margin-top: 16px; padding: 12px 14px; border: 1px solid #f3d6a0; border-radius: 8px; background: #fff9ed; color: #825500; font-size: 13px; }
 .warning-list p { margin: 8px 0 0; line-height: 1.45; }
 .observation-list { display: grid; gap: 10px; }
+.observations-intro { margin-bottom: 18px; }
 .observation-list article { padding: 13px 15px; border: 1px solid var(--color-border); border-radius: 8px; background: #fbfcfe; }
 .observation-list article > div { display: flex; align-items: center; gap: 8px; }
 .observation-list p { margin: 9px 0 5px; font-size: 13px; line-height: 1.45; }
