@@ -42,6 +42,7 @@ La aplicación atiende estas necesidades con un frontend web, una API, PostgreSQ
 - Tratamiento explícito de SE.12 y de datos faltantes.
 - Historial de importaciones y observaciones.
 - Docker Compose, migraciones y scripts reproducibles.
+- Pirámide automatizada 70/20/10 con Jest, ts-jest y Playwright.
 - Documentación de context engineering, prompt engineering y harness engineering.
 - Registro ampliado de las tres fases en `docs/ia/`, con prompts finales en XML.
 

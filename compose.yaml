@@ -49,5 +49,15 @@ services:
     depends_on:
       - api
 
+  e2e:
+    build:
+      context: .
+      dockerfile: e2e/Dockerfile
+    environment:
+      BASE_URL: http://web
+    depends_on:
+      - web
+    profiles: ["tests"]
+
 volumes:
   postgres_data:

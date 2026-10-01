@@ -127,6 +127,28 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 
 Ejecuta sin Node instalado en el host la construcción de API y frontend, auditoría de secretos, Compose, validación estructural del Excel, seed, importación, reimportación idéntica, aceptación funcional P01–P11, smoke y persistencia. En Linux o macOS usar `sh scripts/harness-docker.sh`.
 
+## Pirámide de pruebas 70/20/10
+
+La solución usa Jest con ts-jest para unitarias e integración, y Playwright para la prueba E2E de navegador. La suite tiene 10 casos: 7 unitarios, 2 de integración y 1 E2E.
+
+~~~powershell
+# Windows PowerShell
+& .\scripts\test-pyramid.ps1 unit
+& .\scripts\test-pyramid.ps1 integration
+& .\scripts\test-pyramid.ps1 e2e
+& .\scripts\test-pyramid.ps1 all
+~~~
+
+~~~bash
+# Linux, macOS o Git Bash
+sh scripts/test-pyramid.sh unit
+sh scripts/test-pyramid.sh integration
+sh scripts/test-pyramid.sh e2e
+sh scripts/test-pyramid.sh all
+~~~
+
+Las unitarias aíslan servicios con mocks; integración usa PostgreSQL y `data/CatalogoServicios.xlsx`; E2E abre el frontend servido por Nginx y prueba el recorrido visible de login, catálogo, filtro y logout. Cada runner detiene el flujo si una prueba falla.
+
 ### Prueba de aceptación completa dentro de Docker
 
 ~~~powershell

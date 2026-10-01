@@ -13,6 +13,10 @@ ENV NODE_ENV=production
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
+COPY --from=build /app/apps/api/src ./apps/api/src
+COPY --from=build /app/apps/api/test ./apps/api/test
+COPY --from=build /app/apps/api/tsconfig.json ./apps/api/tsconfig.json
+COPY --from=build /app/apps/api/tsconfig.build.json ./apps/api/tsconfig.build.json
 COPY --from=build /app/database ./database
 RUN mkdir -p /app/data
 COPY data/CatalogoServicios.xlsx /app/data/CatalogoServicios.xlsx

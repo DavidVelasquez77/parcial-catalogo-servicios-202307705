@@ -256,6 +256,36 @@ npm run build
 npm run audit:secrets
 ~~~
 
+### Pirámide automatizada 70/20/10
+
+La calidad se distribuye por costo y alcance, no por cantidad de archivos:
+
+| Nivel | Framework | Casos | Proporción | Qué valida |
+|---|---|---:|---:|---|
+| Unitarias | Jest + ts-jest | 7 | 70% | autenticación, reglas de umbrales, responsables, valores nulos y paginación con dependencias simuladas |
+| Integración | Jest + PostgreSQL real | 2 | 20% | lectura del Excel original, validación estructural e importación repetible contra la base |
+| E2E | Playwright | 1 | 10% | login, navegación del catálogo, búsqueda de SE.12 y cierre de sesión en el navegador |
+
+Los comandos oficiales tampoco requieren Node.js instalado en el host. Ejecutarlos desde la raíz del repositorio:
+
+~~~powershell
+# Windows PowerShell
+& .\scripts\test-pyramid.ps1 unit
+& .\scripts\test-pyramid.ps1 integration
+& .\scripts\test-pyramid.ps1 e2e
+& .\scripts\test-pyramid.ps1 all
+~~~
+
+~~~bash
+# Linux, macOS o Git Bash
+sh scripts/test-pyramid.sh unit
+sh scripts/test-pyramid.sh integration
+sh scripts/test-pyramid.sh e2e
+sh scripts/test-pyramid.sh all
+~~~
+
+`all` ejecuta las 10 pruebas de la pirámide: 7 unitarias, 2 de integración y 1 E2E. El resultado final esperado contiene `{"ok":true,"suite":"all","pyramid":"70/20/10"}`. Las pruebas de aceptación P01–P11 y el harness Docker siguen siendo controles funcionales adicionales, no se cuentan artificialmente dentro de ese porcentaje.
+
 ### Harness completo
 
 ~~~bash

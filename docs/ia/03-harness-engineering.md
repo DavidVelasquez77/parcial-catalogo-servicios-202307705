@@ -23,6 +23,8 @@ El harness no es únicamente un script de pruebas ni depende de que la IA esté 
 | `audit-secrets.mjs` | detecta secretos accidentales versionados |
 | `harness-docker.ps1/.sh` | ejecuta el flujo oficial sin Node.js en el host y detiene ante fallos |
 | `harness.mjs` | atajo opcional para desarrollo local con Node.js |
+| Jest + ts-jest | ejecuta 7 unitarias y 2 integraciones reproducibles dentro del contenedor API |
+| Playwright | ejecuta 1 recorrido E2E del navegador dentro de su contenedor oficial |
 
 ## 3. Orden de control
 
@@ -72,6 +74,8 @@ Este ciclo es parte de Harness Engineering; no se presenta como una cuarta disci
 ~~~
 
 En Linux o macOS se ejecuta `sh scripts/harness-docker.sh`. Este es el flujo oficial y no requiere Node.js en el host: la construcción ocurre en Docker y los scripts de seed, importación, reimportación, aceptación, smoke, auditoría y persistencia se ejecutan dentro de contenedores. `npm run harness` y `npm run persistence:check` quedan como atajos opcionales para desarrollo local.
+
+La pirámide de pruebas se ejecuta con `scripts/test-pyramid.ps1` o `scripts/test-pyramid.sh`. Sus 10 casos se distribuyen como 7 unitarias Jest, 2 integraciones Jest contra PostgreSQL y 1 E2E Playwright. Los comandos aceptan `unit`, `integration`, `e2e` o `all`; la última opción imprime el resultado `70/20/10`.
 
 ## 8. Criterio de aceptación de esta fase
 

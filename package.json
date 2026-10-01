@@ -2,7 +2,10 @@
   "name": "catalogo-servicios-ti",
   "private": true,
   "version": "2.0.0",
-  "workspaces": ["apps/api", "apps/web"],
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
   "scripts": {
     "install:all": "npm install --workspaces",
     "build": "npm run build --workspace apps/api && npm run build --workspace apps/web",
@@ -18,5 +21,8 @@
     "verify:import": "npm run verify:import --workspace apps/api",
     "audit:secrets": "node scripts/audit-secrets.mjs",
     "harness": "node scripts/harness.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.52.0"
   }
 }
