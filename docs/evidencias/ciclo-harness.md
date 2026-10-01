@@ -21,28 +21,29 @@ Con estas piezas otra persona puede levantar el entorno, cargar datos, ejecutar 
 ## 2. Comando principal
 
 ~~~powershell
-$env:HARNESS_RUN_SMOKE='1'
-npm run harness
+& .\scripts\harness-docker.ps1
 ~~~
 
 En Linux o macOS:
 
 ~~~bash
-HARNESS_RUN_SMOKE=1 npm run harness
+sh scripts/harness-docker.sh
 ~~~
 
-## 3. Controles que ejecuta harness.mjs
+Estos comandos son el flujo oficial Docker-only: no requieren Node.js en el host. `npm run harness` se conserva como atajo opcional para desarrollo local.
+
+## 3. Controles que ejecuta el harness Docker-only
 
 | Orden | Control | Qué verifica | Falla si |
 |---:|---|---|---|
-| 1 | typecheck | API y frontend compilan en TypeScript | existen errores de tipos |
-| 2 | build | NestJS y Vite generan artefactos | falla el build |
-| 3 | secret-audit | no hay secretos obvios en fuentes o documentación | encuentra patrones prohibidos |
-| 4 | compose-config | Compose es sintácticamente válido | Docker no puede resolver la configuración |
-| 5 | import-validation | Excel legible, hoja, encabezados A4:L4, rango, códigos, tipos y umbrales | el archivo no cumple el contrato estructural |
+| 1 | build | Docker compila API y frontend mediante sus Dockerfiles | falla el build |
+| 2 | secret-audit | no hay secretos obvios en fuentes o documentación | encuentra patrones prohibidos |
+| 3 | compose-config | Compose es sintácticamente válido | Docker no puede resolver la configuración |
+| 4 | import-validation | Excel legible, hoja, encabezados A4:L4, rango, códigos, tipos y umbrales | el archivo no cumple el contrato estructural |
+| 5 | seed/import/verify | prepara datos demo, sincroniza y comprueba 12/46/0/3 | falla la carga o cambia el conteo |
 | 6 | acceptance | P01–P11: autenticación, roles, organización, duplicados, importación, SE.12, umbrales y responsables | un contrato funcional no coincide |
-| 7 | smoke opcional | recorrido corto P01, P02, P03 y P10 | un estado HTTP no coincide |
-| 8 | persistence | reinicio controlado de db y api y verificación 12/46/0/3 | se pierden datos o cambia el conteo |
+| 7 | smoke | recorrido corto P01, P02, P03 y P10 | un estado HTTP no coincide |
+| 8 | persistence | reinicio controlado de db y api dentro del flujo Docker y verificación 12/46/0/3 | se pierden datos o cambia el conteo |
 
 Cada control hereda el código de salida del proceso. Un control fallido detiene el harness y reporta el paso responsable. La aceptación usa datos temporales con prefijo `ACC-`, prueba primero las bajas lógicas mediante la API y, si termina correctamente, elimina únicamente las filas que creó mediante una transacción de limpieza acotada. Una ejecución fallida conserva los datos para poder diagnosticarla.
 
@@ -84,7 +85,7 @@ El seed es repetible: actualiza los registros demo sin crear otra cuenta demo en
 
 ### Plan
 
-Levantar PostgreSQL, API y frontend mediante Compose. Luego validar el Excel, ejecutar typecheck, build, auditoría, aceptación P01–P11, smoke y persistencia.
+Levantar PostgreSQL, API y frontend mediante Compose. Luego construir las imágenes, validar el Excel, ejecutar seed, importación, aceptación P01–P11, smoke y persistencia, sin depender de Node en el host.
 
 ### Act
 
@@ -127,16 +128,11 @@ Luego se reconstruyó la imagen API.
 
 Se repitieron:
 
-~~~text
-docker compose up -d
-docker compose exec api node apps/api/dist/scripts/validate-import.js
-docker compose exec api node apps/api/dist/scripts/seed-demo.js
-docker compose exec api node apps/api/dist/scripts/import-catalog.js
-docker compose exec api node apps/api/dist/scripts/verify-import.js
-docker compose exec api node apps/api/dist/scripts/smoke.js
-npm test
-npm run persistence:check
+~~~powershell
+& .\scripts\harness-docker.ps1
 ~~~
+
+La misma rutina puede ejecutarse en Linux o macOS con `sh scripts/harness-docker.sh`. Todo el flujo se ejecuta en contenedores; no se requiere Node.js en el host.
 
 Resultado:
 
@@ -197,7 +193,10 @@ La sincronización no hace una limpieza destructiva. Un código nuevo se agrega,
 Para verificar que el harness no depende de una base efímera:
 
 ~~~bash
-npm run persistence:check
+docker compose restart db
+docker compose exec db pg_isready -U catalogo -d catalogo
+docker compose restart api
+docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
 
 El resultado conservó:

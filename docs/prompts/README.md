@@ -82,7 +82,7 @@ Cada ficha responde las mismas preguntas:
 | modelo de datos | claves, relaciones y checks | database/migrations/001_init.sql | migración + typecheck |
 | autenticación | guards, bcrypt y sesión persistida | auth/, users/, smoke.js | P01–P03 |
 | importador | upsert incremental, SE.12 y trazabilidad | imports/import.service.ts | P06–P08 |
-| pruebas y Docker | rutina reproducible y límites | harness.mjs, acceptance.js | P01–P12 |
+| pruebas y Docker | rutina reproducible y límites | harness-docker.ps1/.sh, acceptance.js | P01–P11 |
 
 ## Forma de evaluar cada prompt
 
@@ -138,7 +138,7 @@ Cada ficha responde las mismas preguntas:
 | 02 | modelo y restricciones | migración + typecheck | tablas, FK, checks y build |
 | 03 | sesión y roles | `smoke.js` + aceptación | 401, 200, 201, 403 |
 | 04 | importación incremental | import + verify | 12/46/0/3 y contadores |
-| 05 | reproducibilidad | `harness.mjs` | todos los controles en cero |
+| 05 | reproducibilidad | `harness-docker.ps1/.sh` | todos los controles en cero |
 
 ## Cómo leer una respuesta del asistente
 

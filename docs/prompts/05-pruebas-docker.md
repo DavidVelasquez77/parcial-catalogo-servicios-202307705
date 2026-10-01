@@ -31,7 +31,7 @@ Define un harness para este proyecto con Docker Compose, migración, seed, valid
 
 ## Salida esperada
 
-- scripts/harness.mjs;
+- scripts/harness-docker.ps1 y scripts/harness-docker.sh;
 - validate-import.js;
 - AGENTS.md;
 - compose.yaml;
@@ -46,7 +46,7 @@ El harness debe detenerse en el primer fallo, mostrar el paso responsable y fina
 
 ## Resultado aplicado
 
-El harness ejecuta typecheck, build, secret-audit, compose-config, validación del Excel, aceptación funcional P01–P11, smoke opcional y persistencia. La evidencia de la ruta de migración corregida, la validación del archivo y la verificación final está en docs/evidencias/ciclo-harness.md.
+El harness Docker-only ejecuta Compose, construcción y migración automática, validación del Excel, seed, importación, verificación, aceptación funcional P01–P11, smoke, auditoría de secretos y persistencia. La evidencia de la ruta de migración corregida, la validación del archivo y la verificación final está en docs/evidencias/ciclo-harness.md.
 
 ## Prompt final
 
@@ -74,13 +74,13 @@ El harness ejecuta typecheck, build, secret-audit, compose-config, validación d
     </scripts>
   </project_context>
   <control_sequence>
-    <control order="1" name="typecheck">API y frontend sin errores de tipos.</control>
-    <control order="2" name="build">NestJS y Vite generan artefactos.</control>
-    <control order="3" name="secret-audit">No hay secretos reales versionados.</control>
-    <control order="4" name="compose-config">Compose resuelve la configuración.</control>
-    <control order="5" name="import-validation">El Excel cumple hoja, columnas, tipos y estructura.</control>
-    <control order="6" name="acceptance">P01–P11 se cumplen por HTTP y base real.</control>
-    <control order="7" name="smoke">El recorrido crítico responde correctamente.</control>
+    <control order="1" name="compose-config">Compose resuelve la configuración.</control>
+    <control order="2" name="build-up-migrate">Docker construye API y frontend, levanta dependencias y aplica la migración automática.</control>
+    <control order="3" name="import-validation">El Excel cumple hoja, columnas, tipos y estructura antes de importar.</control>
+    <control order="4" name="seed-import-verify">Los datos demo se preparan, el Excel se sincroniza y los conteos quedan en 12/46/0/3.</control>
+    <control order="5" name="acceptance">P01–P11 se cumplen por HTTP y base real.</control>
+    <control order="6" name="smoke">El recorrido crítico responde correctamente.</control>
+    <control order="7" name="secret-audit">No hay secretos reales versionados.</control>
     <control order="8" name="persistence">Los conteos sobreviven al reinicio controlado.</control>
   </control_sequence>
   <failure_policy>
@@ -108,7 +108,7 @@ El harness ejecuta typecheck, build, secret-audit, compose-config, validación d
     <constraint>No ocultar fallos mediante comandos que siempre devuelvan cero.</constraint>
   </constraints>
   <deliverables>
-    <deliverable>scripts/harness.mjs con pasos ordenados.</deliverable>
+    <deliverable>scripts/harness-docker.ps1 y scripts/harness-docker.sh con pasos ordenados.</deliverable>
     <deliverable>Compose y Dockerfiles reproducibles.</deliverable>
     <deliverable>Comandos de validación, aceptación, smoke y persistencia.</deliverable>
     <deliverable>Salida JSON o código de salida que permita interpretar cada control.</deliverable>
@@ -124,10 +124,8 @@ El harness ejecuta typecheck, build, secret-audit, compose-config, validación d
     <criterion>La auditoría no confunde un .env local ignorado con un secreto publicado.</criterion>
   </acceptance_criteria>
   <validation>
-    <command>npm run harness</command>
-    <command>$env:HARNESS_RUN_SMOKE='1'; npm run harness</command>
-    <command>npm test</command>
-    <command>npm run persistence:check</command>
+    <command>&amp; .\scripts\harness-docker.ps1</command>
+    <command>sh scripts/harness-docker.sh</command>
   </validation>
   <response_format>
     Reportar controles ejecutados, códigos de salida, resultados JSON,
@@ -138,7 +136,8 @@ El harness ejecuta typecheck, build, secret-audit, compose-config, validación d
 
 ## Verificación y artefactos
 
-- Harness: `scripts/harness.mjs`.
+- Harness oficial: `scripts/harness-docker.ps1` y `scripts/harness-docker.sh`.
+- Atajo local opcional: `scripts/harness.mjs`.
 - Auditoría: `scripts/audit-secrets.mjs`.
 - Aceptación: `apps/api/src/scripts/acceptance.ts`.
 - Persistencia: `scripts/persistence-check.mjs`.

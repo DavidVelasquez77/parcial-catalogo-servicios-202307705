@@ -9,6 +9,7 @@ Esta guía permite evaluar la solución desde cero y relacionar cada escenario d
 ~~~bash
 docker compose up --build -d
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
+docker compose exec api node apps/api/dist/scripts/validate-import.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
@@ -106,7 +107,7 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 | P09 | Mínimo mayor que máximo | Crear o editar con minimum 10 y maximum 5 | API rechaza la operación con HTTP 400 | acceptance.js |
 | P10 | Búsqueda y filtros | Buscar SE.12 y seleccionar REVIEW | Resultado de tres servicios | acceptance.js + smoke.js |
 | P11 | Responsable incorrecto | Seleccionar usuario que no pertenece a la sección | API rechaza la asignación | acceptance.js |
-| P12 | Persistencia | Reiniciar PostgreSQL y volver a levantar API | Datos se conservan: 12/46/0/3 | persistence-check.mjs |
+| P12 | Persistencia | Reiniciar PostgreSQL y volver a levantar API | Datos se conservan: 12/46/0/3 | harness-docker.ps1/.sh |
 
 ## Pruebas automatizadas disponibles
 
@@ -115,25 +116,24 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 - `verify-import.js` es una comprobación de integración con PostgreSQL y el modelo importado.
 - `acceptance.js` es una prueba de integración/extremo a extremo de la API: usa HTTP, sesión, guards, reglas de negocio y base de datos real dentro de Docker.
 - `smoke.js` es un recorrido corto de integración para login, logout, permisos y filtros.
-- `persistence-check.mjs` es una prueba operativa de integración que reinicia los servicios y verifica el volumen persistente.
+- `harness-docker.ps1/.sh` incluye la prueba operativa que reinicia los servicios y verifica el volumen persistente. `persistence-check.mjs` queda como atajo local opcional.
 - No se presenta una suite unitaria aislada como sustituto de estos escenarios; los criterios del parcial se comprueban con datos reales y resultados observables.
 
 ### Harness
 
 ~~~powershell
-$env:HARNESS_RUN_SMOKE='1'
-npm run harness
+& .\scripts\harness-docker.ps1
 ~~~
 
-Comprueba typecheck, build, secretos, Compose, validación estructural del Excel, aceptación funcional P01–P11, smoke y persistencia P12.
+Ejecuta sin Node instalado en el host la construcción de API y frontend, auditoría de secretos, Compose, validación estructural del Excel, seed, importación, aceptación funcional P01–P11, smoke y persistencia. En Linux o macOS usar `sh scripts/harness-docker.sh`.
 
-### Prueba de aceptación completa
+### Prueba de aceptación completa dentro de Docker
 
 ~~~powershell
-npm test
+docker compose exec -T api node apps/api/dist/scripts/acceptance.js
 ~~~
 
-Ejecuta dentro del contenedor API `acceptance.js`. Crea datos temporales con prefijo `ACC-`, verifica reglas positivas y negativas, restaura las asignaciones tocadas y limpia exclusivamente las filas creadas por la prueba cuando termina correctamente. La salida esperada contiene `"ok":true` y los checks P01 a P11.
+Ejecuta dentro del contenedor API `acceptance.js`. Crea datos temporales con prefijo `ACC-`, verifica reglas positivas y negativas, restaura las asignaciones tocadas y limpia exclusivamente las filas creadas por la prueba cuando termina correctamente. La salida esperada contiene `"ok":true` y los checks P01 a P11. `npm test` es únicamente un atajo opcional para equipos que ya tengan Node.js y npm.
 
 ### Smoke
 
@@ -150,10 +150,13 @@ Salida esperada:
 ### Persistencia después de reinicio
 
 ~~~powershell
-npm run persistence:check
+docker compose restart db
+docker compose exec db pg_isready -U catalogo -d catalogo
+docker compose restart api
+docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
 
-El script reinicia PostgreSQL, espera su estado healthy, reinicia la API y repite la verificación de importación. No ejecuta `down -v` y por eso no destruye el volumen `postgres_data`.
+El procedimiento reinicia PostgreSQL, comprueba su disponibilidad, reinicia la API y repite la verificación dentro del contenedor. No ejecuta `down -v` y por eso no destruye el volumen `postgres_data`.
 
 ### Importación
 

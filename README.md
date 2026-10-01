@@ -57,15 +57,17 @@ El diseño visual usa CSS propio y tokens de color inspirados en la referencia i
 
 ### Ruta recomendada: Docker
 
-Para ejecutar la aplicación no es necesario instalar Node.js, PostgreSQL ni NestJS en el equipo anfitrión. Solo se necesita:
+Para ejecutar la aplicación y la verificación reproducible no es necesario instalar Node.js, PostgreSQL ni NestJS en el equipo anfitrión. Solo se necesita:
 
 - Docker Desktop abierto;
-- Docker Compose v2, incluido en las versiones actuales de Docker Desktop;
+- Docker Compose v2 y BuildKit, incluidos en Docker Desktop;
 - Git, si se clona el repositorio.
 
-### Ruta opcional: comandos locales
+Versiones usadas en la verificación de esta entrega: Docker Engine `28.5.1` y Docker Compose `v2.40.0-desktop.1`. Se recomienda Docker Desktop actualizado que incluya Compose v2 y BuildKit.
 
-Para ejecutar npm run typecheck, npm run build o npm run harness desde Windows se necesita Node.js 22 o compatible y npm. La base de datos y la aplicación pueden seguir ejecutándose en Docker.
+### Herramientas opcionales de desarrollo
+
+Los comandos `npm run typecheck`, `npm run build` y `npm run harness` son atajos opcionales para desarrollo local. No forman parte del procedimiento de evaluación y requieren Node.js 22. El procedimiento oficial sin Node en el host es `scripts/harness-docker.ps1` en Windows o `scripts/harness-docker.sh` en Linux/macOS.
 
 ## 5. Rutas y encendido de la aplicación
 
@@ -132,8 +134,11 @@ docker compose down
 # Volver a iniciar conservando el volumen postgres_data
 docker compose up -d
 
-# Reiniciar db y API para comprobar persistencia
-npm run persistence:check
+# Reiniciar db y API para comprobar persistencia sin Node en el host
+docker compose restart db
+docker compose exec db pg_isready -U catalogo -d catalogo
+docker compose restart api
+docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
 
 No ejecutar `docker compose down -v` durante la evaluación: elimina los datos persistidos.
@@ -161,6 +166,7 @@ cp .env.example .env
 docker compose up --build -d
 docker compose ps
 docker compose exec api node apps/api/dist/scripts/seed-demo.js
+docker compose exec api node apps/api/dist/scripts/validate-import.js
 docker compose exec api node apps/api/dist/scripts/import-catalog.js
 docker compose exec api node apps/api/dist/scripts/verify-import.js
 ~~~
@@ -253,23 +259,22 @@ npm run audit:secrets
 ### Harness completo
 
 ~~~bash
-npm run harness
+sh scripts/harness-docker.sh
 ~~~
 
-El harness ejecuta typecheck, build, auditoría de secretos, validación de Compose y validación estructural del Excel. Para incluir aceptación, smoke y persistencia contra el entorno Docker:
+El harness oficial ejecuta todo dentro de contenedores: construcción de API y frontend, auditoría, Compose, validación del Excel, seed, importación, aceptación, smoke y persistencia. En Windows PowerShell:
 
 ~~~powershell
-$env:HARNESS_RUN_SMOKE='1'
-npm run harness
+& .\scripts\harness-docker.ps1
 ~~~
 
 En Linux o macOS:
 
 ~~~bash
-HARNESS_RUN_SMOKE=1 npm run harness
+sh scripts/harness-docker.sh
 ~~~
 
-Con `HARNESS_RUN_SMOKE=1`, el harness ejecuta también aceptación P01–P11, smoke y persistencia P12. Como alternativa directa para la aceptación funcional:
+El resultado termina con `{"ok":true,"harness":"docker-only"}`. Como atajos opcionales de desarrollo se conservan:
 
 ~~~bash
 npm test
@@ -334,7 +339,8 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 │   ├── src/users/                    # usuarios y roles
 │   └── src/scripts/                  # migrar, seed, validar, importar, verificar, aceptación, smoke
 ├── apps/web/src/                     # interfaz React y estilos
-├── scripts/harness.mjs               # rutina de verificación reproducible
+├── scripts/harness-docker.ps1/.sh    # harness oficial sin Node en el host
+├── scripts/harness.mjs               # atajo local opcional
 ├── docs/RESOLUCION.md                # explicación técnica completa
 ├── docs/IMPORTACION.md               # reglas del Excel y trazabilidad
 ├── docs/API.md                       # rutas y payloads principales

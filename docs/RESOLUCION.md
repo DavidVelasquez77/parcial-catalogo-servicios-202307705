@@ -373,21 +373,21 @@ El harness es la combinación de:
 - acceptance.js;
 - persistence-check.mjs;
 - audit-secrets.mjs;
-- harness.mjs;
+- harness-docker.ps1 / harness-docker.sh;
 - comandos de logs, reinicio y recuperación;
 - datos controlados de demostración.
 
-La rutina no depende de una suscripción de IA. Tiene entradas, controles observables y códigos de salida. Además, no ejecuta down -v automáticamente.
+La ruta oficial es `harness-docker.ps1` o `harness-docker.sh`; `harness.mjs` y `persistence-check.mjs` se conservan como atajos opcionales para desarrollo local. La rutina oficial no requiere Node.js, PostgreSQL ni NestJS instalados en el host, no depende de una suscripción de IA, tiene entradas y controles observables, y no ejecuta down -v automáticamente.
 
-### Qué comprueba harness.mjs
+### Qué comprueba el harness Docker-only
 
-1. typecheck del API y frontend;
-2. build de API y frontend;
-3. auditoría de secretos;
-4. validación de compose.yaml;
-5. validación del Excel;
+1. construcción de API y frontend dentro de Docker;
+2. auditoría de secretos dentro de un contenedor Node;
+3. validación de compose.yaml;
+4. validación del Excel;
+5. seed, importación y verificación 12/46/0/3;
 6. aceptación funcional P01–P11;
-7. smoke opcional si HARNESS_RUN_SMOKE=1;
+7. smoke;
 8. comprobación de persistencia después del reinicio.
 
 ## 15. Ciclo de corrección del harness
@@ -411,29 +411,19 @@ El ciclo evita considerar una implementación terminada solo porque compila. Cad
 
 ### Comandos ejecutados
 
-~~~text
-npm run typecheck
-npm run build
-npm run harness con HARNESS_RUN_SMOKE=1
-npm test
-npm run persistence:check
-docker compose build api web
-docker compose up -d db api web
-docker compose exec api node apps/api/dist/scripts/seed-demo.js
-docker compose exec api node apps/api/dist/scripts/validate-import.js
-docker compose exec api node apps/api/dist/scripts/import-catalog.js
-docker compose exec api node apps/api/dist/scripts/verify-import.js
-docker compose exec api node apps/api/dist/scripts/smoke.js
-docker compose restart db api
-docker compose up -d web
+~~~powershell
+& .\scripts\harness-docker.ps1
+~~~
+
+~~~bash
+sh scripts/harness-docker.sh
 ~~~
 
 ### Resultados
 
 | Control | Resultado |
 |---|---|
-| TypeScript | Exitoso para API y frontend |
-| Build | Exitoso para NestJS y Vite |
+| Build Docker | Exitoso para NestJS y Vite; la compilación ocurre dentro de las imágenes |
 | Docker | API, web y db en ejecución |
 | Migración | Aplicada automáticamente |
 | Seed | Cuentas y organización demo creadas |
@@ -475,7 +465,7 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | Docker | Dockerfiles y Compose | build y ps | compose.yaml |
 | Context engineering | AGENTS, contexto versionado y guía de fase | revisión de actualizaciones | docs/contexto, docs/ia/01-context-engineering.md |
 | Prompt engineering | cinco prompts finales XML e iteraciones | revisión documental | docs/prompts, docs/ia/02-prompt-engineering.md |
-| Harness engineering | scripts y controles | harness, aceptación y persistencia en verde | scripts/harness.mjs, acceptance.ts |
+| Harness engineering | scripts y controles | harness Docker-only, aceptación y persistencia en verde | scripts/harness-docker.ps1/.sh, acceptance.ts |
 | Ciclo de corrección del harness | evidencia de corrección | fallo y re-ejecución | docs/evidencias |
 
 ## 18. Limitaciones conocidas

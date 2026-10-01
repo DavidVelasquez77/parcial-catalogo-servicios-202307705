@@ -21,13 +21,15 @@ El harness no es únicamente un script de pruebas ni depende de que la IA esté 
 | `smoke.js` | ejecuta un recorrido corto de autenticación y filtros |
 | `persistence-check.mjs` | reinicia servicios y comprueba el volumen |
 | `audit-secrets.mjs` | detecta secretos accidentales versionados |
-| `harness.mjs` | ejecuta controles en orden y detiene ante fallos |
+| `harness-docker.ps1/.sh` | ejecuta el flujo oficial sin Node.js en el host y detiene ante fallos |
+| `harness.mjs` | atajo opcional para desarrollo local con Node.js |
 
 ## 3. Orden de control
 
 ~~~text
-TYPECHECK → BUILD → SECRET-AUDIT → COMPOSE-CONFIG
-    → IMPORT-VALIDATION → ACCEPTANCE → SMOKE → PERSISTENCE
+BUILD → SECRET-AUDIT → COMPOSE-CONFIG → IMPORT-VALIDATION
+    → IMPORT-VALIDATION → SEED → IMPORT → VERIFY → ACCEPTANCE
+    → SMOKE → SECRET-AUDIT → PERSISTENCE
 ~~~
 
 Cada paso tiene una entrada, una salida observable y un código de salida. El siguiente paso no debe ocultar el fallo del anterior.
@@ -66,16 +68,10 @@ Este ciclo es parte de Harness Engineering; no se presenta como una cuarta disci
 ## 7. Comandos principales
 
 ~~~powershell
-docker compose up --build -d
-docker compose ps
-docker compose exec api node apps/api/dist/scripts/validate-import.js
-docker compose exec api node apps/api/dist/scripts/import-catalog.js
-docker compose exec api node apps/api/dist/scripts/verify-import.js
-$env:HARNESS_RUN_SMOKE='1'
-npm run harness
+& .\scripts\harness-docker.ps1
 ~~~
 
-La aceptación directa se ejecuta con `npm test` y la persistencia con `npm run persistence:check`.
+En Linux o macOS se ejecuta `sh scripts/harness-docker.sh`. Este es el flujo oficial y no requiere Node.js en el host: la construcción ocurre en Docker y los scripts de seed, importación, aceptación, smoke, auditoría y persistencia se ejecutan dentro de contenedores. `npm run harness` y `npm run persistence:check` quedan como atajos opcionales para desarrollo local.
 
 ## 8. Criterio de aceptación de esta fase
 

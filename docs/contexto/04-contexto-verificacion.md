@@ -22,20 +22,24 @@ El enunciado califica Context Engineering, Prompt Engineering y Harness Engineer
 | incremental | iguales no reciben UPDATE | resumen de importación |
 | incremental | nuevos se agregan y modificados se actualizan | importación repetida |
 | seguridad | no se versionan secretos | `audit:secrets` |
-| persistencia | datos sobreviven al reinicio | `persistence-check.mjs` |
+| persistencia | datos sobreviven al reinicio | `harness-docker.ps1/.sh` |
 
 ## 3. Orden de verificación
 
 ### Controles automáticos
 
-1. `npm run typecheck`;
-2. `npm run build`;
-3. `npm run audit:secrets`;
-4. `docker compose config`;
-5. `validate-import.js`;
-6. `acceptance.js` P01–P11;
-7. `smoke.js`;
-8. `persistence-check.mjs`.
+La ruta oficial es Docker-only y no necesita Node.js en el host. `scripts/harness-docker.ps1` en Windows y `scripts/harness-docker.sh` en Linux/macOS ejecutan, en este orden:
+
+1. `docker compose config`;
+2. `docker compose up --build -d`, que construye las imágenes y ejecuta la migración automática;
+3. `validate-import.js` dentro de la API, antes de importar;
+4. `seed-demo.js`, importación y `verify-import.js`;
+5. `acceptance.js` P01–P11;
+6. `smoke.js`;
+7. `audit-secrets.mjs` dentro de un contenedor Node efímero;
+8. reinicio controlado de PostgreSQL y API, seguido de una nueva verificación.
+
+Los comandos `npm run typecheck`, `npm run build`, `npm test` y `npm run persistence:check` quedan como atajos opcionales para desarrollo local, no como requisito de evaluación.
 
 ### Revisiones complementarias
 
@@ -53,7 +57,7 @@ El enunciado califica Context Engineering, Prompt Engineering y Harness Engineer
 | `verify-import.js` | PostgreSQL | 12/46/0/3 | invariantes del catálogo |
 | `acceptance.js` | API + datos `ACC-` | checks P01–P11 | reglas HTTP y negocio |
 | `smoke.js` | API levantada | checks rápidos | recorrido crítico |
-| `persistence-check.mjs` | Compose + volumen | conteos tras reinicio | persistencia real |
+| `harness-docker.ps1/.sh` | Compose + volumen | conteos tras reinicio | persistencia real |
 | `audit:secrets` | repositorio | `ok: true` | no hay secretos accidentales |
 | revisión visual | navegador | rutas, estados y foco | usabilidad y accesibilidad básica |
 
@@ -98,7 +102,7 @@ Este ciclo explica cómo se corrigió la ruta de migraciones dentro de Docker, c
 
 ## 8. Resultado de la verificación final
 
-El harness completo quedó en verde con typecheck, build, auditoría, Compose, validación del Excel, aceptación P01–P11, smoke y persistencia. El Excel original fue aceptado con hoja `Servicios Externos`, encabezados A4:L4, 46 servicios y 51 filas de continuación. La reimportación idéntica produce `updated: 0` y `skipped: 46`.
+El harness Docker-only quedó en verde con construcción, migración automática, auditoría, Compose, validación del Excel, aceptación P01–P11, smoke y persistencia. El Excel original fue aceptado con hoja `Servicios Externos`, encabezados A4:L4, 46 servicios y 51 filas de continuación. La reimportación idéntica produce `updated: 0` y `skipped: 46`.
 
 ## 9. Criterio de cierre
 
