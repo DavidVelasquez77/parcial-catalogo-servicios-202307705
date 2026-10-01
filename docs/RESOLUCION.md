@@ -385,7 +385,7 @@ La ruta oficial es `harness-docker.ps1` o `harness-docker.sh`; `harness.mjs` y `
 2. auditoría de secretos dentro de un contenedor Node;
 3. validación de compose.yaml;
 4. validación del Excel;
-5. seed, importación y verificación 12/46/0/3;
+5. seed, importación, reimportación idéntica y verificación 12/46/0/3;
 6. aceptación funcional P01–P11;
 7. smoke;
 8. comprobación de persistencia después del reinicio.

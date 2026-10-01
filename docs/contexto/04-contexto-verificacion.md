@@ -33,7 +33,7 @@ La ruta oficial es Docker-only y no necesita Node.js en el host. `scripts/harnes
 1. `docker compose config`;
 2. `docker compose up --build -d`, que construye las imágenes y ejecuta la migración automática;
 3. `validate-import.js` dentro de la API, antes de importar;
-4. `seed-demo.js`, importación y `verify-import.js`;
+4. `seed-demo.js`, importación, reimportación idéntica y `verify-import.js`;
 5. `acceptance.js` P01–P11;
 6. `smoke.js`;
 7. `audit-secrets.mjs` dentro de un contenedor Node efímero;

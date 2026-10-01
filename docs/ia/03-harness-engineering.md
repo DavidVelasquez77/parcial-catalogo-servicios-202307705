@@ -27,9 +27,9 @@ El harness no es únicamente un script de pruebas ni depende de que la IA esté 
 ## 3. Orden de control
 
 ~~~text
-BUILD → SECRET-AUDIT → COMPOSE-CONFIG → IMPORT-VALIDATION
-    → IMPORT-VALIDATION → SEED → IMPORT → VERIFY → ACCEPTANCE
-    → SMOKE → SECRET-AUDIT → PERSISTENCE
+COMPOSE-CONFIG → BUILD/UP/MIGRATE → IMPORT-VALIDATION → SEED
+    → IMPORT → REIMPORT → VERIFY → ACCEPTANCE → SMOKE
+    → SECRET-AUDIT → PERSISTENCE
 ~~~
 
 Cada paso tiene una entrada, una salida observable y un código de salida. El siguiente paso no debe ocultar el fallo del anterior.
@@ -71,7 +71,7 @@ Este ciclo es parte de Harness Engineering; no se presenta como una cuarta disci
 & .\scripts\harness-docker.ps1
 ~~~
 
-En Linux o macOS se ejecuta `sh scripts/harness-docker.sh`. Este es el flujo oficial y no requiere Node.js en el host: la construcción ocurre en Docker y los scripts de seed, importación, aceptación, smoke, auditoría y persistencia se ejecutan dentro de contenedores. `npm run harness` y `npm run persistence:check` quedan como atajos opcionales para desarrollo local.
+En Linux o macOS se ejecuta `sh scripts/harness-docker.sh`. Este es el flujo oficial y no requiere Node.js en el host: la construcción ocurre en Docker y los scripts de seed, importación, reimportación, aceptación, smoke, auditoría y persistencia se ejecutan dentro de contenedores. `npm run harness` y `npm run persistence:check` quedan como atajos opcionales para desarrollo local.
 
 ## 8. Criterio de aceptación de esta fase
 

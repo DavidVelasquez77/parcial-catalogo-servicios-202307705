@@ -32,6 +32,7 @@ run 'construir y levantar contenedores' docker compose up --build -d
 retry 'validar el Excel dentro de la API' docker compose exec -T api node apps/api/dist/scripts/validate-import.js
 run 'crear cuentas y organización demo' docker compose exec -T api node apps/api/dist/scripts/seed-demo.js
 run 'importar el Excel dentro de la API' docker compose exec -T api node apps/api/dist/scripts/import-catalog.js
+run 'repetir importación para comprobar idempotencia' docker compose exec -T api node apps/api/dist/scripts/import-catalog.js
 run 'verificar conteos y duplicados' docker compose exec -T api node apps/api/dist/scripts/verify-import.js
 run 'ejecutar aceptación P01-P11' docker compose exec -T api node apps/api/dist/scripts/acceptance.js
 run 'ejecutar smoke tests' docker compose exec -T api node apps/api/dist/scripts/smoke.js

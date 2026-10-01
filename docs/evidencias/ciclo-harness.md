@@ -40,7 +40,7 @@ Estos comandos son el flujo oficial Docker-only: no requieren Node.js en el host
 | 2 | secret-audit | no hay secretos obvios en fuentes o documentación | encuentra patrones prohibidos |
 | 3 | compose-config | Compose es sintácticamente válido | Docker no puede resolver la configuración |
 | 4 | import-validation | Excel legible, hoja, encabezados A4:L4, rango, códigos, tipos y umbrales | el archivo no cumple el contrato estructural |
-| 5 | seed/import/verify | prepara datos demo, sincroniza y comprueba 12/46/0/3 | falla la carga o cambia el conteo |
+| 5 | seed/import/reimport/verify | prepara datos demo, la segunda importación devuelve `updated: 0`, `skipped: 46` y se comprueba 12/46/0/3 | falla la carga, cambia el conteo o duplica registros |
 | 6 | acceptance | P01–P11: autenticación, roles, organización, duplicados, importación, SE.12, umbrales y responsables | un contrato funcional no coincide |
 | 7 | smoke | recorrido corto P01, P02, P03 y P10 | un estado HTTP no coincide |
 | 8 | persistence | reinicio controlado de db y api dentro del flujo Docker y verificación 12/46/0/3 | se pierden datos o cambia el conteo |

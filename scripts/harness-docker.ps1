@@ -40,6 +40,7 @@ Invoke-DockerStep 'construir y levantar contenedores' @('compose', 'up', '--buil
 Invoke-DockerRetry 'validar el Excel dentro de la API' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/validate-import.js')
 Invoke-DockerStep 'crear cuentas y organización demo' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/seed-demo.js')
 Invoke-DockerStep 'importar el Excel dentro de la API' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/import-catalog.js')
+Invoke-DockerStep 'repetir importación para comprobar idempotencia' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/import-catalog.js')
 Invoke-DockerStep 'verificar conteos y duplicados' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/verify-import.js')
 Invoke-DockerStep 'ejecutar aceptación P01-P11' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/acceptance.js')
 Invoke-DockerStep 'ejecutar smoke tests' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/smoke.js')

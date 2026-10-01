@@ -125,7 +125,7 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 & .\scripts\harness-docker.ps1
 ~~~
 
-Ejecuta sin Node instalado en el host la construcción de API y frontend, auditoría de secretos, Compose, validación estructural del Excel, seed, importación, aceptación funcional P01–P11, smoke y persistencia. En Linux o macOS usar `sh scripts/harness-docker.sh`.
+Ejecuta sin Node instalado en el host la construcción de API y frontend, auditoría de secretos, Compose, validación estructural del Excel, seed, importación, reimportación idéntica, aceptación funcional P01–P11, smoke y persistencia. En Linux o macOS usar `sh scripts/harness-docker.sh`.
 
 ### Prueba de aceptación completa dentro de Docker
 

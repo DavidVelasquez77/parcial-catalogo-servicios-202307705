@@ -262,7 +262,7 @@ npm run audit:secrets
 sh scripts/harness-docker.sh
 ~~~
 
-El harness oficial ejecuta todo dentro de contenedores: construcción de API y frontend, auditoría, Compose, validación del Excel, seed, importación, aceptación, smoke y persistencia. En Windows PowerShell:
+El harness oficial ejecuta todo dentro de contenedores: construcción de API y frontend, auditoría, Compose, validación del Excel, seed, importación, reimportación idéntica, aceptación, smoke y persistencia. En Windows PowerShell:
 
 ~~~powershell
 & .\scripts\harness-docker.ps1

@@ -77,7 +77,7 @@ El harness Docker-only ejecuta Compose, construcción y migración automática, 
     <control order="1" name="compose-config">Compose resuelve la configuración.</control>
     <control order="2" name="build-up-migrate">Docker construye API y frontend, levanta dependencias y aplica la migración automática.</control>
     <control order="3" name="import-validation">El Excel cumple hoja, columnas, tipos y estructura antes de importar.</control>
-    <control order="4" name="seed-import-verify">Los datos demo se preparan, el Excel se sincroniza y los conteos quedan en 12/46/0/3.</control>
+    <control order="4" name="seed-import-reimport-verify">Los datos demo se preparan, el Excel se sincroniza dos veces y la segunda ejecución omite los 46 registros idénticos sin duplicarlos.</control>
     <control order="5" name="acceptance">P01–P11 se cumplen por HTTP y base real.</control>
     <control order="6" name="smoke">El recorrido crítico responde correctamente.</control>
     <control order="7" name="secret-audit">No hay secretos reales versionados.</control>
