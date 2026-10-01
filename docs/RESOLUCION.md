@@ -5,7 +5,7 @@
 - Asignatura: Software Avanzado.
 - Carné: 202307705.
 - Repositorio: [parcial-catalogo-servicios-202307705](https://github.com/DavidVelasquez77/parcial-catalogo-servicios-202307705).
-- Commit de entrega: aa1bae7.
+- Commit de entrega: 71ac7dc.
 - Etiqueta de entrega: parcial-v2.0.
 - Fecha de última verificación documentada: 30 de septiembre de 2026.
 
