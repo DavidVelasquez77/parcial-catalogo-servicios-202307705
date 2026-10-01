@@ -229,7 +229,7 @@ El archivo oficial del parcial contiene 12 niveles 1 y 46 servicios. El sistema 
 Reglas importantes:
 
 - Se procesa la hoja Servicios Externos.
-- Los encabezados están en A4:L4 y los datos se revisan entre las filas 5 y 106; las listas de opciones siguen en E112:H122.
+- Los encabezados están en A4:L4 y los datos se revisan entre las filas 5 y 101; las listas de opciones siguen en E112:H122.
 - Las celdas combinadas se resuelven usando el valor de su celda principal.
 - Una fila sin código de nivel 2 no crea un servicio.
 - SE.12 conserva como nombre canónico Suministrar Analitica, tomado de la primera ocurrencia; las diferencias se registran como observaciones.
