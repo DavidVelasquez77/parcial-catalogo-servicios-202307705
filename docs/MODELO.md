@@ -56,13 +56,13 @@ erDiagram
 | Versión | `configuration_items.version` |
 | Fecha de Adquisición | `configuration_items.acquired_on` |
 | Estado Actual | `configuration_items.status` |
-| Relaciones | `ci_relations` |
-| Padres/Hijos | `ci_relations`, sin confundir con `ci_categories.parent_id` |
+| Relaciones | Texto original en `technical_attributes.originalRelations`; solo se crea `ci_relations` cuando existe CI destino y se conoce el tipo de relación |
+| Padres/Hijos | Texto original en `technical_attributes.originalParentsChildren`; no se convierte automáticamente en `ci_categories.parent_id` |
 | Ubicación Física | `configuration_items.location`, ubicación controlada opcional en `ci_locations` |
 | Propietario/Responsable | `responsible_user_id` o `responsible_label` cuando la fuente solo da un equipo |
-| Fecha de Cambio y Descripción del Cambio | `ci_history.created_at` y `description` |
-| Documentación relacionada | `documentation_url` |
-| Enlaces a Incidentes y Problemas | `ticket_ci` y tipo de ticket |
+| Fecha de Cambio y Descripción del Cambio | Valores originales en `technical_attributes.sourceChangeDate` y `sourceChangeDescription`; `ci_history` registra el momento de importación, no suplanta la fecha del Excel |
+| Documentación relacionada | Valor original en `technical_attributes.originalDocumentation`; `documentation_url` es la referencia estructurada que se completa en la aplicación |
+| Enlaces a Incidentes y Problemas | Texto original en `technical_attributes.originalIncidentLinks`; nuevas relaciones verificadas en `ticket_ci` |
 | Niveles de Seguridad | `security_level` |
 | Cumplimiento | `compliance_status` |
 | Estado de Configuración | `configuration_status` |
@@ -104,4 +104,30 @@ CMDB_SEED=EVAL2026, CMDB_COUNT=5000: created=0, skipped=5000
 ```
 
 Estas salidas verifican la migración y la idempotencia inicial del generador.
-No acreditan todavía los escenarios P01-P18 de la ampliación.
+La ejecución final de P01–P18 se documenta en [PRUEBAS.md](PRUEBAS.md).
+
+## Importación real de CMDB.xlsx
+
+La migración 004 crea `cmdb_import_runs` y `cmdb_import_observations`. `import-cmdb.ts` verifica hoja, 20 encabezados, nombre, tipo, ubicación, responsable, fechas, tipos de celda y duplicados de origen **antes** de abrir la transacción. Una estructura inválida termina con código de salida distinto de cero y no cambia la base. Cada fila usa un código estable (`CMDB-XLSX-5` y `CMDB-XLSX-6`), con actualización si varían los campos e ignorado si son idénticos. La transacción incluye el historial de CI y las observaciones.
+
+Las dos filas contienen `Base de Datos1` en Relaciones, pero ese CI no existe en la hoja. Se conserva el texto original y se emite una observación por fila. La ausencia de un destino y de un tipo de relación impide crear una arista técnica verificable. El SHA-256 del archivo original leído en la prueba es `d182796bb40b492be2cb87e2c5fe19a8f910f2e754183dc48b5e89bd360464dc`.
+
+## Diccionario de datos operativo
+
+| Entidad | Identidad y claves | Restricciones principales |
+|---|---|---|
+| `ci_categories` | `id`, `code` único, `parent_id` opcional | Un padre por categoría; `source_kind` distingue Excel y proyecto; se rechazan ciclos |
+| `ci_locations` | `id`, `code` único | Ubicaciones controladas para dispositivos generados |
+| `configuration_items` | `id`, `code` único, `category_id` obligatorio | Estado, ubicación y responsable; `is_device` diferencia equipo del CI de origen; `source_reference` y `technical_attributes` guardan procedencia |
+| `ci_relations` | `from_ci_id`, `to_ci_id`, `relation_type` | FKs a CI; `DEPENDS_ON`, `HOSTED_ON`, `PARENT_OF` sin ciclos; `CONNECTED_TO` admite ciclos |
+| `ci_services` | `ci_id`, `service_id` | Relación con servicio de nivel 2 existente |
+| `ci_history` | `ci_id`, acción, fecha | Historial de cambios del sistema; no equivale a la fecha histórica del Excel |
+| `cmdb_import_runs` | `id`, archivo, SHA-256, hoja | Totales creados, actualizados, omitidos y observados |
+| `cmdb_import_observations` | `run_id`, fila, campo | Registra ambigüedades sin inventar relaciones |
+| `support_queues` | `id`, `code` único, `process` | Un proceso por cola; objetivos de primera respuesta y resolución en minutos calendario |
+| `queue_grants` | `queue_id` más usuario o rol | Permisos separados de consulta, atención, transferencia, aprobación y administración |
+| `tickets` | `id`, `number` único, FKs de servicio, cola y personas | Servicio nivel 1 derivado; estado, prioridad, impacto, urgencia, canal, fechas y datos propios del proceso |
+| `ticket_ci`, `ticket_links` | pares de IDs | CI afectados y vínculos entre tickets; motivo obligatorio si no hay CI |
+| `ticket_history`, `ticket_comments`, `ticket_attachments` | FK a ticket | Bitácora con actor y valores; visibilidad pública/interna; descarga autorizada |
+
+La jerarquía organizacional del catálogo (`Empresa → Área → Departamento → Sección → Puesto → Usuario`) y la clasificación de CI son grafos distintos. El Excel CMDB solamente proporciona las raíces Hardware y Software; la lección 22 define el concepto de CI y relaciones, sin enumerar en la copia suministrada una taxonomía exhaustiva de equipos. Por eso la clasificación permite añadir hijos y las cuatro hojas sintéticas están marcadas como decisión `PROJECT`.

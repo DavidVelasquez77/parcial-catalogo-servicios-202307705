@@ -98,6 +98,20 @@ async function main() {
     const incident = await create('INCIDENT',{incidentCategory:'I1'});
     await status(`/desk/tickets/${incident.id}`,200,'GET',undefined,admin);
     await status('/desk/tickets',400,'POST',{title:'Inválido',description:'Referencia',serviceId:999999,queueId:queueId('INCIDENT'),noCiReason:'No aplica',processData:{incidentCategory:'I1'}},admin);
+    const filePath = `/desk/tickets/${incident.id}/attachments`;
+    const evidence = new FormData();
+    evidence.append('file',new Blob(['Evidencia de prueba'],{type:'text/plain'}),'evidencia.txt');
+    const uploaded = await fetch(base+filePath,{method:'POST',headers:{Cookie:admin.cookie},body:evidence});
+    eq(uploaded.status,201,'adjunto de texto válido');
+    const attachment = await uploaded.json() as {id:number};
+    const anonymousDownload = await fetch(`${base}${filePath}/${attachment.id}`);
+    eq(anonymousDownload.status,401,'descarga sin sesión');
+    const authorizedDownload = await fetch(`${base}${filePath}/${attachment.id}`,{headers:{Cookie:admin.cookie}});
+    eq(authorizedDownload.status,200,'descarga autorizada');
+    const invalidFile = new FormData();
+    invalidFile.append('file',new Blob(['contenido inválido'],{type:'application/pdf'}),'falso.pdf');
+    const invalidUpload = await fetch(base+filePath,{method:'POST',headers:{Cookie:admin.cookie},body:invalidFile});
+    eq(invalidUpload.status,400,'firma de PDF inválida');
     done('P05');
 
     const privateQueue = await status('/desk/queues',201,'POST',{code:`PRV-${stamp}`,name:'Cola privada de prueba',process:'INCIDENT'},admin);
@@ -192,6 +206,10 @@ async function main() {
 
     const testCi1 = await status('/cmdb/items',201,'POST',{code:`T-A-${stamp}`,name:'CI origen de prueba',categoryId:child.id,location:'Laboratorio',responsibleUserId:admin.id},admin);
     const testCi2 = await status('/cmdb/items',201,'POST',{code:`T-B-${stamp}`,name:'CI destino de prueba',categoryId:child.id,location:'Laboratorio',responsibleUserId:admin.id},admin);
+    const changedCi = await status(`/cmdb/items/${testCi1.id}`,200,'PATCH',{name:'CI origen editado',isDevice:false},admin);
+    eq(changedCi.is_device,false,'edición de CI no dispositivo');
+    const ciDetail = await status(`/cmdb/items/${testCi1.id}`,200,'GET',undefined,admin);
+    truth(Array.isArray(ciDetail.classificationPath) && ciDetail.classificationPath.length===2,'ruta jerárquica del CI');
     await status('/cmdb/services',201,'POST',{ciId:testCi1.id,serviceId},admin);
     await status('/cmdb/relations',201,'POST',{fromCiId:testCi1.id,toCiId:testCi2.id,relationType:'DEPENDS_ON'},admin);
     await status('/cmdb/relations',409,'POST',{fromCiId:testCi2.id,toCiId:testCi1.id,relationType:'DEPENDS_ON'},admin);

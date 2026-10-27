@@ -1,5 +1,9 @@
 # Resolución técnica del parcial
 
+> **Ampliación Service Desk (octubre de 2026):** Este documento conserva la explicación del catálogo original. La segunda tarea se resolvió en el mismo repositorio. Su modelo y procedencia están en [MODELO.md](MODELO.md); las siete máquinas de estados, colas, soporte e indicadores en [PROCESOS.md](PROCESOS.md); las cuatro técnicas de trabajo con IA en [IA.md](IA.md); y la matriz P01–P18 con salidas reales en [PRUEBAS.md](PRUEBAS.md). El procedimiento exacto desde un clon limpio está al inicio del [README](../README.md). Se mantuvo PostgreSQL con SQL parametrizado, NestJS, React y Docker Compose, sin Prisma ni dependencia de un proveedor de IA.
+
+> **Fuentes:** `data/CatalogoServicios.xlsx` y los cuatro archivos de `data/fuentes/` se conservan originales. El segundo Excel aporta dos CI de ejemplo y las raíces Hardware/Software; las subcategorías y los 5,000 equipos son datos sintéticos del proyecto. La importación registra dos observaciones por las referencias a `Base de Datos1` inexistente, sin crear un CI ficticio. Las migraciones 002–004 añaden CMDB, tickets, roles múltiples y trazabilidad de importación. Los formularios se especializan por proceso y la API valida permisos y transiciones. La defensa individual puede demostrar ambos grafos y la rutina `scripts/service-desk-test.ps1` o `.sh`.
+
 ## 1. Identificación y objetivo
 
 - Asignatura: Software Avanzado.

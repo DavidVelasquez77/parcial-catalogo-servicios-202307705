@@ -1,10 +1,72 @@
-# Catálogo de Servicios TI
+# Service Desk y Catálogo de Servicios TI
 
-> La ampliación Service Desk se desarrolla en la rama `codex/service-desk`.
-> El estado evaluado del parcial 2 permanece en la etiqueta `parcial-v2.0`.
-> Los nuevos datos y pruebas de la segunda tarea se documentan en
-> [docs/MODELO.md](docs/MODELO.md). No considerar esta rama una entrega final
-> de la segunda tarea hasta completar P01-P18.
+Este repositorio conserva la entrega anterior del catálogo (`parcial-v2.0`) y la amplía con tickets, siete procesos, colas, permisos, CMDB y 5,000 dispositivos sintéticos. La documentación de la segunda tarea está en [MODELO](docs/MODELO.md), [PROCESOS](docs/PROCESOS.md), [IA](docs/IA.md) y [PRUEBAS](docs/PRUEBAS.md). El desarrollo se realiza en la rama `codex/service-desk` hasta integrarlo en `main`.
+
+## Inicio rápido desde un clon limpio
+
+Requisitos en Windows, Linux y macOS: Git, Docker Engine o Docker Desktop con `docker compose` v2. No se exige Node.js ni PostgreSQL en el equipo anfitrión. Ejecute los comandos desde una terminal abierta en cualquier carpeta donde quiera guardar el proyecto; `git clone` crea su propia carpeta.
+
+```sh
+git clone https://github.com/DavidVelasquez77/parcial-catalogo-servicios-202307705.git
+cd parcial-catalogo-servicios-202307705
+```
+
+Si la ampliación aún no se ha integrado en `main`, ejecute `git switch codex/service-desk` después de clonar. En **PowerShell (Windows)**:
+
+```powershell
+Copy-Item .env.example .env
+docker compose up --build -d
+docker compose ps
+docker compose exec -T api node apps/api/dist/scripts/seed-demo.js
+docker compose exec -T api node apps/api/dist/scripts/import-catalog.js
+docker compose exec -T api node apps/api/dist/scripts/import-cmdb.js
+docker compose exec -T -e CMDB_SEED=EVAL2026 -e CMDB_COUNT=5000 api node apps/api/dist/scripts/generate-cmdb.js
+docker compose exec -T api node apps/api/dist/scripts/seed-service-desk.js
+```
+
+En **Linux/macOS**, sustituya únicamente la copia del archivo por `cp .env.example .env`; los comandos `docker compose` son los mismos. La API aplica las migraciones 001–004 al iniciar. La web queda en **http://localhost:8080/**; `http://localhost:8080/api` es la API por el proxy web. Si el puerto 8080 ya está ocupado, defina `WEB_PORT=8081` y `WEB_ORIGIN=http://localhost:8081` en `.env` antes de iniciar y use **http://localhost:8081/**. Las contraseñas de demostración están en `.env.example` y se pueden cambiar en `.env` antes de sembrar; no use credenciales reales.
+
+| Cuenta | Contraseña predeterminada | Uso |
+|---|---|---|
+| `admin.demo` | `Admin123!` | Configuración completa |
+| `consulta.demo` | `Consulta123!` | Lectura, sin modificaciones |
+| `solicitante.demo` | `Solicita123!` | Portal y tickets propios |
+| `agente1.demo`, `agente2.demo` | `Agente123!` | Atención y transferencias |
+| `aprobador.demo` | `Aprueba123!` | Aprobaciones autorizadas |
+
+El script de preparación crea siete colas y 37 tickets de muestra. La importación de `data/fuentes/CMDB.xlsx` procesa dos CI originales y registra las referencias ambiguas sin inventar destinos; la generación agrega **5,000 dispositivos distintos**. Los tres comandos de carga son repetibles y no borran datos existentes. Ambos Excel originales se conservan sin cambios.
+
+### Pruebas reproducibles
+
+Las suites de Service Desk usan el proyecto Compose separado `service-desk-suite-202307705`; no eliminan el volumen de la aplicación normal. En PowerShell:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1
+```
+
+En Linux/macOS:
+
+```sh
+sh scripts/service-desk-test.sh
+```
+
+Esa rutina hace preparación, importaciones repetidas, 5,000 dispositivos, escenarios **P01–P18** y reinicio persistente. Para las pruebas unitarias con Jest y las de navegador con Playwright, sin instalar Node en el host, consulte los comandos exactos en [PRUEBAS.md](docs/PRUEBAS.md). Una ejecución termina con código 0 si pasa y distinto de 0 al fallar.
+
+### Operación diaria
+
+```sh
+docker compose ps
+docker compose logs -f api
+docker compose logs -f web
+docker compose stop
+docker compose start
+```
+
+`docker compose down` también conserva los datos. **Solo para reiniciar una evaluación desechable**, `docker compose -p service-desk-suite-202307705 down -v` elimina el volumen aislado de pruebas; nunca use `down -v` sobre la instalación que quiere conservar. Los adjuntos persisten en `uploads_data` y PostgreSQL en `postgres_data`.
+
+---
+
+## Documentación histórica del catálogo original
 
 Aplicación web para convertir el catálogo institucional de servicios externos de TI en un sistema consultable y administrable. El proyecto incorpora autenticación local, roles, estructura organizacional, responsables, catálogos controlados, importación repetible del Excel original y trazabilidad de los datos.
 
@@ -39,9 +101,9 @@ La aplicación permite:
 - importar el Excel de forma repetible sin crear duplicados;
 - conservar campos incompletos como desconocidos y marcarlos como En revisión;
 - registrar ejecuciones de importación, observaciones y datos de origen;
-- operar con dos roles: ADMIN y CONSULTA.
+- operar, en la entrega original del catálogo, con ADMIN y CONSULTA; la ampliación añade Solicitante, Agente y Aprobador, además de roles múltiples.
 
-No se implementan tickets, facturación ni consumo de servicios porque están fuera del alcance del enunciado.
+La primera entrega no incluía tickets. La ampliación Service Desk sí los implementa; facturación y consumo continúan fuera de alcance.
 
 ## 3. Tecnologías y justificación
 
