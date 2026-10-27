@@ -21,7 +21,7 @@ Los ocho prompts operativos y sus criterios están en [prompts/service-desk.md](
 
 ## 3. Harness Engineering
 
-El harness es el conjunto `AGENTS.md` + `compose.yaml` + migraciones 001–004 + importadores + generador + semillas + `scripts/service-desk-test.ps1/.sh` + Jest + Playwright + auditoría de secretos. Su rutina aislada hace, en orden:
+El harness es el conjunto `AGENTS.md` + `compose.yaml` + migraciones 001–005 + importadores + generador + semillas + `scripts/service-desk-test.ps1/.sh` + Jest + Playwright + auditoría de secretos. Su rutina aislada hace, en orden:
 
 1. Construir PostgreSQL y API y esperar salud; la API ejecuta las migraciones.
 2. Crear organización y cuentas; validar/importar catálogo dos veces y verificar 12/46.
@@ -46,8 +46,46 @@ Los ciclos 1 y 2 cubren permiso/datos y defecto funcional respectivamente; el ci
 
 ## 5. Grafos y evidencia
 
-Aunque la explicación oral aclaró que Graph Engineering no se califica de forma separada, el enunciado exige funcionalidad de grafos. La clasificación de categorías y las dependencias técnicas tienen reglas de ciclo diferentes, descritas en [MODELO.md](MODELO.md) y [PROCESOS.md](PROCESOS.md). P04 rechaza ciclo de clasificación; P14 rechaza ciclo de dependencia y recorre CI → servicio potencialmente afectado. El recorrido no diagnostica por sí solo una interrupción efectiva.
+La explicación oral de la lección 25 (transcripción 5:48–5:59) dijo que
+Graph Engineering sería opcional en la evaluación oral, mientras el enunciado
+escrito sigue exigiendo relaciones, ciclos y recorrido de impacto. Se modelaron
+estos grafos por separado, con semántica y reglas propias:
+
+| Grafo | Nodo y arista | Invariante | Evidencia |
+|---|---|---|---|
+| Clasificación | `ci_categories`; `parent_id` apunta a una categoría padre | A lo sumo un padre, padre/antecesores activos y ningún ciclo | API `CmdbService.updateCategory`, P04 |
+| Composición física | `configuration_items`; `PARENT_OF` va de CI padre a componente | Un solo padre físico por componente y ningún ciclo de composición | Migración 005, `CmdbService.createRelation`, P14 |
+| Dependencia técnica | `configuration_items`; `DEPENDS_ON` y `HOSTED_ON` van del CI dependiente al CI requerido | Sin ciclos incluso al combinar ambos tipos | `CmdbService.createRelation`, P14 |
+| Conectividad | `configuration_items`; `CONNECTED_TO` registra un enlace técnico | Puede formar ciclos, porque una red puede tener caminos alternos | Política en `CmdbService.createRelation` y [PROCESOS.md](PROCESOS.md) |
+| CI → servicio y ticket | `ci_services` y `ticket_ci` enlazan nodos de dominio | Solo referencias existentes; no se infiere que una dependencia sea una falla | Ficha de CI, P05/P14 |
+
+El análisis de impacto empieza en un CI, sigue **en sentido inverso** las
+aristas `DEPENDS_ON` y `HOSTED_ON` para hallar los CI que lo requieren, y une
+sus servicios por `ci_services`. La consulta recursiva usa `UNION` sobre el ID
+del CI para visitar cada nodo una vez y terminar incluso ante datos heredados
+anómalos. Devuelve servicios *potencialmente afectados*, no un diagnóstico de
+interrupción. `CONNECTED_TO` y `PARENT_OF` no se usan como prueba de impacto
+automático porque representan otra semántica. El diagrama, las celdas y las
+denominaciones de origen están en [CMDB_JERARQUIA.md](CMDB_JERARQUIA.md).
+
+Durante la revisión de fuentes y código se detectó que la primera validación
+impedía ciclos por cada tipo técnico, pero permitía un ciclo formado por una
+arista `DEPENDS_ON` y otra `HOSTED_ON`. La corrección valida ambos tipos como
+un solo grafo acíclico. La prueba P14 intenta ese ciclo mixto y exige HTTP 409.
+La regla de padre físico único proviene de la explicación oral de la lección
+22 (21:37–22:01); los tipos de arista y el recorrido son decisiones operativas
+del proyecto, no valores del Excel.
+
+La secuencia verificable de esta revisión fue: lectura del Excel, PDF y
+transcripciones → diagrama/diccionario versionados en `77bef42` → revisión de
+`ci_relations` y hallazgo de padre múltiple y ciclo mixto posible → migración
+005 y cambio de API fijados en `13b27c1` → P04/P14 y suite completa con código
+0 → actualización de la evidencia. El hallazgo se detectó al revisar código;
+**no se ejecutó una prueba roja antes de la corrección**, por lo que esta
+secuencia no se presenta como un ciclo de fallo automatizado previo. Los
+ciclos completos con fallo observado y nueva verificación están en la tabla
+de Loop Engineering de arriba.
 
 ## Commits clave
 
-`3bb3d72`: modelo y generador; `fe4ea55`: tickets, flujos y aceptación; `623e949`: importación del CMDB original y formularios; `146bbe4`: documentos, pruebas y calidad; `85d913f`: tercera actualización de contexto verificada; `677c807`: edición visual de colas/categorías y filtros completos. Consulte `git log --oneline` para el SHA completo de entrega. La entrega anterior del catálogo se mantiene en la etiqueta `parcial-v2.0`.
+`3bb3d72`: modelo y generador; `fe4ea55`: tickets, flujos y aceptación; `623e949`: importación del CMDB original y formularios; `146bbe4`: documentos, pruebas y calidad; `85d913f`: tercera actualización de contexto verificada; `677c807`: edición visual de colas/categorías y filtros completos; `77bef42`: transcripción y fuentes CMDB; `13b27c1`: padre físico único, ubicaciones y validación de grafos. Consulte `git log --oneline` para el SHA completo de entrega. La entrega anterior del catálogo se mantiene en la etiqueta `parcial-v2.0`.

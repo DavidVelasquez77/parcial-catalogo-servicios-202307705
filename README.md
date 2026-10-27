@@ -1,6 +1,6 @@
 # Service Desk y Catálogo de Servicios TI
 
-Este repositorio conserva la entrega anterior del catálogo (`parcial-v2.0`) y la amplía con tickets, siete procesos, colas, permisos, CMDB y 5,000 dispositivos sintéticos. La documentación de la segunda tarea está en [MODELO](docs/MODELO.md), [PROCESOS](docs/PROCESOS.md), [IA](docs/IA.md) y [PRUEBAS](docs/PRUEBAS.md). La ampliación se integra en `main`; la etiqueta `parcial-v2.0` conserva la entrega anterior.
+Este repositorio conserva la entrega anterior del catálogo (`parcial-v2.0`) y la amplía con tickets, siete procesos, colas, permisos, CMDB y 5,000 dispositivos sintéticos. La documentación de la segunda tarea está en [MODELO](docs/MODELO.md), [jerarquía y fuentes de CMDB](docs/CMDB_JERARQUIA.md), [PROCESOS](docs/PROCESOS.md), [IA](docs/IA.md) y [PRUEBAS](docs/PRUEBAS.md). La ampliación se integra en `main`; la etiqueta `parcial-v2.0` conserva la entrega anterior.
 
 ## Inicio rápido desde un clon limpio
 
@@ -24,7 +24,7 @@ docker compose exec -T -e CMDB_SEED=EVAL2026 -e CMDB_COUNT=5000 api node apps/ap
 docker compose exec -T api node apps/api/dist/scripts/seed-service-desk.js
 ```
 
-En **Linux/macOS**, sustituya únicamente la copia del archivo por `cp .env.example .env`; los comandos `docker compose` son los mismos. La API aplica las migraciones 001–004 al iniciar. La web queda en **http://localhost:8080/**; `http://localhost:8080/api` es la API por el proxy web. Si el puerto 8080 ya está ocupado, defina `WEB_PORT=8081` y `WEB_ORIGIN=http://localhost:8081` en `.env` antes de iniciar y use **http://localhost:8081/**. Las contraseñas de demostración están en `.env.example` y se pueden cambiar en `.env` antes de sembrar; no use credenciales reales.
+En **Linux/macOS**, sustituya únicamente la copia del archivo por `cp .env.example .env`; los comandos `docker compose` son los mismos. La API aplica las migraciones 001–005 al iniciar. La web queda en **http://localhost:8080/**; `http://localhost:8080/api` es la API por el proxy web. Si el puerto 8080 ya está ocupado, defina `WEB_PORT=8081` y `WEB_ORIGIN=http://localhost:8081` en `.env` antes de iniciar y use **http://localhost:8081/**. Las contraseñas de demostración están en `.env.example` y se pueden cambiar en `.env` antes de sembrar; no use credenciales reales.
 
 | Cuenta | Contraseña predeterminada | Uso |
 |---|---|---|
@@ -35,6 +35,14 @@ En **Linux/macOS**, sustituya únicamente la copia del archivo por `cp .env.exam
 | `aprobador.demo` | `Aprueba123!` | Aprobaciones autorizadas |
 
 El script de preparación crea siete colas y 37 tickets de muestra. La importación de `data/fuentes/CMDB.xlsx` procesa dos CI originales y registra las referencias ambiguas sin inventar destinos; la generación agrega **5,000 dispositivos distintos**. Los tres comandos de carga son repetibles y no borran datos existentes. Ambos Excel originales se conservan sin cambios.
+
+En **CMDB**, el administrador puede mantener categorías, ubicaciones
+controladas y CI. Un CI importado conserva la ubicación textual del Excel si
+no existe una ubicación identificada. La composición `Padre técnico de`
+permite un solo padre por componente; dependencias y conexiones se administran
+por separado. La [transcripción y comparación de fuentes](docs/CMDB_JERARQUIA.md)
+explican por qué las cuatro subcategorías de los dispositivos sintéticos no
+se atribuyen al material docente.
 
 ### Pruebas reproducibles
 
@@ -529,6 +537,7 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 ## 14. Documentación adicional
 
 - [Resolución técnica](docs/RESOLUCION.md)
+- [Jerarquía, diccionario y procedencia de CMDB](docs/CMDB_JERARQUIA.md)
 - [Guía de evaluación y pruebas](docs/GUIA_EVALUACION.md)
 - [Importación y calidad de datos](docs/IMPORTACION.md)
 - [API y reglas de autorización](docs/API.md)

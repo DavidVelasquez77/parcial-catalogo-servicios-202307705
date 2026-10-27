@@ -73,7 +73,19 @@ La ampliación requiere ejecutar `scripts/service-desk-test.ps1` o `.sh` en el p
 
 ## Actualización de contexto 4: cierre verificable (26 de octubre de 2026)
 
-Tras la validación final de la ampliación, las rutas de consulta prioritarias son `README.md` para un clon limpio, `docs/MODELO.md` para fuentes y grafos, `docs/PROCESOS.md` para reglas, `docs/IA.md` para las cuatro técnicas y `docs/PRUEBAS.md` para salidas P01–P18. La suite final con ExcelJS y dependencias actualizadas preservó 12/46, dos CI originales, 5,000 dispositivos únicos y persistencia tras reinicio; Jest pasó 13 pruebas y Playwright 2 recorridos. `npm run lint`, `npm run typecheck`, `npm run audit:secrets` y `npm audit --audit-level=high` terminaron con código 0. Ante futuros cambios, volver a ejecutar las comprobaciones afectadas y actualizar fecha, SHA y resultados; no reutilizar estos números como si fueran una prueba nueva.
+Tras aquella validación de la ampliación, las rutas de consulta prioritarias eran `README.md` para un clon limpio, `docs/MODELO.md` para fuentes y grafos, `docs/PROCESOS.md` para reglas, `docs/IA.md` para las técnicas documentadas entonces y `docs/PRUEBAS.md` para salidas P01–P18. La suite con ExcelJS y dependencias actualizadas preservó 12/46, dos CI originales, 5,000 dispositivos únicos y persistencia tras reinicio; Jest pasó 13 pruebas y Playwright 2 recorridos. `npm run lint`, `npm run typecheck`, `npm run audit:secrets` y `npm audit --audit-level=high` terminaron con código 0. Ante futuros cambios, volver a ejecutar las comprobaciones afectadas y actualizar fecha, SHA y resultados; no reutilizar estos números como si fueran una prueba nueva.
+
+## Actualización de contexto 5: jerarquía y composición CMDB (26 de octubre de 2026)
+
+Las transcripciones de las lecciones 22 y 25 permitieron separar tres cosas:
+SKMS → CMS → CMDB es contexto conceptual; `Hardware` y `Software` son los dos
+tipos realmente presentes en `CMDB.xlsx`; las cuatro subcategorías de los
+5,000 dispositivos son decisiones `PROJECT`. J5:J6 no aporta padres/hijos.
+La explicación oral 21:37–22:01 exige un solo padre físico por componente.
+`docs/CMDB_JERARQUIA.md` registra diagramas, diccionario, celdas, minutos y
+la secuencia histórica real. La migración 005 protege esa exclusividad en la
+base. `DEPENDS_ON` y `HOSTED_ON` se validan juntos para evitar ciclos mixtos;
+`CONNECTED_TO` admite ciclos. Repetir P04 y P14 cuando se cambien estas reglas.
 
 ## 4. Restricciones técnicas
 

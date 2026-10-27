@@ -232,6 +232,22 @@ La importación es una sincronización incremental por código:
 - un código que desapareció del Excel no se elimina ni se desactiva automáticamente, para evitar pérdida silenciosa de trazabilidad;
 - las asignaciones de responsable no se reemplazan por valores vacíos del Excel.
 
+## Ampliación CMDB
+
+| Método | Ruta | Permiso | Regla principal |
+|---|---|---|---|
+| GET | `/api/cmdb/categories` | Sesión | Devuelve clasificación, origen y padre. |
+| POST/PATCH | `/api/cmdb/categories`, `/api/cmdb/categories/:id` | ADMIN | Padre existente y activo; sin ciclos ni desactivación con CI o hijos activos. |
+| GET | `/api/cmdb/locations` | Sesión | Devuelve ubicaciones controladas. |
+| POST/PATCH | `/api/cmdb/locations`, `/api/cmdb/locations/:id` | ADMIN | Código único; no desactivar con CI activo vinculado; renombrar sincroniza CI y bitácora. |
+| GET/POST/PATCH | `/api/cmdb/items`, `/api/cmdb/items/:id` | Sesión para GET; ADMIN para escritura | Categoría y responsable válidos; `locationId` opcional. Con ID, el texto debe coincidir con el nombre controlado; sin ID se conserva ubicación libre del origen. |
+| POST | `/api/cmdb/relations` | ADMIN | `PARENT_OF` admite un solo padre por componente y no tiene ciclos; `DEPENDS_ON`/`HOSTED_ON` no admiten ciclos ni combinados. |
+| GET | `/api/cmdb/items/:id/impact` | Sesión | Lista servicios potencialmente afectados por dependencias, sin diagnosticar interrupción efectiva. |
+
+El [diagrama y diccionario de origen](CMDB_JERARQUIA.md) identifican las
+celdas del Excel y las diapositivas o minutos de clase usados para estas
+reglas. La base impone además un índice único parcial para `PARENT_OF`.
+
 ## Matriz de autorización
 
 | Operación | Público | CONSULTA | ADMIN |

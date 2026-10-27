@@ -103,8 +103,9 @@ de tiempo son campos operativos nuevos. No se presentan como campos del Excel.
 
 - La clasificación tiene un solo padre por categoría, rechaza padres
   inexistentes o inactivos y ciclos.
-- `DEPENDS_ON`, `HOSTED_ON` y `PARENT_OF` rechazan ciclos de su tipo;
-  `PARENT_OF` permite un solo padre físico por CI componente;
+- `DEPENDS_ON` y `HOSTED_ON` rechazan ciclos incluso cuando se combinan;
+  `PARENT_OF` rechaza sus propios ciclos y permite un solo padre físico por
+  CI componente;
   `CONNECTED_TO` permite redes bidireccionales o cíclicas.
 - Un recorrido de dependencias reporta servicios *potencialmente afectados*;
   la relación no prueba una interrupción real.
@@ -140,7 +141,7 @@ Las dos filas contienen `Base de Datos1` en Relaciones, pero ese CI no existe en
 | `ci_categories` | `id`, `code` único, `parent_id` opcional | Un padre por categoría; `source_kind` distingue Excel y proyecto; se rechazan ciclos |
 | `ci_locations` | `id`, `code` único, `name`, `active` | Ubicaciones controladas con CRUD; `location_id` del CI es opcional para preservar texto original sin identidad comprobada |
 | `configuration_items` | `id`, `code` único, `category_id` obligatorio | Estado, ubicación y responsable; `is_device` diferencia equipo del CI de origen; `source_reference` y `technical_attributes` guardan procedencia |
-| `ci_relations` | `from_ci_id`, `to_ci_id`, `relation_type` | FKs a CI; `DEPENDS_ON`, `HOSTED_ON`, `PARENT_OF` sin ciclos del mismo tipo; `PARENT_OF` tiene padre único por hijo; `CONNECTED_TO` admite ciclos |
+| `ci_relations` | `from_ci_id`, `to_ci_id`, `relation_type` | FKs a CI; `DEPENDS_ON`/`HOSTED_ON` forman un grafo acíclico conjunto, `PARENT_OF` es acíclico y tiene padre único por hijo; `CONNECTED_TO` admite ciclos |
 | `ci_services` | `ci_id`, `service_id` | Relación con servicio de nivel 2 existente |
 | `ci_history` | `ci_id`, acción, fecha | Historial de cambios del sistema; no equivale a la fecha histórica del Excel |
 | `cmdb_import_runs` | `id`, archivo, SHA-256, hoja | Totales creados, actualizados, omitidos y observados |

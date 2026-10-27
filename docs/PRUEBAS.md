@@ -60,3 +60,30 @@ El criterio de salida fue código 0 para cada rutina, P01–P18 PASS, 5,000 disp
 La matriz aquí vincula requisito → implementación → ejecución → salida verificable. Las decisiones y fórmulas están en [PROCESOS.md](PROCESOS.md), el modelo en [MODELO.md](MODELO.md), y los ciclos de corrección en [IA.md](IA.md).
 
 Controles adicionales sobre `677c807`: `npm run lint`, `npm run typecheck`, `npm run audit:secrets` y `npm audit --audit-level=high` terminaron con código 0; la auditoría informó `found 0 vulnerabilities`.
+
+## Revisión de fuentes y corrección CMDB (26 de octubre de 2026, Guatemala)
+
+El código de esta revisión quedó fijado después de las pruebas en `13b27c1`;
+el diagrama y las transcripciones originales habían quedado antes en
+`77bef42`. La correspondencia con la lección 22, la aclaración oral de la
+lección 25 y las celdas B4:U6 está en [CMDB_JERARQUIA.md](CMDB_JERARQUIA.md).
+Esta sección es evidencia nueva; no reemplaza ni cambia los resultados
+históricos de `677c807` descritos arriba.
+
+| Control ejecutado | Entrada y criterio | Salida observada |
+|---|---|---|
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` | Proyecto Compose aislado; Excel de catálogo y CMDB repetidos, semilla EVAL2026 y P01–P18 | Código 0; `{"ok":true,"suite":"Service Desk P01-P18","isolatedProject":"service-desk-suite-202307705"}`. 12/46 servicios, dos CI originales, 5,000 dispositivos únicos. |
+| P04 dentro de la suite | Hardware y Software con origen `EXCEL`; las cuatro hojas generadas con origen `PROJECT`; J5:J6 sin padres/hijos; ubicación recuperable; duplicado, padre inexistente y ciclo rechazados | `{"id":"P04","result":"PASS"}`. |
+| P14 dentro de la suite | Renombrar ubicación vinculada y auditar el cambio; bloquear su desactivación; impedir segundo padre, ciclo de composición y ciclo mixto `DEPENDS_ON`/`HOSTED_ON`; recorrer CI → servicio | `{"id":"P14","result":"PASS"}`. Las escrituras inválidas devolvieron 409. |
+| P16 y P17 dentro de la suite | Paginación y métricas controladas | P16 PASS, 13.9 ms en una consulta interna puntual con Docker/PostgreSQL 16 Alpine; P17 PASS, primera atención 30 min y resolución 80 min. |
+| P18 dentro de la suite | Reiniciar DB y API sin borrar volúmenes | PASS; después del reinicio: 12 nivel 1, 46 nivel 2, 5,000 dispositivos, 2 CI fuente, 281 tickets, 1,012 entradas de historial y 23 colas. Los últimos tres totales incluyen ejecuciones anteriores de la suite aislada. |
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 all` | Unitarias Jest, integración con Excel/PostgreSQL y navegador Playwright | Código 0; 13 unitarias, 2 de integración y 3 E2E. El tercer E2E creó y editó categoría, ubicación y cola desde la interfaz. |
+| `docker compose -p service-desk-suite-202307705 exec -T -w /app/apps/api api npm run lint` | ESLint dentro del contenedor con `eslint.config.js` incluido en la imagen | Código 0. La primera ejecución manual falló porque faltaba copiar ese archivo al contenedor; se corrigió el Dockerfile y se repitió satisfactoriamente. |
+| `npm run audit:secrets` y `docker compose ps` | No publicar secretos; aplicación normal disponible | Auditoría código 0, `{"ok":true,"scanned":"source, configuration and documentation"}`; web, API y DB activos; GET `http://localhost:8080/` devolvió 200. |
+
+La prueba final de aceptación se ejecutó sobre un proyecto **aislado ya
+existente**. Por ello los importadores informaron `skipped=46` y `skipped=2`
+en vez de nuevos registros; las observaciones se siguieron registrando. La
+migración 005 se aplicó sobre la base de esa suite sin borrar datos. El README
+describe la creación desde un volumen vacío; esta ejecución específica
+comprueba la actualización de un entorno persistente, no una clonación nueva.
