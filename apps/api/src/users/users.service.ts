@@ -33,6 +33,7 @@ export class UsersService {
 
   async list() {
     const result = await this.db.query(`SELECT u.id, u.name, u.username, u.email, u.role, u.active,
+      ARRAY(SELECT ur.role FROM user_roles ur WHERE ur.user_id=u.id ORDER BY ur.role) AS roles,
       u.position_id AS "positionId", p.code AS "positionCode", p.name AS "positionName",
       s.id AS "sectionId", s.name AS "sectionName"
       FROM users u JOIN positions p ON p.id = u.position_id JOIN sections s ON s.id = p.section_id

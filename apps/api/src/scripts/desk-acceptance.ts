@@ -71,6 +71,10 @@ async function main() {
 
     const categories = await status('/cmdb/categories',200,'GET',undefined,admin) as Array<Record<string,any>>;
     truth(categories.some((c) => c.sourceKind==='EXCEL' && c.name==='Hardware'),'raíz Hardware del Excel');
+    const sourceCi = await pool.query(`SELECT code,technical_attributes FROM configuration_items
+      WHERE code IN ('CMDB-XLSX-5','CMDB-XLSX-6') ORDER BY code`);
+    eq(sourceCi.rows.length,2,'CI originales del Excel');
+    truth(sourceCi.rows.every((row) => row.technical_attributes.sourceSheet==='CMDB'),'trazabilidad de origen CMDB');
     await status('/cmdb/categories',400,'POST',{code:`BAD-${stamp}`,name:'Huérfana',parentId:999999999},admin);
     const root = await status('/cmdb/categories',201,'POST',{code:`RT-${stamp}`,name:'Raíz de prueba'},admin);
     const child = await status('/cmdb/categories',201,'POST',{code:`CH-${stamp}`,name:'Hija de prueba',parentId:root.id},admin);

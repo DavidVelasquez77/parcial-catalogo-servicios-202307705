@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query, Req, StreamableFile, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, Req, StreamableFile, UploadedFile, UseGuards, UseInterceptors } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { createReadStream } from 'node:fs';
 import { Request } from 'express';
@@ -24,6 +24,9 @@ export class DeskController {
   @Post('queues') createQueue(@Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.createQueue(body, req.user); }
   @Patch('queues/:id') updateQueue(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.updateQueue(id, body, req.user); }
   @Post('queues/:id/grants') grant(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.grant(id, body, req.user); }
+  @Get('queues/:id/grants') grants(@Param('id', ParseIntPipe) id: number, @Req() req: AuthedRequest) { return this.service.grants(id, req.user); }
+  @Delete('queues/:id/grants/:grantId') revoke(@Param('id', ParseIntPipe) id: number,
+    @Param('grantId', ParseIntPipe) grantId: number, @Req() req: AuthedRequest) { return this.service.revoke(id, grantId, req.user); }
   @Get('tickets') tickets(@Query() query: Record<string, string | undefined>, @Req() req: AuthedRequest) { return this.service.tickets(query, req.user); }
   @Post('tickets') createTicket(@Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.createTicket(body, req.user); }
   @Get('tickets/:id') ticket(@Param('id', ParseIntPipe) id: number, @Req() req: AuthedRequest) { return this.service.ticket(id, req.user); }

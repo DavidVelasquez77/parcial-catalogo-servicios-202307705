@@ -24,6 +24,7 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
       SESSION_SECRET: ${SESSION_SECRET:-change_this_local_demo_secret}
       IMPORT_FILE: /app/data/CatalogoServicios.xlsx
+      CMDB_IMPORT_FILE: /app/data/fuentes/CMDB.xlsx
       UPLOAD_DIR: /app/uploads
       EXPECTED_LEVEL1_COUNT: ${EXPECTED_LEVEL1_COUNT:-12}
       EXPECTED_LEVEL2_COUNT: ${EXPECTED_LEVEL2_COUNT:-46}
@@ -42,6 +43,7 @@ services:
     command: ["sh", "-c", "node apps/api/dist/scripts/migrate.js && node apps/api/dist/main.js"]
     volumes:
       - ./data/CatalogoServicios.xlsx:/app/data/CatalogoServicios.xlsx:ro
+      - ./data/fuentes/CMDB.xlsx:/app/data/fuentes/CMDB.xlsx:ro
       - uploads_data:/app/uploads
 
   web:

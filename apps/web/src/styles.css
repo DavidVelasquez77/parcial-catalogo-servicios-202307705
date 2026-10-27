@@ -63,3 +63,8 @@
 .desk-section pre { padding: 13px; background: var(--color-bg); border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .sidebar { overflow-y: auto; }
 @media (max-width: 640px) { .desk-facts, .desk-category-grid, .desk-article-grid, .desk-metric-grid { grid-template-columns: 1fr; } }
+.desk-checks { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.desk-checks label { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+.desk-checks input { width: auto; }
+.desk-search-options { display: flex; flex-wrap: wrap; gap: 7px; max-height: 150px; overflow-y: auto; }
+.desk-search-options button { font-size: 12px; padding: 7px 10px; }

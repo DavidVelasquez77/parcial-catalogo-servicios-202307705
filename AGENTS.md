@@ -58,7 +58,15 @@ La solución debe mantener:
 - trazabilidad de hoja, fila, transformación y observación;
 - Docker, PostgreSQL y volumen persistente.
 
-No agregar tickets, facturación ni consumo de servicios sin una solicitud explícita, porque están fuera del alcance.
+La segunda tarea solicita explícitamente tickets y procesos de Service Desk. Se implementan en `apps/api/src/desk` y `apps/web/src/DeskPages.tsx`. Facturación y consumo permanecen fuera de alcance.
+
+## Actualización de contexto 2: CMDB original e importación (26 de octubre de 2026)
+
+La inspección de `data/fuentes/CMDB.xlsx` confirmó hoja `CMDB`, encabezados B4:U4 y solo dos CI en filas 5 y 6. Ambos mencionan `Base de Datos1`, ausente como registro. El importador `apps/api/src/scripts/import-cmdb.ts` valida toda la hoja antes de abrir la transacción, usa códigos estables `CMDB-XLSX-5/6`, conserva texto de origen y deja observación de esa referencia sin crear un CI ficticio. La migración 004 registra cada ejecución y sus observaciones. Las cuatro subcategorías para 5,000 dispositivos tienen procedencia `PROJECT`, no `EXCEL`.
+
+## Actualización de contexto 3: verificación integral (26 de octubre de 2026)
+
+La ampliación requiere ejecutar `scripts/service-desk-test.ps1` o `.sh` en el proyecto Compose aislado `service-desk-suite-202307705`. Esta rutina importa ambas fuentes dos veces, genera y repite 5,000 dispositivos, prepara siete colas y 35 o más tickets, ejecuta P01–P17 y reinicia PostgreSQL para P18. Registrar las salidas reales en `docs/PRUEBAS.md`. Los formularios de Service Desk deben mostrar campos específicos por proceso y las restricciones se vuelven a validar en la API.
 
 ## 4. Restricciones técnicas
 

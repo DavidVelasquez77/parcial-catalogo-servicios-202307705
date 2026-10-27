@@ -102,13 +102,19 @@ export class CmdbService {
     const result = await this.db.query(`SELECT ci.*,cc.code AS category_code,cc.name AS category_name
       FROM configuration_items ci JOIN ci_categories cc ON cc.id=ci.category_id WHERE ci.id=$1`, [id]);
     if (!result.rows[0]) throw new NotFoundException('CI no encontrado.');
-    const [relations, services, tickets, history] = await Promise.all([
+    const [relations, services, tickets, history, classification] = await Promise.all([
       this.db.query('SELECT * FROM ci_relations WHERE from_ci_id=$1 OR to_ci_id=$1 ORDER BY id', [id]),
       this.db.query(`SELECT s.id,s.code,s.name FROM ci_services cs JOIN service_level_2 s ON s.id=cs.service_id WHERE cs.ci_id=$1`, [id]),
       this.db.query(`SELECT t.id,t.number,t.title,t.state FROM ticket_ci tc JOIN tickets t ON t.id=tc.ticket_id WHERE tc.ci_id=$1 ORDER BY t.created_at DESC LIMIT 50`, [id]),
       this.db.query('SELECT * FROM ci_history WHERE ci_id=$1 ORDER BY created_at DESC LIMIT 100', [id]),
+      this.db.query(`WITH RECURSIVE chain AS (
+        SELECT id,code,name,parent_id,0 AS depth FROM ci_categories WHERE id=$1
+        UNION ALL SELECT p.id,p.code,p.name,p.parent_id,c.depth+1
+        FROM ci_categories p JOIN chain c ON p.id=c.parent_id WHERE c.depth<20
+      ) SELECT id,code,name FROM chain ORDER BY depth DESC`, [result.rows[0].category_id]),
     ]);
-    return { ...result.rows[0], relations: relations.rows, services: services.rows, tickets: tickets.rows, history: history.rows };
+    return { ...result.rows[0], classificationPath: classification.rows,
+      relations: relations.rows, services: services.rows, tickets: tickets.rows, history: history.rows };
   }
 
   async createItem(body: Record<string, unknown>, actorId: number) {
@@ -120,19 +126,26 @@ export class CmdbService {
     if (!itemStatuses.includes(status as typeof itemStatuses[number])) throw new BadRequestException('Estado no válido.');
     const category = await this.db.query('SELECT active FROM ci_categories WHERE id=$1', [categoryId]);
     if (!category.rows[0]?.active) throw new BadRequestException('La categoría no existe o está inactiva.');
+    const responsibleUserId = body.responsibleUserId == null ? null : positiveId(body.responsibleUserId,'Responsable');
+    const responsibleLabel = body.responsibleLabel == null ? null : String(body.responsibleLabel).trim() || null;
+    if (!responsibleUserId && !responsibleLabel) throw new BadRequestException('El CI requiere un usuario o equipo responsable.');
+    if (responsibleUserId) {
+      const owner = await this.db.query('SELECT active FROM users WHERE id=$1',[responsibleUserId]);
+      if (!owner.rows[0]?.active) throw new BadRequestException('El usuario responsable no existe o está inactivo.');
+    }
     const duplicate = await this.db.query('SELECT id FROM configuration_items WHERE code=$1', [code]);
     if (duplicate.rows[0]) throw new ConflictException('El código de CI ya existe.');
     const technical = body.technicalAttributes ?? {};
     if (!technical || typeof technical !== 'object' || Array.isArray(technical)) throw new BadRequestException('Los atributos técnicos deben ser un objeto.');
     return this.db.transaction(async (client) => {
       const created = await client.query(`INSERT INTO configuration_items
-        (code,name,category_id,description,serial_number,version,acquired_on,status,location,
+        (code,name,category_id,is_device,description,serial_number,version,acquired_on,status,location,
          responsible_user_id,responsible_label,documentation_url,security_level,compliance_status,
          configuration_status,license_number,license_expires_on,technical_attributes,source_reference)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
         RETURNING *`,
-        [code,name,categoryId,body.description ?? null,body.serialNumber ?? null,body.version ?? null,
-          body.acquiredOn ?? null,status,location,body.responsibleUserId ?? null,body.responsibleLabel ?? null,
+        [code,name,categoryId,body.isDevice !== false,body.description ?? null,body.serialNumber ?? null,body.version ?? null,
+          body.acquiredOn ?? null,status,location,responsibleUserId,responsibleLabel,
           body.documentationUrl ?? null,body.securityLevel ?? null,body.complianceStatus ?? null,
           body.configurationStatus ?? null,body.licenseNumber ?? null,body.licenseExpiresOn ?? null,
           JSON.stringify(technical),body.sourceReference ?? null]);
@@ -150,12 +163,21 @@ export class CmdbService {
       const categoryId = body.categoryId === undefined ? old.category_id : positiveId(body.categoryId, 'Categoría');
       const category = await client.query('SELECT active FROM ci_categories WHERE id=$1', [categoryId]);
       if (!category.rows[0]?.active) throw new BadRequestException('La categoría no existe o está inactiva.');
+      const responsibleUserId = body.responsibleUserId === undefined ? old.responsible_user_id :
+        body.responsibleUserId === null ? null : positiveId(body.responsibleUserId,'Responsable');
+      const responsibleLabel = body.responsibleLabel === undefined ? old.responsible_label :
+        body.responsibleLabel === null ? null : String(body.responsibleLabel).trim() || null;
+      if (!responsibleUserId && !responsibleLabel) throw new BadRequestException('El CI requiere un usuario o equipo responsable.');
+      if (responsibleUserId) {
+        const owner = await client.query('SELECT active FROM users WHERE id=$1',[responsibleUserId]);
+        if (!owner.rows[0]?.active) throw new BadRequestException('El usuario responsable no existe o está inactivo.');
+      }
       const status = String(body.status ?? old.status);
       if (!itemStatuses.includes(status as typeof itemStatuses[number])) throw new BadRequestException('Estado no válido.');
       const technical = body.technicalAttributes ?? old.technical_attributes;
       if (!technical || typeof technical !== 'object' || Array.isArray(technical)) throw new BadRequestException('Los atributos técnicos deben ser un objeto.');
       const updated = await client.query(`UPDATE configuration_items SET
-        name=$1,category_id=$2,description=$3,serial_number=$4,version=$5,acquired_on=$6,
+        name=$1,category_id=$2,is_device=$19,description=$3,serial_number=$4,version=$5,acquired_on=$6,
         status=$7,location=$8,responsible_user_id=$9,responsible_label=$10,documentation_url=$11,
         security_level=$12,compliance_status=$13,configuration_status=$14,license_number=$15,
         license_expires_on=$16,technical_attributes=$17::jsonb,updated_at=NOW()
@@ -164,11 +186,11 @@ export class CmdbService {
           body.description ?? old.description,body.serialNumber ?? old.serial_number,
           body.version ?? old.version,body.acquiredOn ?? old.acquired_on,status,
           body.location === undefined ? old.location : textValue(body.location, 'Ubicación'),
-          body.responsibleUserId ?? old.responsible_user_id,body.responsibleLabel ?? old.responsible_label,
+          responsibleUserId,responsibleLabel,
           body.documentationUrl ?? old.documentation_url,body.securityLevel ?? old.security_level,
           body.complianceStatus ?? old.compliance_status,body.configurationStatus ?? old.configuration_status,
           body.licenseNumber ?? old.license_number,body.licenseExpiresOn ?? old.license_expires_on,
-          JSON.stringify(technical),id]);
+          JSON.stringify(technical),id,body.isDevice === undefined ? old.is_device : body.isDevice === true]);
       await client.query(`INSERT INTO ci_history(ci_id,actor_id,action,old_values,new_values)
         VALUES($1,$2,'UPDATE',$3::jsonb,$4::jsonb)`,
         [id, actorId, JSON.stringify(old), JSON.stringify(updated.rows[0])]);

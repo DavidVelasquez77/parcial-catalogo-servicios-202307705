@@ -9,6 +9,8 @@ compose exec -T api node apps/api/dist/scripts/validate-import.js
 compose exec -T api node apps/api/dist/scripts/import-catalog.js
 compose exec -T api node apps/api/dist/scripts/import-catalog.js
 compose exec -T api node apps/api/dist/scripts/verify-import.js
+compose exec -T api node apps/api/dist/scripts/import-cmdb.js
+compose exec -T api node apps/api/dist/scripts/import-cmdb.js
 compose exec -T -e CMDB_SEED=EVAL2026 -e CMDB_COUNT=5000 api node apps/api/dist/scripts/generate-cmdb.js
 compose exec -T -e CMDB_SEED=EVAL2026 -e CMDB_COUNT=5000 api node apps/api/dist/scripts/generate-cmdb.js
 compose exec -T api node apps/api/dist/scripts/seed-service-desk.js

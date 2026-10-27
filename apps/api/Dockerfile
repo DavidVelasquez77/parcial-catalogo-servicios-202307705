@@ -20,5 +20,6 @@ COPY --from=build /app/apps/api/tsconfig.build.json ./apps/api/tsconfig.build.js
 COPY --from=build /app/database ./database
 RUN mkdir -p /app/data
 COPY data/CatalogoServicios.xlsx /app/data/CatalogoServicios.xlsx
+COPY data/fuentes/CMDB.xlsx /app/data/fuentes/CMDB.xlsx
 EXPOSE 3000
 CMD ["sh", "-c", "node apps/api/dist/scripts/migrate.js && node apps/api/dist/main.js"]

@@ -24,6 +24,14 @@ function level(value: unknown, label: string) {
   if (!Number.isInteger(number) || number < 1 || number > 5) throw new BadRequestException(`${label} debe estar entre 1 y 5.`);
   return number;
 }
+function optionalPositiveMinutes(value: unknown, label: string): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 1 || number > 525600) {
+    throw new BadRequestException(`${label} debe ser un número entero de minutos entre 1 y 525600.`);
+  }
+  return number;
+}
 
 @Injectable()
 export class DeskService {
@@ -77,7 +85,8 @@ export class DeskService {
       (code,name,description,process,support_level,first_response_minutes,resolution_minutes)
       VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [code,name,body.description ?? null,process,supportLevel,
-        body.firstResponseMinutes ?? null,body.resolutionMinutes ?? null]);
+        optionalPositiveMinutes(body.firstResponseMinutes,'Objetivo de primera respuesta'),
+        optionalPositiveMinutes(body.resolutionMinutes,'Objetivo de resolución')]);
     return result.rows[0];
   }
 
@@ -102,8 +111,8 @@ export class DeskService {
         WHERE id=$8 RETURNING *`,
         [body.name === undefined ? old.name : requiredText(body.name,'Nombre',160),
           body.description ?? old.description,process,levelValue,
-          body.firstResponseMinutes ?? old.first_response_minutes,
-          body.resolutionMinutes ?? old.resolution_minutes,active,id]);
+          body.firstResponseMinutes === undefined ? old.first_response_minutes : optionalPositiveMinutes(body.firstResponseMinutes,'Objetivo de primera respuesta'),
+          body.resolutionMinutes === undefined ? old.resolution_minutes : optionalPositiveMinutes(body.resolutionMinutes,'Objetivo de resolución'),active,id]);
       return updated.rows[0];
     });
   }
@@ -132,6 +141,35 @@ export class DeskService {
         VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
         [queueId,userId,role,...flags.map((key) => body[key] === true)]);
       return result.rows[0];
+    });
+  }
+
+  async grants(queueId: number, user: AuthenticatedUser) {
+    this.assertAdmin(user);
+    const queue = await this.db.query('SELECT id FROM support_queues WHERE id=$1', [queueId]);
+    if (!queue.rows[0]) throw new NotFoundException('Cola no encontrada.');
+    const result = await this.db.query(`SELECT g.id,g.role,g.user_id AS "userId",u.name AS "userName",
+      g.can_view AS "canView",g.can_handle AS "canHandle",g.can_transfer AS "canTransfer",
+      g.can_approve AS "canApprove",g.can_admin AS "canAdmin"
+      FROM queue_grants g LEFT JOIN users u ON u.id=g.user_id
+      WHERE g.queue_id=$1 ORDER BY g.role NULLS LAST,u.name`, [queueId]);
+    return result.rows;
+  }
+
+  async revoke(queueId: number, grantId: number, user: AuthenticatedUser) {
+    this.assertAdmin(user);
+    return this.db.transaction(async (client) => {
+      const grant = await client.query('SELECT * FROM queue_grants WHERE id=$1 AND queue_id=$2 FOR UPDATE', [grantId,queueId]);
+      if (!grant.rows[0]) throw new NotFoundException('Permiso de cola no encontrado.');
+      const row = grant.rows[0];
+      const open = await client.query(`SELECT t.id FROM tickets t WHERE t.queue_id=$1
+        AND t.state NOT IN ('CLOSED','REJECTED') AND t.assigned_user_id IS NOT NULL
+        AND (t.assigned_user_id=$2 OR ($3::text IS NOT NULL AND EXISTS(
+          SELECT 1 FROM user_roles ur WHERE ur.user_id=t.assigned_user_id AND ur.role=$3))) LIMIT 1`,
+        [queueId,row.user_id,row.role]);
+      if (open.rows[0]) throw new ConflictException('Reasigna los tickets abiertos antes de retirar este permiso.');
+      await client.query('DELETE FROM queue_grants WHERE id=$1', [grantId]);
+      return {revoked:true};
     });
   }
 
@@ -438,6 +476,7 @@ export class DeskService {
       const ticket = result.rows[0];
       if (!ticket) throw new NotFoundException('Ticket no encontrado.');
       await this.assertAllowed(ticket.queue_id,user,'can_transfer',client);
+      if (['CLOSED','REJECTED'].includes(ticket.state)) throw new ConflictException('No se transfiere un ticket finalizado.');
       const destination = await client.query('SELECT id,process FROM support_queues WHERE id=$1 AND active', [destinationId]);
       if (!destination.rows[0]) throw new BadRequestException('Cola destino inexistente o inactiva.');
       if (destination.rows[0].process !== ticket.process) throw new BadRequestException('La cola destino debe pertenecer al mismo proceso.');
@@ -481,6 +520,7 @@ export class DeskService {
       const ci = await client.query('SELECT id FROM configuration_items WHERE id=$1', [ciId]);
       if (!ci.rows[0]) throw new BadRequestException('CI inexistente.');
       const inserted = await client.query('INSERT INTO ticket_ci(ticket_id,ci_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING *', [id,ciId]);
+      if (inserted.rows[0]) await client.query('UPDATE tickets SET no_ci_reason=NULL,updated_at=NOW() WHERE id=$1', [id]);
       if (inserted.rows[0]) await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,new_values)
         VALUES($1,$2,'LINK_CI',$3::jsonb)`, [id,user.id,JSON.stringify({ ciId })]);
       return { linked: !!inserted.rows[0] };

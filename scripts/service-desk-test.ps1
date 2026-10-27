@@ -15,6 +15,8 @@ Invoke-Compose 'validar Excel original' @('exec','-T','api','node','apps/api/dis
 Invoke-Compose 'importar catálogo' @('exec','-T','api','node','apps/api/dist/scripts/import-catalog.js')
 Invoke-Compose 'repetir importación sin duplicar' @('exec','-T','api','node','apps/api/dist/scripts/import-catalog.js')
 Invoke-Compose 'verificar 12/46 e incidencias' @('exec','-T','api','node','apps/api/dist/scripts/verify-import.js')
+Invoke-Compose 'importar los CI originales de CMDB.xlsx' @('exec','-T','api','node','apps/api/dist/scripts/import-cmdb.js')
+Invoke-Compose 'repetir CMDB.xlsx sin duplicar' @('exec','-T','api','node','apps/api/dist/scripts/import-cmdb.js')
 Invoke-Compose 'generar 5000 dispositivos' @('exec','-T','-e','CMDB_SEED=EVAL2026','-e','CMDB_COUNT=5000','api','node','apps/api/dist/scripts/generate-cmdb.js')
 Invoke-Compose 'repetir generación sin duplicar' @('exec','-T','-e','CMDB_SEED=EVAL2026','-e','CMDB_COUNT=5000','api','node','apps/api/dist/scripts/generate-cmdb.js')
 Invoke-Compose 'preparar siete colas y tickets' @('exec','-T','api','node','apps/api/dist/scripts/seed-service-desk.js')
