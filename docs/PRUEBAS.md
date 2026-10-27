@@ -87,3 +87,28 @@ en vez de nuevos registros; las observaciones se siguieron registrando. La
 migración 005 se aplicó sobre la base de esa suite sin borrar datos. El README
 describe la creación desde un volumen vacío; esta ejecución específica
 comprueba la actualización de un entorno persistente, no una clonación nueva.
+
+## Cierre de tickets y trazabilidad (27 de octubre de 2026, Guatemala)
+
+La corrección del apartado 4 quedó en el commit de código `eac5e25`. Se agregó
+`POST /api/desk/tickets/:id/escalate` para incidentes: el servidor exige
+permiso `can_transfer`, motivo, estado válido y una cola activa del mismo
+proceso con nivel de soporte estrictamente superior. La transición directa a
+`ESCALATED` se rechaza. La ficha ahora ofrece únicamente destinos válidos y
+permite desplegar los valores anteriores y nuevos de la bitácora junto al
+nombre del actor. Pausa, reanudación, asignación, transición y vinculación de
+CI guardan los cambios de sus campos relevantes; los tickets de ejemplo en
+estado `ESCALATED` se ubican en la cola de incidentes de nivel 2.
+
+| Comando o escenario | Resultado real observado |
+|---|---|
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` | Código 0; `{"ok":true,"suite":"Service Desk P01-P18","isolatedProject":"service-desk-suite-202307705"}`. Se reutilizó el volumen **aislado** de pruebas: importación del catálogo con 12/46, 3 REVIEW y `skipped=46`; CMDB con dos CI originales y 5,000 dispositivos únicos. |
+| P08 | PASS. Se rechazó pasar directamente a `ESCALATED`, escalar a una cola del mismo nivel, hacerlo sin permiso y omitir el motivo. Se aceptó el traslado del nivel 1 al 2 y se verificaron estado, cola, actor, nivel anterior/nuevo y cola anterior/nueva. El ticket de muestra `DEMO-INC-05` quedó en nivel 2. |
+| P15 | PASS. Pausa y reanudación conservaron actor y valores anteriores/nuevos; el cierre inválido se rechazó y la reapertura incrementó `reopen_count` a 1. |
+| P18 | PASS tras reiniciar PostgreSQL y API sin borrar el volumen: 12 nivel 1, 46 nivel 2, 5,000 dispositivos, 2 CI originales, 323 tickets, 1,199 entradas de historial y 28 colas. Tickets, historial y colas adicionales incluyen ejecuciones previas de la suite aislada. |
+| `npm run typecheck`, `npm run lint`, `npm run audit:secrets`, `git diff --check` y `npm run build --workspace apps/web` | Todos terminaron con código 0. La auditoría devolvió `{"ok":true,"scanned":"source, configuration and documentation"}` y la compilación web transformó 1,632 módulos. |
+| `docker compose up --build -d`, `docker compose exec -T api node apps/api/dist/scripts/seed-service-desk.js`, GET `http://localhost:8080/` | Aplicación normal reconstruida sin borrar datos; semilla repetida con `created=0`, 37 tickets de muestra y ocho colas preparadas; la web respondió HTTP 200. |
+
+La suite P01–P18 prueba la API y persistencia; la compilación confirma que el
+nuevo componente de interfaz se empaqueta sin errores. Esta revisión no afirma
+una prueba visual manual completa del nuevo control de escalamiento.
