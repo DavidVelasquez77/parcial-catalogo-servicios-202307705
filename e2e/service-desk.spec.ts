@@ -30,6 +30,8 @@ test('portal Service Desk: ticket, CMDB, indicadores y conocimientos', async ({ 
   await page.getByLabel('Buscar ticket').fill(title);
   await page.getByRole('button', { name: 'Buscar' }).click();
   await expect(page.getByText(title, { exact: true })).toBeVisible();
+  await page.getByLabel('Filtrar prioridad').selectOption('3');
+  await expect(page.getByText(title, { exact: true })).toBeVisible();
   await page.locator('table tbody tr').first().click();
   const ticket = page.getByRole('dialog', { name: 'Ficha de ticket' });
   await expect(ticket.getByText(title, { exact: true })).toBeVisible();
@@ -39,4 +41,39 @@ test('portal Service Desk: ticket, CMDB, indicadores y conocimientos', async ({ 
   await expect(page.getByRole('heading', { name: 'Tablero de atención' })).toBeVisible();
   await page.getByRole('button', { name: 'Conocimientos' }).click();
   await expect(page.getByRole('heading', { name: 'Base de conocimientos' })).toBeVisible();
+});
+
+test('mantenimiento visual de categoría y cola', async ({ page }) => {
+  const code = `UI-${Date.now()}`;
+  await page.goto('/');
+  await page.getByLabel('Usuario o correo').fill('admin.demo');
+  await page.getByLabel('Contraseña').fill('Admin123!');
+  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+
+  await page.getByRole('button', { name: 'CMDB', exact: true }).click();
+  const categoryPanel = page.locator('section.panel').filter({ has: page.getByRole('heading', { name: 'Jerarquía de clasificación' }) });
+  await categoryPanel.getByLabel('Código').fill(code);
+  await categoryPanel.getByLabel('Nombre').fill('Categoría de interfaz');
+  await categoryPanel.getByRole('button', { name: 'Agregar categoría' }).click();
+  const categoryCard = categoryPanel.locator('.desk-note').filter({ hasText: code });
+  await expect(categoryCard).toBeVisible();
+  await categoryCard.getByRole('button', { name: 'Editar categoría' }).click();
+  const categoryDialog = page.getByRole('dialog', { name: `Editar categoría ${code}` });
+  await categoryDialog.getByLabel('Nombre').fill('Categoría revisada');
+  await categoryDialog.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(categoryCard).toContainText('Categoría revisada');
+
+  await page.getByRole('button', { name: 'Colas', exact: true }).click();
+  const queuePanel = page.locator('section.panel').filter({ has: page.getByRole('heading', { name: 'Crear cola' }) });
+  await queuePanel.getByLabel('Código').fill(code);
+  await queuePanel.getByLabel('Nombre').fill('Cola de interfaz');
+  await queuePanel.getByRole('button', { name: 'Crear cola' }).click();
+  const queueRow = page.locator('table tbody tr').filter({ hasText: code });
+  await expect(queueRow).toBeVisible();
+  await queueRow.getByRole('button', { name: 'Editar' }).click();
+  const queueDialog = page.getByRole('dialog', { name: `Editar cola ${code}` });
+  await queueDialog.getByLabel('Nombre').fill('Cola revisada');
+  await queueDialog.getByLabel('Primera respuesta (min)').fill('45');
+  await queueDialog.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(queueRow).toContainText('Cola revisada');
 });

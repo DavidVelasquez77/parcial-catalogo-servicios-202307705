@@ -32,6 +32,15 @@ function optionalPositiveMinutes(value: unknown, label: string): number | null {
   }
   return number;
 }
+function dateFilter(value: string | undefined, label: string): string | null {
+  if (!value) return null;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new BadRequestException(`${label} debe tener formato YYYY-MM-DD.`);
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (!Number.isFinite(parsed.getTime()) || parsed.toISOString().slice(0,10)!==value) {
+    throw new BadRequestException(`${label} no es una fecha válida.`);
+  }
+  return parsed.toISOString();
+}
 
 @Injectable()
 export class DeskService {
@@ -176,6 +185,9 @@ export class DeskService {
   async tickets(query: Record<string, string | undefined>, user: AuthenticatedUser) {
     const page = Math.max(1,Math.min(100000,Number(query.page) || 1));
     const pageSize = Math.max(1,Math.min(100,Number(query.pageSize) || 20));
+    const from = dateFilter(query.from,'Desde');
+    const to = dateFilter(query.to,'Antes de');
+    if (from && to && from >= to) throw new BadRequestException('La fecha final debe ser posterior a la inicial.');
     const params: unknown[] = [user.id,user.roles,query.search?.trim() ?? '',
       query.queueId ? idOf(query.queueId,'Cola') : null,
       query.process ?? null,query.state ?? null,
@@ -194,7 +206,7 @@ export class DeskService {
         AND (g.user_id=$1 OR g.role=ANY($2::text[]))))`;
     params.push(query.serviceId ? idOf(query.serviceId,'Servicio') : null,
       query.assigneeId ? idOf(query.assigneeId,'Responsable') : null,
-      query.from ?? null,query.to ?? null,
+      from,to,
       this.isAdmin(user) || user.roles.includes('CONSULTA'));
     const [count,rows] = await Promise.all([
       this.db.query(`SELECT COUNT(*)::int AS total FROM tickets t ${where}`,params),

@@ -68,3 +68,8 @@
 .desk-checks input { width: auto; }
 .desk-search-options { display: flex; flex-wrap: wrap; gap: 7px; max-height: 150px; overflow-y: auto; }
 .desk-search-options button { font-size: 12px; padding: 7px 10px; }
+.desk-checkbox { display:flex; align-items:center; gap:8px; }
+.desk-checkbox input[type="checkbox"] { width:auto; margin:0; }
+.desk-extra-filters { margin-top:10px; flex-wrap:wrap; }
+.desk-extra-filters label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--color-muted); }
+.desk-extra-filters input[type="date"] { min-width:145px; }

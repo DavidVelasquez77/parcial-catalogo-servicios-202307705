@@ -98,6 +98,10 @@ async function main() {
     const incident = await create('INCIDENT',{incidentCategory:'I1'});
     await status(`/desk/tickets/${incident.id}`,200,'GET',undefined,admin);
     await status('/desk/tickets',400,'POST',{title:'Inválido',description:'Referencia',serviceId:999999,queueId:queueId('INCIDENT'),noCiReason:'No aplica',processData:{incidentCategory:'I1'}},admin);
+    await status('/desk/tickets?from=2026-99-99',400,'GET',undefined,admin);
+    await status('/desk/tickets?from=2026-10-27&to=2026-10-26',400,'GET',undefined,admin);
+    const filtered = await status(`/desk/tickets?search=${stamp}&queueId=${queueId('INCIDENT')}&serviceId=${serviceId}&priority=3`,200,'GET',undefined,admin);
+    truth(filtered.data.some((row:Record<string,unknown>)=>Number(row.id)===Number(incident.id)),'filtros combinados de ticket');
     const filePath = `/desk/tickets/${incident.id}/attachments`;
     const evidence = new FormData();
     evidence.append('file',new Blob(['Evidencia de prueba'],{type:'text/plain'}),'evidencia.txt');
