@@ -26,7 +26,7 @@ El harness es el conjunto `AGENTS.md` + `compose.yaml` + migraciones 001–005 +
 1. Construir PostgreSQL y API y esperar salud; la API ejecuta las migraciones.
 2. Crear organización y cuentas; validar/importar catálogo dos veces y verificar 12/46.
 3. Importar `CMDB.xlsx` dos veces, con observaciones; generar 5,000 dispositivos dos veces con la misma semilla.
-4. Crear siete colas y 37 tickets de ejemplo; ejecutar P01–P17 con códigos de salida.
+4. Crear ocho colas (siete procesos y una cola de incidentes de nivel 2) y 37 tickets de ejemplo; ejecutar P01–P17 con códigos de salida.
 5. Tomar una huella de conteos, reiniciar PostgreSQL/API y comparar la huella para P18.
 
 La rutina no borra volúmenes. `DESK_TEST_ISOLATED=1` impide ejecutar la aceptación por accidente sobre la instalación normal. Los Excel se montan de solo lectura, el auditor revisa secretos versionados y `.env` permanece ignorado. Los comandos y salidas reales se consignan en [PRUEBAS.md](PRUEBAS.md). La aplicación funciona después de construirse sin claves ni suscripción de IA.

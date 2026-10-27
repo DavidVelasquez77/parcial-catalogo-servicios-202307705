@@ -75,7 +75,9 @@ export class DeskService {
   async queues(user: AuthenticatedUser) {
     const result = await this.db.query(`SELECT q.*,
       EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_handle
-        AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canHandle"
+        AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canHandle",
+      EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_transfer
+        AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canTransfer"
       FROM support_queues q ORDER BY q.process,q.name`, [user.id,user.roles]);
     return result.rows;
   }
@@ -290,7 +292,8 @@ export class DeskService {
     const staff = this.isAdmin(user) || await this.allowed(row.queue_id,user,'can_view');
     if (!staff && !user.roles.includes('CONSULTA') && row.requester_id !== user.id) throw new ForbiddenException('No puedes consultar este ticket.');
     const [history,comments,ci,links,attachments] = await Promise.all([
-      this.db.query('SELECT * FROM ticket_history WHERE ticket_id=$1 ORDER BY created_at,id', [id]),
+      this.db.query(`SELECT h.*,u.name AS actor_name FROM ticket_history h
+        LEFT JOIN users u ON u.id=h.actor_id WHERE h.ticket_id=$1 ORDER BY h.created_at,h.id`, [id]),
       this.db.query(`SELECT * FROM ticket_comments WHERE ticket_id=$1
         AND ($2::boolean OR visibility='PUBLIC') ORDER BY created_at,id`, [id,staff]),
       this.db.query(`SELECT ci.id,ci.code,ci.name FROM ticket_ci tc
@@ -306,7 +309,7 @@ export class DeskService {
   async claim(id: number, user: AuthenticatedUser) {
     this.assertWriter(user);
     return this.db.transaction(async (client) => {
-      const ticket = await client.query('SELECT id,queue_id,state,assigned_user_id FROM tickets WHERE id=$1 FOR UPDATE', [id]);
+      const ticket = await client.query('SELECT id,queue_id,state,assigned_user_id,first_attended_at FROM tickets WHERE id=$1 FOR UPDATE', [id]);
       if (!ticket.rows[0]) throw new NotFoundException('Ticket no encontrado.');
       await this.assertAllowed(ticket.rows[0].queue_id,user,'can_handle',client);
       if (['CLOSED','REJECTED'].includes(ticket.rows[0].state)) throw new ConflictException('El ticket ya está finalizado.');
@@ -317,7 +320,8 @@ export class DeskService {
       if (!updated.rows[0]) throw new ConflictException('Otro agente ya tomó este ticket.');
       await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values)
         VALUES($1,$2,'CLAIM',$3::jsonb,$4::jsonb)`,
-        [id,user.id,JSON.stringify({ assignedUserId: null }),JSON.stringify({ assignedUserId: user.id })]);
+        [id,user.id,JSON.stringify({ assignedUserId: null, firstAttendedAt: ticket.rows[0].first_attended_at }),
+          JSON.stringify({ assignedUserId: user.id, firstAttendedAt: updated.rows[0].first_attended_at })]);
       return updated.rows[0];
     });
   }
@@ -355,6 +359,7 @@ export class DeskService {
       const result = await client.query('SELECT * FROM tickets WHERE id=$1 FOR UPDATE', [id]);
       const ticket = result.rows[0];
       if (!ticket) throw new NotFoundException('Ticket no encontrado.');
+      if (to === 'ESCALATED') throw new BadRequestException('Escala el incidente a una cola de nivel superior con motivo.');
       if (!canTransition(ticket.process as DeskProcess,ticket.state,to)) throw new BadRequestException('Transición no permitida para este proceso.');
       const approval = ['APPROVED','REJECTED'].includes(to);
       const reopen = ticket.state === 'CLOSED' && to === 'SUBMITTED';
@@ -420,7 +425,10 @@ export class DeskService {
         WHERE id=$2 RETURNING *`, [to,id]);
       await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values,reason)
         VALUES($1,$2,'TRANSITION',$3::jsonb,$4::jsonb,$5)`,
-        [id,user.id,JSON.stringify({ state: ticket.state }),JSON.stringify({ state: to }),reason]);
+        [id,user.id,
+          JSON.stringify({ state: ticket.state, resolvedAt: ticket.resolved_at, closedAt: ticket.closed_at, reopenCount: ticket.reopen_count }),
+          JSON.stringify({ state: updated.rows[0].state, resolvedAt: updated.rows[0].resolved_at,
+            closedAt: updated.rows[0].closed_at, reopenCount: updated.rows[0].reopen_count }),reason]);
       return updated.rows[0];
     });
   }
@@ -445,9 +453,9 @@ export class DeskService {
     }
     const changed = { ...data, approvedServiceId: serviceId };
     await client.query('UPDATE tickets SET process_data=$1::jsonb WHERE id=$2', [JSON.stringify(changed),ticket.id]);
-    await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,new_values)
-      VALUES($1,$2,'SERVICE_APPROVED',$3::jsonb)`,
-      [ticket.id,actor.id,JSON.stringify({ approvedServiceId: serviceId })]);
+    await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values)
+      VALUES($1,$2,'SERVICE_APPROVED',$3::jsonb,$4::jsonb)`,
+      [ticket.id,actor.id,JSON.stringify(data),JSON.stringify(changed)]);
   }
 
   private async ensureEventIncident(client: PoolClient, event: Record<string,any>, actor: AuthenticatedUser) {
@@ -503,6 +511,40 @@ export class DeskService {
     });
   }
 
+  async escalate(id: number, body: Record<string, unknown>, user: AuthenticatedUser) {
+    this.assertWriter(user);
+    const destinationId = idOf(body.queueId,'Cola destino');
+    const reason = requiredText(body.reason,'Motivo del escalamiento',1000);
+    return this.db.transaction(async (client) => {
+      const result = await client.query('SELECT * FROM tickets WHERE id=$1 FOR UPDATE', [id]);
+      const ticket = result.rows[0];
+      if (!ticket) throw new NotFoundException('Ticket no encontrado.');
+      await this.assertAllowed(ticket.queue_id,user,'can_transfer',client);
+      if (ticket.process !== 'INCIDENT' || !['DIAGNOSING','IN_PROGRESS','ESCALATED'].includes(ticket.state)) {
+        throw new ConflictException('Solo se escala un incidente en diagnóstico, atención o escalamiento.');
+      }
+      const queues = await client.query(`SELECT id,process,support_level,active FROM support_queues
+        WHERE id=ANY($1::int[])`, [[ticket.queue_id,destinationId]]);
+      const source = queues.rows.find((queue) => queue.id === ticket.queue_id);
+      const destination = queues.rows.find((queue) => queue.id === destinationId);
+      if (!source || !destination?.active || destination.process !== ticket.process) {
+        throw new BadRequestException('Selecciona una cola activa del mismo proceso.');
+      }
+      if (destination.support_level <= source.support_level) {
+        throw new BadRequestException('El escalamiento requiere una cola con nivel de soporte superior.');
+      }
+      const updated = await client.query(`UPDATE tickets SET queue_id=$1,assigned_user_id=NULL,
+        state='ESCALATED',updated_at=NOW() WHERE id=$2 RETURNING *`, [destinationId,id]);
+      await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values,reason)
+        VALUES($1,$2,'ESCALATE',$3::jsonb,$4::jsonb,$5)`, [id,user.id,
+          JSON.stringify({ queueId: ticket.queue_id, supportLevel: source.support_level,
+            assignedUserId: ticket.assigned_user_id, state: ticket.state }),
+          JSON.stringify({ queueId: destinationId, supportLevel: destination.support_level,
+            assignedUserId: null, state: 'ESCALATED' }),reason]);
+      return updated.rows[0];
+    });
+  }
+
   async comment(id: number, body: Record<string, unknown>, user: AuthenticatedUser) {
     this.assertWriter(user);
     const ticket = await this.db.query('SELECT queue_id,requester_id FROM tickets WHERE id=$1', [id]);
@@ -529,12 +571,15 @@ export class DeskService {
     if (!ticket.rows[0]) throw new NotFoundException('Ticket no encontrado.');
     await this.assertAllowed(ticket.rows[0].queue_id,user,'can_handle');
     return this.db.transaction(async (client) => {
+      const current = await client.query('SELECT no_ci_reason FROM tickets WHERE id=$1 FOR UPDATE', [id]);
       const ci = await client.query('SELECT id FROM configuration_items WHERE id=$1', [ciId]);
       if (!ci.rows[0]) throw new BadRequestException('CI inexistente.');
       const inserted = await client.query('INSERT INTO ticket_ci(ticket_id,ci_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING *', [id,ciId]);
       if (inserted.rows[0]) await client.query('UPDATE tickets SET no_ci_reason=NULL,updated_at=NOW() WHERE id=$1', [id]);
-      if (inserted.rows[0]) await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,new_values)
-        VALUES($1,$2,'LINK_CI',$3::jsonb)`, [id,user.id,JSON.stringify({ ciId })]);
+      if (inserted.rows[0]) await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values)
+        VALUES($1,$2,'LINK_CI',$3::jsonb,$4::jsonb)`, [id,user.id,
+          JSON.stringify({ noCiReason: current.rows[0].no_ci_reason }),
+          JSON.stringify({ ciId, noCiReason: null })]);
       return { linked: !!inserted.rows[0] };
     });
   }
@@ -636,7 +681,10 @@ export class DeskService {
       await this.assertAllowed(ticket.queue_id,user,'can_handle',client);
       if (ticket.paused_at || ['CLOSED','REJECTED','RESOLVED'].includes(ticket.state)) throw new ConflictException('El ticket no puede pausarse en este estado.');
       const updated = await client.query('UPDATE tickets SET paused_at=NOW(),updated_at=NOW() WHERE id=$1 RETURNING *', [id]);
-      await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,reason) VALUES($1,$2,'PAUSE',$3)`, [id,user.id,reason]);
+      await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values,reason)
+        VALUES($1,$2,'PAUSE',$3::jsonb,$4::jsonb,$5)`, [id,user.id,
+          JSON.stringify({ pausedAt: ticket.paused_at, pausedSeconds: ticket.paused_seconds }),
+          JSON.stringify({ pausedAt: updated.rows[0].paused_at, pausedSeconds: updated.rows[0].paused_seconds }),reason]);
       return updated.rows[0];
     });
   }
@@ -653,7 +701,10 @@ export class DeskService {
       const updated = await client.query(`UPDATE tickets SET paused_seconds=paused_seconds+
         GREATEST(0,EXTRACT(EPOCH FROM (NOW()-paused_at))::bigint),paused_at=NULL,updated_at=NOW()
         WHERE id=$1 RETURNING *`, [id]);
-      await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,reason) VALUES($1,$2,'RESUME',$3)`, [id,user.id,reason]);
+      await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values,reason)
+        VALUES($1,$2,'RESUME',$3::jsonb,$4::jsonb,$5)`, [id,user.id,
+          JSON.stringify({ pausedAt: ticket.paused_at, pausedSeconds: ticket.paused_seconds }),
+          JSON.stringify({ pausedAt: updated.rows[0].paused_at, pausedSeconds: updated.rows[0].paused_seconds }),reason]);
       return updated.rows[0];
     });
   }

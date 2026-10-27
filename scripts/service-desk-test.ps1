@@ -19,7 +19,7 @@ Invoke-Compose 'importar los CI originales de CMDB.xlsx' @('exec','-T','api','no
 Invoke-Compose 'repetir CMDB.xlsx sin duplicar' @('exec','-T','api','node','apps/api/dist/scripts/import-cmdb.js')
 Invoke-Compose 'generar 5000 dispositivos' @('exec','-T','-e','CMDB_SEED=EVAL2026','-e','CMDB_COUNT=5000','api','node','apps/api/dist/scripts/generate-cmdb.js')
 Invoke-Compose 'repetir generación sin duplicar' @('exec','-T','-e','CMDB_SEED=EVAL2026','-e','CMDB_COUNT=5000','api','node','apps/api/dist/scripts/generate-cmdb.js')
-Invoke-Compose 'preparar siete colas y tickets' @('exec','-T','api','node','apps/api/dist/scripts/seed-service-desk.js')
+Invoke-Compose 'preparar siete procesos, ocho colas y tickets' @('exec','-T','api','node','apps/api/dist/scripts/seed-service-desk.js')
 Invoke-Compose 'escenarios P01-P17' @('exec','-T','-e','DESK_TEST_ISOLATED=1','api','node','apps/api/dist/scripts/desk-acceptance.js')
 
 $before = (& docker compose -p $project exec -T api node apps/api/dist/scripts/desk-persistence.js | Out-String).Trim()

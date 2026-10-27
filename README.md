@@ -34,7 +34,7 @@ En **Linux/macOS**, sustituya únicamente la copia del archivo por `cp .env.exam
 | `agente1.demo`, `agente2.demo` | `Agente123!` | Atención y transferencias |
 | `aprobador.demo` | `Aprueba123!` | Aprobaciones autorizadas |
 
-El script de preparación crea siete colas y 37 tickets de muestra. La importación de `data/fuentes/CMDB.xlsx` procesa dos CI originales y registra las referencias ambiguas sin inventar destinos; la generación agrega **5,000 dispositivos distintos**. Los tres comandos de carga son repetibles y no borran datos existentes. Ambos Excel originales se conservan sin cambios.
+El script de preparación crea ocho colas (una por cada uno de los siete procesos y una cola adicional de nivel 2 para escalar incidentes) y 37 tickets de muestra. La importación de `data/fuentes/CMDB.xlsx` procesa dos CI originales y registra las referencias ambiguas sin inventar destinos; la generación agrega **5,000 dispositivos distintos**. Los tres comandos de carga son repetibles y no borran datos existentes. Ambos Excel originales se conservan sin cambios.
 
 En **CMDB**, el administrador puede mantener categorías, ubicaciones
 controladas y CI. Un CI importado conserva la ubicación textual del Excel si

@@ -65,7 +65,15 @@ async function seedQueues(client: PoolClient) {
     await client.query(`INSERT INTO queue_grants(queue_id,role,can_view,can_approve)
       VALUES($1,'APROBADOR',TRUE,TRUE) ON CONFLICT DO NOTHING`, [queueId]);
   }
-  return queues;
+  const escalationQueue = await client.query<{ id: number }>(`INSERT INTO support_queues
+    (code,name,process,support_level,first_response_minutes,resolution_minutes)
+    VALUES('Q-INCIDENT-L2','Soporte técnico de incidentes','INCIDENT',2,60,480)
+    ON CONFLICT(code) DO UPDATE SET name=EXCLUDED.name,process=EXCLUDED.process,
+      support_level=2,active=TRUE,updated_at=NOW() RETURNING id`);
+  const incidentEscalationQueueId = escalationQueue.rows[0].id;
+  await client.query(`INSERT INTO queue_grants(queue_id,role,can_view,can_handle,can_transfer)
+    VALUES($1,'AGENTE',TRUE,TRUE,TRUE) ON CONFLICT DO NOTHING`, [incidentEscalationQueueId]);
+  return { queues, incidentEscalationQueueId };
 }
 
 function dataFor(process: DeskProcess, index: number) {
@@ -90,7 +98,7 @@ async function main() {
     const services = await client.query<{ id: number }>(`SELECT id FROM service_level_2 WHERE status='ACTIVE' ORDER BY id`);
     if (!position.rows[0] || !services.rows[0]) throw new Error('Ejecuta seed-demo e import-catalog antes de seed-service-desk.');
     const users = await createUsers(client,position.rows[0].id);
-    const queues = await seedQueues(client);
+    const { queues, incidentEscalationQueueId } = await seedQueues(client);
     const ci = await client.query<{ id: number }>(`SELECT id FROM configuration_items WHERE is_device ORDER BY id LIMIT 20`);
     let created = 0;
     for (const [,,process] of queueDefinitions) {
@@ -110,7 +118,8 @@ async function main() {
             'Ticket sintético para recorrer estados y permisos sin datos personales.',
             users.get('solicitante.demo'),users.get('solicitante.demo'),
             process === 'ACCESS' ? users.get('solicitante.demo') : null,
-            serviceId,queues.get(process),processType[process],process,state,
+            serviceId,process === 'INCIDENT' && state === 'ESCALATED' ? incidentEscalationQueueId : queues.get(process),
+            processType[process],process,state,
             1 + ((index - 1) % 5),JSON.stringify(dataFor(process,index)),
             ci.rows.length ? null : 'Sin CI cargados al preparar la muestra',
             index % 2 === 0 ? users.get('agente1.demo') : null,
@@ -126,11 +135,22 @@ async function main() {
           [ticketId,users.get('solicitante.demo'),JSON.stringify({ state, process })]);
       }
     }
+    const oldEscalated = await client.query<{ id: number; queue_id: number }>(`SELECT id,queue_id
+      FROM tickets WHERE number='DEMO-INC-05' AND process='INCIDENT' FOR UPDATE`);
+    if (oldEscalated.rows[0] && oldEscalated.rows[0].queue_id !== incidentEscalationQueueId) {
+      await client.query('UPDATE tickets SET queue_id=$1,updated_at=NOW() WHERE id=$2',
+        [incidentEscalationQueueId,oldEscalated.rows[0].id]);
+      await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values,reason)
+        VALUES($1,NULL,'DEMO_SEED_REPAIR',$2::jsonb,$3::jsonb,$4)`,
+        [oldEscalated.rows[0].id,JSON.stringify({ queueId: oldEscalated.rows[0].queue_id }),
+          JSON.stringify({ queueId: incidentEscalationQueueId }),
+          'Se alinea el ejemplo de estado ESCALATED con una cola de soporte de nivel 2.']);
+    }
     const totals = await client.query(`SELECT process,COUNT(*)::int AS count FROM tickets
       WHERE number LIKE 'DEMO-%' GROUP BY process ORDER BY process`);
     await client.query('COMMIT');
     console.log(JSON.stringify({ ok: true,created,total: totals.rows.reduce((sum,row) => sum + row.count,0),
-      byProcess: totals.rows,queues: queues.size,accounts: [...users.keys()] }));
+      byProcess: totals.rows,queues: queues.size + 1,accounts: [...users.keys()] }));
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

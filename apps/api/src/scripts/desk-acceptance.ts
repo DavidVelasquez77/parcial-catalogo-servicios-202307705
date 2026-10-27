@@ -155,6 +155,28 @@ async function main() {
     eq(transferred.queue_id,privateQueue.id,'cola destino');
     truth(transferred.history.some((item:Record<string,unknown>) => item.action==='TRANSFER'),'historial de transferencia');
     await status(`/desk/tickets/${race.id}/transfer`,400,'POST',{queueId:queueId('CHANGE'),reason:'Proceso distinto'},admin);
+    await status(`/desk/tickets/${race.id}/transition`,201,'POST',{to:'CLASSIFIED'},admin);
+    await status(`/desk/tickets/${race.id}/transition`,201,'POST',{to:'DIAGNOSING'},admin);
+    await status(`/desk/tickets/${race.id}/transition`,400,'POST',{to:'ESCALATED',reason:'Sin destino'},admin);
+    await status(`/desk/tickets/${race.id}/escalate`,400,'POST',{queueId:queueId('INCIDENT'),reason:'Mismo nivel'},admin);
+    const upperQueue = await status('/desk/queues',201,'POST',
+      {code:`ESC-${stamp}`,name:'Soporte nivel 2 de prueba',process:'INCIDENT',supportLevel:2},admin);
+    await status(`/desk/tickets/${race.id}/escalate`,403,'POST',
+      {queueId:upperQueue.id,reason:'Sin permiso'},agent2);
+    await status(`/desk/tickets/${race.id}/escalate`,400,'POST',{queueId:upperQueue.id},admin);
+    await status(`/desk/tickets/${race.id}/escalate`,201,'POST',
+      {queueId:upperQueue.id,reason:'Escalamiento documentado'},admin);
+    const escalated = await status(`/desk/tickets/${race.id}`,200,'GET',undefined,admin);
+    eq(escalated.state,'ESCALATED','estado escalado');
+    eq(escalated.queue_id,upperQueue.id,'cola de nivel superior');
+    const escalation = escalated.history.find((item:Record<string,unknown>) => item.action==='ESCALATE');
+    truth(escalation && escalation.actor_id===admin.id && escalation.actor_name &&
+      escalation.old_values.supportLevel===1 && escalation.new_values.supportLevel===2 &&
+      escalation.old_values.queueId===privateQueue.id && escalation.new_values.queueId===upperQueue.id,
+      'escalamiento con actor y valores anteriores/nuevos');
+    const seededEscalation = await pool.query(`SELECT q.support_level FROM tickets t
+      JOIN support_queues q ON q.id=t.queue_id WHERE t.number='DEMO-INC-05' AND t.state='ESCALATED'`);
+    eq(seededEscalation.rows[0]?.support_level,2,'ejemplo escalado en nivel 2');
     done('P08');
 
     const resolvedByProcess: Record<string,number> = {};
@@ -251,12 +273,20 @@ async function main() {
 
     const unfinished = await create('INCIDENT',{incidentCategory:'I4'});
     await status(`/desk/tickets/${unfinished.id}/transition`,400,'POST',{to:'CLOSED'},admin);
+    await status(`/desk/tickets/${unfinished.id}/pause`,201,'POST',{reason:'Espera controlada'},admin);
+    await status(`/desk/tickets/${unfinished.id}/resume`,201,'POST',{reason:'Atención reanudada'},admin);
     for (const to of ['CLASSIFIED','DIAGNOSING','IN_PROGRESS','RESOLVED','CLOSED']) {
       await status(`/desk/tickets/${unfinished.id}/transition`,201,'POST',{to,reason:'Solución de prueba'},admin);
     }
     await status(`/desk/tickets/${unfinished.id}/transition`,201,'POST',{to:'SUBMITTED',reason:'Se repitió el problema'},admin);
     const reopened = await status(`/desk/tickets/${unfinished.id}`,200,'GET',undefined,admin);
     eq(reopened.reopen_count,1,'reapertura');truth(reopened.history.some((item:Record<string,unknown>) => item.action==='TRANSITION'),'actor en historial');
+    const pause = reopened.history.find((item:Record<string,unknown>) => item.action==='PAUSE');
+    const resume = reopened.history.find((item:Record<string,unknown>) => item.action==='RESUME');
+    truth(pause?.old_values && pause?.new_values?.pausedAt && pause?.actor_name,
+      'pausa con actor y valores anteriores/nuevos');
+    truth(resume?.old_values?.pausedAt && resume?.new_values && resume.new_values.pausedAt===null,
+      'reanudación con valores anteriores/nuevos');
     done('P15');
 
     const started = performance.now();

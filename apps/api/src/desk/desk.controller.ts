@@ -34,6 +34,7 @@ export class DeskController {
   @Patch('tickets/:id/process-data') processData(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.updateProcessData(id, body, req.user); }
   @Post('tickets/:id/transition') transition(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.transition(id, body, req.user); }
   @Post('tickets/:id/transfer') transfer(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.transfer(id, body, req.user); }
+  @Post('tickets/:id/escalate') escalate(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.escalate(id, body, req.user); }
   @Post('tickets/:id/comments') comment(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.comment(id, body, req.user); }
   @Post('tickets/:id/ci') linkCi(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.linkCi(id, body, req.user); }
   @Post('tickets/:id/links') linkTicket(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.linkTicket(id, body, req.user); }

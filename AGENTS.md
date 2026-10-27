@@ -69,7 +69,7 @@ La inspección de `data/fuentes/CMDB.xlsx` confirmó hoja `CMDB`, encabezados B4
 
 ## Actualización de contexto 3: verificación integral (26 de octubre de 2026)
 
-La ampliación requiere ejecutar `scripts/service-desk-test.ps1` o `.sh` en el proyecto Compose aislado `service-desk-suite-202307705`. Esta rutina importa ambas fuentes dos veces, genera y repite 5,000 dispositivos, prepara siete colas y 35 o más tickets, ejecuta P01–P17 y reinicia PostgreSQL para P18. Registrar las salidas reales en `docs/PRUEBAS.md`. Los formularios de Service Desk deben mostrar campos específicos por proceso y las restricciones se vuelven a validar en la API.
+La ampliación requiere ejecutar `scripts/service-desk-test.ps1` o `.sh` en el proyecto Compose aislado `service-desk-suite-202307705`. Esta rutina importa ambas fuentes dos veces, genera y repite 5,000 dispositivos, prepara una cola por cada uno de los siete procesos más una cola de nivel 2 para incidentes y 35 o más tickets, ejecuta P01–P17 y reinicia PostgreSQL para P18. Registrar las salidas reales en `docs/PRUEBAS.md`. Los formularios de Service Desk deben mostrar campos específicos por proceso y las restricciones se vuelven a validar en la API.
 
 ## Actualización de contexto 4: cierre verificable (26 de octubre de 2026)
 
