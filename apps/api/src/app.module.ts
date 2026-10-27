@@ -6,6 +6,7 @@ import { UsersModule } from './users/users.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { ServicesModule } from './services/services.module';
 import { ImportModule } from './imports/import.module';
+import { CmdbModule } from './cmdb/cmdb.module';
 
-@Module({ imports: [DatabaseModule, AuthModule, OrganizationModule, UsersModule, CatalogModule, ServicesModule, ImportModule] })
+@Module({ imports: [DatabaseModule, AuthModule, OrganizationModule, UsersModule, CatalogModule, ServicesModule, ImportModule, CmdbModule] })
 export class AppModule {}

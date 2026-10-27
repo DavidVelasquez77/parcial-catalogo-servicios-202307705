@@ -1,5 +1,11 @@
 # Catálogo de Servicios TI
 
+> La ampliación Service Desk se desarrolla en la rama `codex/service-desk`.
+> El estado evaluado del parcial 2 permanece en la etiqueta `parcial-v2.0`.
+> Los nuevos datos y pruebas de la segunda tarea se documentan en
+> [docs/MODELO.md](docs/MODELO.md). No considerar esta rama una entrega final
+> de la segunda tarea hasta completar P01-P18.
+
 Aplicación web para convertir el catálogo institucional de servicios externos de TI en un sistema consultable y administrable. El proyecto incorpora autenticación local, roles, estructura organizacional, responsables, catálogos controlados, importación repetible del Excel original y trazabilidad de los datos.
 
 Este repositorio corresponde al parcial práctico de Software Avanzado, carné 202307705.
