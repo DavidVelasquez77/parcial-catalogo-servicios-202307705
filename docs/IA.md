@@ -50,4 +50,4 @@ Aunque la explicación oral aclaró que Graph Engineering no se califica de form
 
 ## Commits clave
 
-`3bb3d72`: modelo y generador; `fe4ea55`: tickets, flujos y aceptación; `623e949`: importación del CMDB original y formularios; `146bbe4`: documentos, pruebas y calidad; `85d913f`: tercera actualización de contexto verificada. Consulte `git log --oneline` para el SHA completo de entrega. La entrega anterior del catálogo se mantiene en la etiqueta `parcial-v2.0`.
+`3bb3d72`: modelo y generador; `fe4ea55`: tickets, flujos y aceptación; `623e949`: importación del CMDB original y formularios; `146bbe4`: documentos, pruebas y calidad; `85d913f`: tercera actualización de contexto verificada; `677c807`: edición visual de colas/categorías y filtros completos. Consulte `git log --oneline` para el SHA completo de entrega. La entrega anterior del catálogo se mantiene en la etiqueta `parcial-v2.0`.

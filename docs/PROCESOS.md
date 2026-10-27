@@ -28,6 +28,16 @@ De la diapositiva 15: E0 es programado, E1 es no programado sin impacto, E2 impa
 
 La diapositiva 16 rotula I0 sin interrupción; I1 hasta 3 horas; I2 hasta 8 horas; I3 hasta 2 días; I4 hasta 1 semana; I5 un mes o más; I6 seguridad. `incident-rules.ts` da prioridad a I6 e I0; para duraciones solapadas elige el intervalo más corto que encaja. Para el hueco entre una semana y un mes aplica I4 como **regla complementaria del proyecto** (`PROJECT_GAP_RULE_7_TO_30_DAYS`), sin atribuirla a la diapositiva. Sin duración suficiente solicita revisión manual. La categoría no es un SLA de resolución. P12 verifica el hueco y las siete categorías de muestra.
 
+La agrupación visual de la **diapositiva 16** se transcribe así; se verificó en la página renderizada, porque la extracción de texto no conserva las celdas fusionadas:
+
+| Categoría | Prioridad mostrada en la lección | Redundancia mostrada |
+|---|---|---|
+| I0 | Baja | Existe redundancia en recursos y servicios |
+| I1–I2 | Media | No existe redundancia en recursos y servicios |
+| I3–I6 | Alta | No existe redundancia en recursos y servicios |
+
+La prioridad operativa del ticket se registra aparte en una escala configurable 1–5; la tabla anterior es una **equivalencia docente de referencia**, no una asignación automática rígida. La disponibilidad de redundancia se registra explícitamente por caso y puede diferir de la ilustración. No se sobrescribe un dato observado para hacerlo coincidir con la diapositiva.
+
 La diapositiva 11 incluye nivel 0 Autoservicio, 1 Help Desk, 2 Soporte Técnico, 3 Ingenieros y 4 Externo; las diapositivas 12–13 describen 0–3 y sitúan proveedores en 3. La aplicación adopta el esquema 0–4 configurable en cada cola. El nivel 0 es el portal y FAQ; las colas de muestra parten en 1. Escalar se refleja en estado e historial y puede transferirse a otra cola del mismo proceso con nivel apropiado. Los porcentajes docentes 20/70/5/5 se presentan como referencia, no como cuotas forzadas.
 
 ## Indicadores
