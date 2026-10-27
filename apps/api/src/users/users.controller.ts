@@ -12,4 +12,5 @@ export class UsersController {
   @Get() list() { return this.service.list(); }
   @Post() create(@Body() body: Record<string, unknown>) { return this.service.create(body); }
   @Patch(':id') update(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) { return this.service.update(id, body); }
+  @Patch(':id/roles') setRoles(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>) { return this.service.setRoles(id, body); }
 }

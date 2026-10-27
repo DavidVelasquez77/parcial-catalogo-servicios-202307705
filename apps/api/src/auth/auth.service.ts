@@ -10,6 +10,7 @@ export class AuthService {
   async login(identifier: string, password: string): Promise<AuthenticatedUser> {
     const result = await this.db.query<AuthenticatedUser & { passwordHash: string }>(
       `SELECT u.id, u.name, u.username, u.email, u.role, u.active,
+              ARRAY(SELECT ur.role FROM user_roles ur WHERE ur.user_id=u.id ORDER BY ur.role) AS roles,
               u.position_id AS "positionId", p.section_id AS "sectionId",
               u.password_hash AS "passwordHash"
        FROM users u JOIN positions p ON p.id = u.position_id
@@ -28,6 +29,7 @@ export class AuthService {
   async currentUser(userId: number): Promise<AuthenticatedUser | null> {
     const result = await this.db.query<AuthenticatedUser>(
       `SELECT u.id, u.name, u.username, u.email, u.role, u.active,
+              ARRAY(SELECT ur.role FROM user_roles ur WHERE ur.user_id=u.id ORDER BY ur.role) AS roles,
               u.position_id AS "positionId", p.section_id AS "sectionId"
        FROM users u JOIN positions p ON p.id = u.position_id WHERE u.id = $1`,
       [userId],

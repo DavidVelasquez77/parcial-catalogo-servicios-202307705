@@ -15,7 +15,10 @@
     "db:seed": "node dist/scripts/seed-demo.js",
     "import:catalog": "node dist/scripts/import-catalog.js",
     "validate:import": "node dist/scripts/validate-import.js",
-    "verify:import": "node dist/scripts/verify-import.js"
+    "verify:import": "node dist/scripts/verify-import.js",
+    "cmdb:generate": "node dist/scripts/generate-cmdb.js",
+    "desk:seed": "node dist/scripts/seed-service-desk.js",
+    "desk:acceptance": "node dist/scripts/desk-acceptance.js"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.0",

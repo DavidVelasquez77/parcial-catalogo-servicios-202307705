@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'CONSULTA';
+export type UserRole = 'ADMIN' | 'CONSULTA' | 'SOLICITANTE' | 'AGENTE' | 'APROBADOR';
 
 export interface AuthenticatedUser {
   id: number;
@@ -6,6 +6,7 @@ export interface AuthenticatedUser {
   username: string;
   email: string | null;
   role: UserRole;
+  roles: UserRole[];
   active: boolean;
   positionId: number;
   sectionId: number;

@@ -20,7 +20,9 @@
     "validate:import": "npm run validate:import --workspace apps/api",
     "verify:import": "npm run verify:import --workspace apps/api",
     "audit:secrets": "node scripts/audit-secrets.mjs",
-    "harness": "node scripts/harness.mjs"
+    "harness": "node scripts/harness.mjs",
+    "test:desk:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1",
+    "test:desk:unix": "sh scripts/service-desk-test.sh"
   },
   "devDependencies": {
     "@playwright/test": "1.52.0"

@@ -24,6 +24,7 @@ services:
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:8080}
       SESSION_SECRET: ${SESSION_SECRET:-change_this_local_demo_secret}
       IMPORT_FILE: /app/data/CatalogoServicios.xlsx
+      UPLOAD_DIR: /app/uploads
       EXPECTED_LEVEL1_COUNT: ${EXPECTED_LEVEL1_COUNT:-12}
       EXPECTED_LEVEL2_COUNT: ${EXPECTED_LEVEL2_COUNT:-46}
       EXPECTED_REVIEW_COUNT: ${EXPECTED_REVIEW_COUNT:-3}
@@ -31,12 +32,17 @@ services:
       DEMO_ADMIN_PASSWORD: ${DEMO_ADMIN_PASSWORD:-Admin123!}
       DEMO_QUERY_USERNAME: ${DEMO_QUERY_USERNAME:-consulta.demo}
       DEMO_QUERY_PASSWORD: ${DEMO_QUERY_PASSWORD:-Consulta123!}
+      DEMO_REQUESTER_PASSWORD: ${DEMO_REQUESTER_PASSWORD:-Solicita123!}
+      DEMO_AGENT1_PASSWORD: ${DEMO_AGENT1_PASSWORD:-Agente123!}
+      DEMO_AGENT2_PASSWORD: ${DEMO_AGENT2_PASSWORD:-Agente123!}
+      DEMO_APPROVER_PASSWORD: ${DEMO_APPROVER_PASSWORD:-Aprueba123!}
     depends_on:
       db:
         condition: service_healthy
     command: ["sh", "-c", "node apps/api/dist/scripts/migrate.js && node apps/api/dist/main.js"]
     volumes:
       - ./data/CatalogoServicios.xlsx:/app/data/CatalogoServicios.xlsx:ro
+      - uploads_data:/app/uploads
 
   web:
     build:
@@ -45,7 +51,7 @@ services:
       args:
         VITE_API_BASE_URL: /api
     ports:
-      - "8080:80"
+      - "${WEB_PORT:-8080}:80"
     depends_on:
       - api
 
@@ -61,3 +67,4 @@ services:
 
 volumes:
   postgres_data:
+  uploads_data:

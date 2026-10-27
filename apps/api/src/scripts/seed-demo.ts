@@ -29,6 +29,11 @@ async function main() {
       ON CONFLICT(username) DO UPDATE SET name=EXCLUDED.name,email=EXCLUDED.email,password_hash=EXCLUDED.password_hash,role='ADMIN',active=TRUE,position_id=EXCLUDED.position_id`, ['Administrador demo', process.env.DEMO_ADMIN_USERNAME ?? 'admin.demo', 'admin.demo@example.local', adminHash, positionId]);
     await client.query(`INSERT INTO users(name,username,email,password_hash,role,position_id) VALUES($1,$2,$3,$4,'CONSULTA',$5)
       ON CONFLICT(username) DO UPDATE SET name=EXCLUDED.name,email=EXCLUDED.email,password_hash=EXCLUDED.password_hash,role='CONSULTA',active=TRUE,position_id=EXCLUDED.position_id`, ['Usuario consulta demo', process.env.DEMO_QUERY_USERNAME ?? 'consulta.demo', 'consulta.demo@example.local', queryHash, queryPositionId]);
+    for (const [username, role] of [[process.env.DEMO_ADMIN_USERNAME ?? 'admin.demo', 'ADMIN'], [process.env.DEMO_QUERY_USERNAME ?? 'consulta.demo', 'CONSULTA']]) {
+      const account = await client.query<{ id: number }>('SELECT id FROM users WHERE username=$1', [username]);
+      await client.query('DELETE FROM user_roles WHERE user_id=$1', [account.rows[0].id]);
+      await client.query('INSERT INTO user_roles(user_id,role) VALUES($1,$2)', [account.rows[0].id, role]);
+    }
     console.log(JSON.stringify({ ok: true, companyId, areaId, departmentId, sectionId, demoUsers: [process.env.DEMO_ADMIN_USERNAME ?? 'admin.demo', process.env.DEMO_QUERY_USERNAME ?? 'consulta.demo'] }));
   } finally {
     client.release();
