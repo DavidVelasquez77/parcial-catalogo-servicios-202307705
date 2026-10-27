@@ -68,6 +68,10 @@ La inspección de `data/fuentes/CMDB.xlsx` confirmó hoja `CMDB`, encabezados B4
 
 La ampliación requiere ejecutar `scripts/service-desk-test.ps1` o `.sh` en el proyecto Compose aislado `service-desk-suite-202307705`. Esta rutina importa ambas fuentes dos veces, genera y repite 5,000 dispositivos, prepara siete colas y 35 o más tickets, ejecuta P01–P17 y reinicia PostgreSQL para P18. Registrar las salidas reales en `docs/PRUEBAS.md`. Los formularios de Service Desk deben mostrar campos específicos por proceso y las restricciones se vuelven a validar en la API.
 
+## Actualización de contexto 4: cierre verificable (26 de octubre de 2026)
+
+Tras la validación final de la ampliación, las rutas de consulta prioritarias son `README.md` para un clon limpio, `docs/MODELO.md` para fuentes y grafos, `docs/PROCESOS.md` para reglas, `docs/IA.md` para las cuatro técnicas y `docs/PRUEBAS.md` para salidas P01–P18. La suite final con ExcelJS y dependencias actualizadas preservó 12/46, dos CI originales, 5,000 dispositivos únicos y persistencia tras reinicio; Jest pasó 13 pruebas y Playwright 2 recorridos. `npm run lint`, `npm run typecheck`, `npm run audit:secrets` y `npm audit --audit-level=high` terminaron con código 0. Ante futuros cambios, volver a ejecutar las comprobaciones afectadas y actualizar fecha, SHA y resultados; no reutilizar estos números como si fueran una prueba nueva.
+
 ## 4. Restricciones técnicas
 
 - No usar Prisma.
