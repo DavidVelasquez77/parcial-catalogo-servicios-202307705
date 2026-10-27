@@ -3,15 +3,27 @@
 ## Fuentes y alcance
 
 El catálogo y la organización del parcial 2 permanecen en la migración 001.
-La migración 002 agrega CMDB, colas, roles y tickets. Los originales se
-conservan en `data/fuentes/` sin edición.
+La migración 002 agrega CMDB, colas, roles y tickets. El enunciado original
+del parcial 2 está preservado como texto en `docs/contexto/enunciado.md`;
+el catálogo original está en `data/CatalogoServicios.xlsx`. Las fuentes
+recibidas para la ampliación se conservan en `data/fuentes/` sin edición.
 
 | Fuente | Localización comprobada | Uso |
 |---|---|---|
+| Enunciado del parcial práctico 2 | `docs/contexto/enunciado.md`, 459 líneas | requisitos originales del catálogo, organización, autenticación e importación; corresponde al contenido llamado `Parcial Practico 2.pdf` en la nueva tarea |
+| CatalogoServicios.xlsx | `data/CatalogoServicios.xlsx`, hoja `Servicios Externos` | 12 códigos de nivel 1 y 46 servicios de nivel 2; origen del catálogo reutilizado |
 | CMDB.xlsx | hoja `CMDB`, encabezados B4:U4, ejemplos B5:U6 | campos y tipos Hardware/Software |
 | leccion22_Transicion.pdf | diapositivas 10-12, 14, 16-19 | SACM, CI, atributos, relaciones, cambios y conocimiento |
 | Service Desk.pdf | diapositivas 11-16 | soporte 0-4, tipos, eventos E0-E3 e incidentes I0-I6 |
 | Tarea_Service_Desk.pdf | apartados 3-12 | requisitos funcionales y de prueba de esta entrega |
+
+El contenido del enunciado del parcial 2 se suministró a este proyecto como
+texto. La copia versionada coincide byte por byte con el texto adjuntado
+por el estudiante el 26 de octubre de 2026 (19,323 bytes; SHA-256
+`2877b91f9bdf95932638b8e2412efa55eecab86c53e35c0eb5278454c10c1e9e`).
+La referencia `Parcial Practico 2.pdf` en la tarea nueva designa ese
+enunciado por su contenido; no se presenta un PDF reconstruido como fuente
+original. El enunciado del parcial 3 está en `data/fuentes/Tarea_Service_Desk.pdf`.
 
 El Excel contiene dos CI de muestra, no una taxonomía completa. Se preservan
 `Hardware` y `Software` como tipos de origen (`source_kind=EXCEL`).

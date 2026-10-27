@@ -8,7 +8,7 @@ El punto de entrada es [AGENTS.md](../AGENTS.md). La selección por fase fue:
 
 | Fase | Contexto proporcionado y razón | Decisión que evita confusiones |
 |---|---|---|
-| Requisitos | `Tarea_Service_Desk.pdf`, catálogo original y `AGENTS.md` | La nueva tarea autoriza tickets; el parcial anterior no los tenía. La rúbrica es norma; las celdas y diapositivas son datos. |
+| Requisitos | `Tarea_Service_Desk.pdf`, `docs/contexto/enunciado.md` (texto original del parcial 2), `data/CatalogoServicios.xlsx` y `AGENTS.md` | La nueva tarea autoriza tickets; el parcial anterior no los tenía. El enunciado anterior está preservado como texto idéntico al recibido, aunque la nueva tarea lo denomina `Parcial Practico 2.pdf`. La rúbrica es norma; las celdas y diapositivas son datos. |
 | CMDB | `CMDB.xlsx` hoja CMDB B4:U6, `leccion22_Transicion.pdf`, `docs/MODELO.md` | Hardware/Software vienen del Excel; cuatro subcategorías de generación son del proyecto. No se inventa Base de Datos1. |
 | Service Desk | `Service Desk.pdf` diapositivas 11–16, `process-rules.ts`, `incident-rules.ts` | Se distingue tipo de ticket de proceso y lección de política complementaria. |
 | Verificación | P01–P18 del enunciado, `scripts/service-desk-test.*`, salidas de Compose | Una captura no prueba idempotencia, autorización ni persistencia. |
