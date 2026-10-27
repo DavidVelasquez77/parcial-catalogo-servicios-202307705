@@ -43,7 +43,7 @@ test('portal Service Desk: ticket, CMDB, indicadores y conocimientos', async ({ 
   await expect(page.getByRole('heading', { name: 'Base de conocimientos' })).toBeVisible();
 });
 
-test('mantenimiento visual de categoría y cola', async ({ page }) => {
+test('mantenimiento visual de categoría, ubicación y cola', async ({ page }) => {
   const code = `UI-${Date.now()}`;
   await page.goto('/');
   await page.getByLabel('Usuario o correo').fill('admin.demo');
@@ -62,6 +62,18 @@ test('mantenimiento visual de categoría y cola', async ({ page }) => {
   await categoryDialog.getByLabel('Nombre').fill('Categoría revisada');
   await categoryDialog.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(categoryCard).toContainText('Categoría revisada');
+
+  const locationPanel = page.locator('section.panel').filter({ has: page.getByRole('heading', { name: 'Ubicaciones controladas' }) });
+  await locationPanel.getByLabel('Código').fill(code);
+  await locationPanel.getByLabel('Nombre').fill('Ubicación de interfaz');
+  await locationPanel.getByRole('button', { name: 'Agregar ubicación' }).click();
+  const locationCard = locationPanel.locator('.desk-note').filter({ hasText: code });
+  await expect(locationCard).toBeVisible();
+  await locationCard.getByRole('button', { name: 'Editar ubicación' }).click();
+  const locationDialog = page.getByRole('dialog', { name: `Editar ubicación ${code}` });
+  await locationDialog.getByLabel('Nombre').fill('Ubicación revisada');
+  await locationDialog.getByRole('button', { name: 'Guardar cambios' }).click();
+  await expect(locationCard).toContainText('Ubicación revisada');
 
   await page.getByRole('button', { name: 'Colas', exact: true }).click();
   const queuePanel = page.locator('section.panel').filter({ has: page.getByRole('heading', { name: 'Crear cola' }) });

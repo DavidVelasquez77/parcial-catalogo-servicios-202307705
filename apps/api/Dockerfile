@@ -15,6 +15,7 @@ COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY --from=build /app/apps/api/package.json ./apps/api/package.json
 COPY --from=build /app/apps/api/src ./apps/api/src
 COPY --from=build /app/apps/api/test ./apps/api/test
+COPY --from=build /app/apps/api/eslint.config.js ./apps/api/eslint.config.js
 COPY --from=build /app/apps/api/tsconfig.json ./apps/api/tsconfig.json
 COPY --from=build /app/apps/api/tsconfig.build.json ./apps/api/tsconfig.build.json
 COPY --from=build /app/database ./database

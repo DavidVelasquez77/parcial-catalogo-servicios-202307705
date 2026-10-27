@@ -76,6 +76,51 @@ export class CmdbService {
     });
   }
 
+  async locations() {
+    const result = await this.db.query('SELECT id,code,name,active FROM ci_locations ORDER BY name,id');
+    return result.rows;
+  }
+
+  async createLocation(body: Record<string, unknown>) {
+    const code = textValue(body.code, 'Código', 50);
+    const name = textValue(body.name, 'Nombre', 160);
+    return this.db.transaction(async (client) => {
+      const duplicate = await client.query('SELECT id FROM ci_locations WHERE code=$1', [code]);
+      if (duplicate.rows[0]) throw new ConflictException('El código de ubicación ya existe.');
+      const result = await client.query('INSERT INTO ci_locations(code,name) VALUES($1,$2) RETURNING id,code,name,active', [code,name]);
+      return result.rows[0];
+    });
+  }
+
+  async updateLocation(id: number, body: Record<string, unknown>, actorId: number) {
+    return this.db.transaction(async (client) => {
+      const current = await client.query('SELECT id,code,name,active FROM ci_locations WHERE id=$1 FOR UPDATE', [id]);
+      if (!current.rows[0]) throw new NotFoundException('Ubicación no encontrada.');
+      const previous = current.rows[0];
+      const name = body.name === undefined ? previous.name : textValue(body.name, 'Nombre', 160);
+      if (body.active !== undefined && typeof body.active !== 'boolean') throw new BadRequestException('El estado de la ubicación debe ser verdadero o falso.');
+      const active = body.active === undefined ? previous.active : body.active;
+      if (!active) {
+        const linked = await client.query(`SELECT 1 FROM configuration_items
+          WHERE location_id=$1 AND status<>'RETIRED' LIMIT 1`, [id]);
+        if (linked.rows[0]) throw new ConflictException('Reasigna o retira los CI vinculados antes de desactivar la ubicación.');
+      }
+      if (name !== previous.name) {
+        const changed = await client.query(`UPDATE configuration_items SET location=$1,updated_at=NOW()
+          WHERE location_id=$2 RETURNING id`, [name,id]);
+        if (changed.rowCount) {
+          await client.query(`INSERT INTO ci_history(ci_id,actor_id,action,old_values,new_values)
+            SELECT id,$1,'LOCATION_RENAME',jsonb_build_object('location',$2::text),
+              jsonb_build_object('location',$3::text) FROM configuration_items WHERE location_id=$4`,
+          [actorId,previous.name,name,id]);
+        }
+      }
+      const result = await client.query(`UPDATE ci_locations SET name=$1,active=$2 WHERE id=$3
+        RETURNING id,code,name,active`, [name,active,id]);
+      return result.rows[0];
+    });
+  }
+
   async items(query: Record<string, string | undefined>) {
     const page = Math.max(1, Math.min(100000, Number(query.page) || 1));
     const pageSize = Math.max(1, Math.min(100, Number(query.pageSize) || 20));
@@ -121,7 +166,16 @@ export class CmdbService {
     const code = textValue(body.code, 'Código', 80);
     const name = textValue(body.name, 'Nombre');
     const categoryId = positiveId(body.categoryId, 'Categoría');
-    const location = textValue(body.location, 'Ubicación');
+    const locationId = body.locationId == null ? null : positiveId(body.locationId, 'Ubicación controlada');
+    let location: string;
+    if (locationId) {
+      const controlled = await this.db.query('SELECT name FROM ci_locations WHERE id=$1 AND active', [locationId]);
+      if (!controlled.rows[0]) throw new BadRequestException('La ubicación controlada no existe o está inactiva.');
+      location = controlled.rows[0].name;
+      if (body.location != null && String(body.location).trim() !== location) throw new BadRequestException('La ubicación escrita no coincide con la ubicación controlada.');
+    } else {
+      location = textValue(body.location, 'Ubicación');
+    }
     const status = String(body.status ?? 'ACTIVE');
     if (!itemStatuses.includes(status as typeof itemStatuses[number])) throw new BadRequestException('Estado no válido.');
     const category = await this.db.query('SELECT active FROM ci_categories WHERE id=$1', [categoryId]);
@@ -139,16 +193,16 @@ export class CmdbService {
     if (!technical || typeof technical !== 'object' || Array.isArray(technical)) throw new BadRequestException('Los atributos técnicos deben ser un objeto.');
     return this.db.transaction(async (client) => {
       const created = await client.query(`INSERT INTO configuration_items
-        (code,name,category_id,is_device,description,serial_number,version,acquired_on,status,location,
+        (code,name,category_id,is_device,description,serial_number,version,acquired_on,status,location,location_id,
          responsible_user_id,responsible_label,documentation_url,security_level,compliance_status,
          configuration_status,license_number,license_expires_on,technical_attributes,source_reference)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$21,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
         RETURNING *`,
         [code,name,categoryId,body.isDevice !== false,body.description ?? null,body.serialNumber ?? null,body.version ?? null,
           body.acquiredOn ?? null,status,location,responsibleUserId,responsibleLabel,
           body.documentationUrl ?? null,body.securityLevel ?? null,body.complianceStatus ?? null,
           body.configurationStatus ?? null,body.licenseNumber ?? null,body.licenseExpiresOn ?? null,
-          JSON.stringify(technical),body.sourceReference ?? null]);
+          JSON.stringify(technical),body.sourceReference ?? null,locationId]);
       await client.query(`INSERT INTO ci_history(ci_id,actor_id,action,new_values)
         VALUES($1,$2,'CREATE',$3::jsonb)`, [created.rows[0].id, actorId, JSON.stringify(created.rows[0])]);
       return created.rows[0];
@@ -176,21 +230,37 @@ export class CmdbService {
       if (!itemStatuses.includes(status as typeof itemStatuses[number])) throw new BadRequestException('Estado no válido.');
       const technical = body.technicalAttributes ?? old.technical_attributes;
       if (!technical || typeof technical !== 'object' || Array.isArray(technical)) throw new BadRequestException('Los atributos técnicos deben ser un objeto.');
+      let locationId: number | null = old.location_id;
+      let location: string = old.location;
+      if (body.locationId !== undefined) {
+        locationId = body.locationId === null ? null : positiveId(body.locationId, 'Ubicación controlada');
+        if (locationId) {
+          const controlled = await client.query('SELECT name FROM ci_locations WHERE id=$1 AND active', [locationId]);
+          if (!controlled.rows[0]) throw new BadRequestException('La ubicación controlada no existe o está inactiva.');
+          location = controlled.rows[0].name;
+          if (body.location != null && String(body.location).trim() !== location) throw new BadRequestException('La ubicación escrita no coincide con la ubicación controlada.');
+        } else {
+          location = textValue(body.location, 'Ubicación');
+        }
+      } else if (body.location !== undefined) {
+        const newLocation = textValue(body.location, 'Ubicación');
+        if (newLocation !== old.location) { locationId = null; location = newLocation; }
+      }
       const updated = await client.query(`UPDATE configuration_items SET
         name=$1,category_id=$2,is_device=$19,description=$3,serial_number=$4,version=$5,acquired_on=$6,
-        status=$7,location=$8,responsible_user_id=$9,responsible_label=$10,documentation_url=$11,
+        status=$7,location=$8,location_id=$20,responsible_user_id=$9,responsible_label=$10,documentation_url=$11,
         security_level=$12,compliance_status=$13,configuration_status=$14,license_number=$15,
         license_expires_on=$16,technical_attributes=$17::jsonb,updated_at=NOW()
         WHERE id=$18 RETURNING *`,
         [body.name === undefined ? old.name : textValue(body.name, 'Nombre'),categoryId,
           body.description ?? old.description,body.serialNumber ?? old.serial_number,
           body.version ?? old.version,body.acquiredOn ?? old.acquired_on,status,
-          body.location === undefined ? old.location : textValue(body.location, 'Ubicación'),
+          location,
           responsibleUserId,responsibleLabel,
           body.documentationUrl ?? old.documentation_url,body.securityLevel ?? old.security_level,
           body.complianceStatus ?? old.compliance_status,body.configurationStatus ?? old.configuration_status,
           body.licenseNumber ?? old.license_number,body.licenseExpiresOn ?? old.license_expires_on,
-          JSON.stringify(technical),id,body.isDevice === undefined ? old.is_device : body.isDevice === true]);
+          JSON.stringify(technical),id,body.isDevice === undefined ? old.is_device : body.isDevice === true,locationId]);
       await client.query(`INSERT INTO ci_history(ci_id,actor_id,action,old_values,new_values)
         VALUES($1,$2,'UPDATE',$3::jsonb,$4::jsonb)`,
         [id, actorId, JSON.stringify(old), JSON.stringify(updated.rows[0])]);
@@ -208,12 +278,19 @@ export class CmdbService {
       await client.query('SELECT pg_advisory_xact_lock(22027)');
       const found = await client.query('SELECT id FROM configuration_items WHERE id=ANY($1::bigint[])', [[fromId,toId]]);
       if (found.rowCount !== 2) throw new BadRequestException('Ambos CI deben existir.');
+      if (relationType === 'PARENT_OF') {
+        const assigned = await client.query(`SELECT from_ci_id FROM ci_relations
+          WHERE to_ci_id=$1 AND relation_type='PARENT_OF' LIMIT 1`, [toId]);
+        if (assigned.rows[0]) throw new ConflictException('El CI componente ya pertenece a un CI padre.');
+      }
       if (relationType !== 'CONNECTED_TO') {
+        const acyclicTypes = relationType === 'PARENT_OF'
+          ? ['PARENT_OF'] : ['DEPENDS_ON','HOSTED_ON'];
         const cycle = await client.query(`WITH RECURSIVE reachable(id) AS (
-          SELECT to_ci_id FROM ci_relations WHERE from_ci_id=$1 AND relation_type=$3
+          SELECT to_ci_id FROM ci_relations WHERE from_ci_id=$1 AND relation_type=ANY($3::text[])
           UNION SELECT r.to_ci_id FROM ci_relations r JOIN reachable x ON r.from_ci_id=x.id
-          WHERE r.relation_type=$3
-        ) SELECT 1 FROM reachable WHERE id=$2 LIMIT 1`, [toId,fromId,relationType]);
+          WHERE r.relation_type=ANY($3::text[])
+        ) SELECT 1 FROM reachable WHERE id=$2 LIMIT 1`, [toId,fromId,acyclicTypes]);
         if (cycle.rows[0]) throw new ConflictException('Esta relación crearía un ciclo no permitido.');
       }
       const exists = await client.query('SELECT id FROM ci_relations WHERE from_ci_id=$1 AND to_ci_id=$2 AND relation_type=$3', [fromId,toId,relationType]);
@@ -235,11 +312,11 @@ export class CmdbService {
   async impact(id: number) {
     const item = await this.db.query('SELECT id FROM configuration_items WHERE id=$1', [id]);
     if (!item.rows[0]) throw new NotFoundException('CI no encontrado.');
-    const result = await this.db.query(`WITH RECURSIVE affected(id, depth) AS (
-      SELECT $1::bigint,0
+    const result = await this.db.query(`WITH RECURSIVE affected(id) AS (
+      SELECT $1::bigint
       UNION
-      SELECT r.from_ci_id,a.depth+1 FROM ci_relations r JOIN affected a ON r.to_ci_id=a.id
-      WHERE r.relation_type IN ('DEPENDS_ON','HOSTED_ON') AND a.depth < 20
+      SELECT r.from_ci_id FROM ci_relations r JOIN affected a ON r.to_ci_id=a.id
+      WHERE r.relation_type IN ('DEPENDS_ON','HOSTED_ON')
     )
     SELECT DISTINCT ci.id,ci.code,ci.name,s.id AS service_id,s.code AS service_code,s.name AS service_name
     FROM affected a JOIN configuration_items ci ON ci.id=a.id

@@ -71,14 +71,26 @@ async function main() {
 
     const categories = await status('/cmdb/categories',200,'GET',undefined,admin) as Array<Record<string,any>>;
     truth(categories.some((c) => c.sourceKind==='EXCEL' && c.name==='Hardware'),'raíz Hardware del Excel');
+    truth(categories.some((c) => c.sourceKind==='EXCEL' && c.name==='Software'),'raíz Software del Excel');
+    truth(categories.filter((c) => c.code?.startsWith('HW-')).every((c) => c.sourceKind==='PROJECT'),
+      'subcategorías sintéticas identificadas como decisión del proyecto');
     const sourceCi = await pool.query(`SELECT code,technical_attributes FROM configuration_items
       WHERE code IN ('CMDB-XLSX-5','CMDB-XLSX-6') ORDER BY code`);
     eq(sourceCi.rows.length,2,'CI originales del Excel');
     truth(sourceCi.rows.every((row) => row.technical_attributes.sourceSheet==='CMDB'),'trazabilidad de origen CMDB');
+    truth(sourceCi.rows.every((row) => !row.technical_attributes.originalParentsChildren),
+      'J5:J6 no aporta relaciones padre/hijo');
     await status('/cmdb/categories',400,'POST',{code:`BAD-${stamp}`,name:'Huérfana',parentId:999999999},admin);
     const root = await status('/cmdb/categories',201,'POST',{code:`RT-${stamp}`,name:'Raíz de prueba'},admin);
     const child = await status('/cmdb/categories',201,'POST',{code:`CH-${stamp}`,name:'Hija de prueba',parentId:root.id},admin);
     await status(`/cmdb/categories/${root.id}`,400,'PATCH',{parentId:child.id},admin);
+    const controlledLocation = await status('/cmdb/locations',201,'POST',
+      {code:`LOC-${stamp}`,name:'Laboratorio de prueba'},admin);
+    await status('/cmdb/locations',409,'POST',
+      {code:`LOC-${stamp}`,name:'Duplicada'},admin);
+    const visibleLocations = await status('/cmdb/locations',200,'GET',undefined,admin);
+    truth(visibleLocations.some((item:Record<string,unknown>)=>Number(item.id)===Number(controlledLocation.id)),
+      'ubicación controlada recuperable');
     done('P04');
 
     const services = await status('/services?status=ACTIVE&pageSize=100',200,'GET',undefined,admin);
@@ -208,8 +220,16 @@ async function main() {
     eq(related.links.length,2,'relaciones problema-incidente-cambio');
     done('P13');
 
-    const testCi1 = await status('/cmdb/items',201,'POST',{code:`T-A-${stamp}`,name:'CI origen de prueba',categoryId:child.id,location:'Laboratorio',responsibleUserId:admin.id},admin);
+    const testCi1 = await status('/cmdb/items',201,'POST',{code:`T-A-${stamp}`,name:'CI origen de prueba',categoryId:child.id,locationId:controlledLocation.id,location:'Laboratorio de prueba',responsibleUserId:admin.id},admin);
     const testCi2 = await status('/cmdb/items',201,'POST',{code:`T-B-${stamp}`,name:'CI destino de prueba',categoryId:child.id,location:'Laboratorio',responsibleUserId:admin.id},admin);
+    const testCi3 = await status('/cmdb/items',201,'POST',{code:`T-C-${stamp}`,name:'Componente de prueba',categoryId:child.id,location:'Laboratorio',responsibleUserId:admin.id},admin);
+    await status('/cmdb/items',400,'POST',{code:`T-INVALID-${stamp}`,name:'Ubicación inválida',categoryId:child.id,locationId:999999999,responsibleUserId:admin.id},admin);
+    await status(`/cmdb/locations/${controlledLocation.id}`,200,'PATCH',{name:'Laboratorio renombrado'},admin);
+    const renamedCi = await status(`/cmdb/items/${testCi1.id}`,200,'GET',undefined,admin);
+    eq(renamedCi.location,'Laboratorio renombrado','ubicación sincronizada');
+    truth(renamedCi.history.some((item:Record<string,unknown>)=>item.action==='LOCATION_RENAME'),
+      'cambio de ubicación en historial');
+    await status(`/cmdb/locations/${controlledLocation.id}`,409,'PATCH',{active:false},admin);
     const changedCi = await status(`/cmdb/items/${testCi1.id}`,200,'PATCH',{name:'CI origen editado',isDevice:false},admin);
     eq(changedCi.is_device,false,'edición de CI no dispositivo');
     const ciDetail = await status(`/cmdb/items/${testCi1.id}`,200,'GET',undefined,admin);
@@ -217,6 +237,13 @@ async function main() {
     await status('/cmdb/services',201,'POST',{ciId:testCi1.id,serviceId},admin);
     await status('/cmdb/relations',201,'POST',{fromCiId:testCi1.id,toCiId:testCi2.id,relationType:'DEPENDS_ON'},admin);
     await status('/cmdb/relations',409,'POST',{fromCiId:testCi2.id,toCiId:testCi1.id,relationType:'DEPENDS_ON'},admin);
+    await status('/cmdb/relations',409,'POST',{fromCiId:testCi2.id,toCiId:testCi1.id,relationType:'HOSTED_ON'},admin);
+    await status('/cmdb/relations',201,'POST',{fromCiId:testCi1.id,toCiId:testCi3.id,relationType:'PARENT_OF'},admin);
+    await status('/cmdb/relations',409,'POST',{fromCiId:testCi2.id,toCiId:testCi3.id,relationType:'PARENT_OF'},admin);
+    await status('/cmdb/relations',409,'POST',{fromCiId:testCi3.id,toCiId:testCi1.id,relationType:'PARENT_OF'},admin);
+    const parents = await pool.query(`SELECT COUNT(*)::int AS total FROM ci_relations
+      WHERE to_ci_id=$1 AND relation_type='PARENT_OF'`,[testCi3.id]);
+    eq(parents.rows[0].total,1,'componente con padre único');
     const impact = await status(`/cmdb/items/${testCi2.id}/impact`,200,'GET',undefined,admin);
     truth(impact.potentiallyAffected.some((item:Record<string,any>) => Number(item.id)===Number(testCi1.id)),'recorrido de dependencia');
     truth(impact.potentiallyAffected.some((item:Record<string,any>) => Number(item.service_id)===serviceId),'servicio potencialmente afectado');
