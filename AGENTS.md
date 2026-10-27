@@ -6,6 +6,9 @@ El usuario autorizó ampliar este mismo repositorio con la tarea de Service Desk
 El enunciado vigente está en `data/fuentes/Tarea_Service_Desk.pdf`; las fuentes
 `data/fuentes/CMDB.xlsx`, `data/fuentes/Service Desk.pdf` y
 `data/fuentes/leccion22_Transicion.pdf` se conservan sin modificaciones.
+Las transcripciones originales están en `data/fuentes/transcripciónTransición.md`
+y `data/fuentes/transcripciónServiceDesck.md`; el diagrama y diccionario
+contrastados están en `docs/CMDB_JERARQUIA.md`.
 La restricción anterior de no agregar tickets deja de aplicar a esta ampliación.
 La etiqueta `parcial-v2.0` conserva el estado de la entrega anterior.
 
