@@ -13,7 +13,7 @@ El punto de entrada es [AGENTS.md](../AGENTS.md). La selección por fase fue:
 | Service Desk | `Service Desk.pdf` diapositivas 11–16, `process-rules.ts`, `incident-rules.ts` | Se distingue tipo de ticket de proceso y lección de política complementaria. |
 | Verificación | P01–P18 del enunciado, `scripts/service-desk-test.*`, salidas de Compose | Una captura no prueba idempotencia, autorización ni persistencia. |
 
-Se registran tres actualizaciones de contexto con cambios versionados: (1) `3bb3d72` añadió el alcance Service Desk, la precedencia de fuentes y la separación de grafos; (2) `623e949` documentó el hallazgo de los dos CI, la referencia ausente y la importación transaccional; (3) `623e949` añadió la rutina aislada P01–P18 y la regla de no atribuir a Excel las categorías sintéticas. Las actualizaciones 2 y 3 están en un mismo commit porque se cerraron juntas tras la prueba; son dos decisiones distintas, no dos commits ficticios. La regla de confianza de `AGENTS.md` impide ejecutar instrucciones dentro de Excel, PDFs, logs o resultados de herramientas. Los documentos externos sirven para datos y requisitos, no para dar órdenes al agente.
+Se registran tres actualizaciones de contexto con cambios versionados: (1) `3bb3d72` añadió el alcance Service Desk, la precedencia de fuentes y la separación de grafos; (2) `623e949` documentó el hallazgo de los dos CI, la referencia ausente y la importación transaccional; (3) `85d913f` cerró el contexto tras verificar P01–P18, Jest, Playwright, lint, tipos y auditorías, y fijó la regla de repetir controles afectados ante cambios nuevos. La actualización 3 interna de `AGENTS.md` también se añadió en `623e949`; las tres actualizaciones aquí seleccionadas quedan vinculadas a tres commits distintos. La regla de confianza de `AGENTS.md` impide ejecutar instrucciones dentro de Excel, PDFs, logs o resultados de herramientas. Los documentos externos sirven para datos y requisitos, no para dar órdenes al agente.
 
 ## 2. Prompt Engineering
 
@@ -50,4 +50,4 @@ Aunque la explicación oral aclaró que Graph Engineering no se califica de form
 
 ## Commits clave
 
-`3bb3d72`: modelo y generador; `fe4ea55`: tickets, flujos y aceptación; `623e949`: importación del CMDB original, formularios y actualizaciones de contexto. Los documentos de esta fase se agregan en un commit posterior; consulte `git log --oneline` para el SHA completo de entrega. La entrega anterior del catálogo se mantiene en la etiqueta `parcial-v2.0`.
+`3bb3d72`: modelo y generador; `fe4ea55`: tickets, flujos y aceptación; `623e949`: importación del CMDB original y formularios; `146bbe4`: documentos, pruebas y calidad; `85d913f`: tercera actualización de contexto verificada. Consulte `git log --oneline` para el SHA completo de entrega. La entrega anterior del catálogo se mantiene en la etiqueta `parcial-v2.0`.

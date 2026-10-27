@@ -1,5 +1,13 @@
 # Guía de evaluación y pruebas
 
+## Defensa rápida de Service Desk (segunda tarea)
+
+Desde un clon limpio de `main`, copiar `.env.example` a `.env` (PowerShell: `Copy-Item .env.example .env`; Linux/macOS: `cp .env.example .env`), ejecutar `docker compose up --build -d` y luego los cinco comandos de preparación del [README](../README.md): seed de cuentas, importación del catálogo, importación de CMDB, generación de 5,000 dispositivos y seed de tickets. Entrar en `http://localhost:8080/` como `admin.demo` con la contraseña local de demostración configurada en `.env`.
+
+En cinco minutos, mostrar: (1) **Tickets**, filtros, un detalle con bitácora, CI y campos específicos de proceso; (2) **Colas**, siete procesos, nivel y permisos por rol o usuario; (3) **CMDB**, dos CI con procedencia `CMDB.xlsx` y 5,000 dispositivos, clasificación y recorrido de impacto; (4) **Indicadores**, tiempos calendario y cumplimiento de objetivos; (5) **Conocimientos**, autoservicio nivel 0. Enseñar `docs/PROCESOS.md` para explicar E0–E3, I0–I6 y aprobaciones; `docs/MODELO.md` para diferenciar jerarquía de categorías y relaciones técnicas.
+
+Si se solicita harness, ejecutar `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` en Windows o `sh scripts/service-desk-test.sh` en Linux/macOS. La salida muestra P01–P18 y P18 tras reiniciar PostgreSQL. Para la evidencia de IA, abrir `docs/IA.md` y `docs/prompts/service-desk.md`; explicar un prompt revisado y una actualización de `AGENTS.md`. El proyecto de pruebas usa otro nombre Compose y no modifica la instalación normal. El recorrido antiguo del catálogo continúa debajo.
+
 ## Objetivo
 
 Esta guía permite evaluar la solución desde cero y relacionar cada escenario del enunciado con un comando, una acción de interfaz y un resultado esperado.

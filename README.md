@@ -1,6 +1,6 @@
 # Service Desk y Catálogo de Servicios TI
 
-Este repositorio conserva la entrega anterior del catálogo (`parcial-v2.0`) y la amplía con tickets, siete procesos, colas, permisos, CMDB y 5,000 dispositivos sintéticos. La documentación de la segunda tarea está en [MODELO](docs/MODELO.md), [PROCESOS](docs/PROCESOS.md), [IA](docs/IA.md) y [PRUEBAS](docs/PRUEBAS.md). El desarrollo se realiza en la rama `codex/service-desk` hasta integrarlo en `main`.
+Este repositorio conserva la entrega anterior del catálogo (`parcial-v2.0`) y la amplía con tickets, siete procesos, colas, permisos, CMDB y 5,000 dispositivos sintéticos. La documentación de la segunda tarea está en [MODELO](docs/MODELO.md), [PROCESOS](docs/PROCESOS.md), [IA](docs/IA.md) y [PRUEBAS](docs/PRUEBAS.md). La ampliación se integra en `main`; la etiqueta `parcial-v2.0` conserva la entrega anterior.
 
 ## Inicio rápido desde un clon limpio
 
@@ -11,7 +11,7 @@ git clone https://github.com/DavidVelasquez77/parcial-catalogo-servicios-2023077
 cd parcial-catalogo-servicios-202307705
 ```
 
-Si la ampliación aún no se ha integrado en `main`, ejecute `git switch codex/service-desk` después de clonar. En **PowerShell (Windows)**:
+En **PowerShell (Windows)**:
 
 ```powershell
 Copy-Item .env.example .env
