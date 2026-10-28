@@ -575,7 +575,13 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 .
 ├── AGENTS.md                         # contexto operativo para el asistente
 ├── data/CatalogoServicios.xlsx       # fuente original, sin modificar
+├── data/fuentes/                     # CMDB.xlsx, PDFs fuente y transcripciones
 ├── compose.yaml                      # PostgreSQL + API + frontend
+├── .env.example                      # plantilla sin secretos reales
+├── .dockerignore                     # excluye .env, dependencias y artefactos locales
+├── apps/api/Dockerfile               # API y scripts de datos/pruebas
+├── apps/web/Dockerfile               # frontend
+├── e2e/Dockerfile                    # navegador Playwright aislado
 ├── database/migrations/              # esquema SQL versionado
 ├── apps/api/
 │   ├── src/auth/                     # login, sesión y roles
@@ -584,19 +590,37 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 │   ├── src/organization/             # jerarquía organizacional
 │   ├── src/services/                 # catálogo de servicios
 │   ├── src/users/                    # usuarios y roles
-│   └── src/scripts/                  # migrar, seed, validar, importar, verificar, aceptación, smoke
+│   ├── src/desk/                     # tickets, colas, transiciones y auditoría
+│   ├── src/cmdb/                     # categorías, CI, relaciones e impacto
+│   ├── src/scripts/                  # migración, importadores, generador y aceptación
+│   └── test/                         # pruebas unitarias y de integración
 ├── apps/web/src/                     # interfaz React y estilos
+├── e2e/                              # recorridos Playwright
 ├── scripts/harness-docker.ps1/.sh    # harness oficial sin Node en el host
-├── scripts/harness.mjs               # atajo local opcional
+├── scripts/service-desk-test.*       # aceptación aislada P01–P18
+├── scripts/test-pyramid.*            # unit, integración, E2E o all
 ├── docs/RESOLUCION.md                # explicación técnica completa
+├── docs/MODELO.md                    # ER, diccionario y fuentes del modelo
+├── docs/PROCESOS.md                  # tipos, colas, permisos y flujos
+├── docs/IA.md                        # contexto, prompts, harness, loops y grafos
+├── docs/PRUEBAS.md                   # matriz y resultados reproducibles
 ├── docs/IMPORTACION.md               # reglas del Excel y trazabilidad
 ├── docs/API.md                       # rutas y payloads principales
 ├── docs/GUIA_EVALUACION.md           # recorrido y matriz de pruebas
-├── docs/ia/                           # fases Context, Prompt y Harness Engineering
+├── docs/ia/                           # guías de las cinco prácticas de ingeniería
 ├── docs/contexto/                    # actualizaciones de contexto
 ├── docs/prompts/                     # prompts y criterios de aceptación
-└── docs/evidencias/                  # evidencia del harness y ciclo de corrección
+└── docs/evidencias/                  # ciclos y reporte P01–P18 con fecha y commit
 ~~~
+
+Las migraciones SQL se encuentran en `database/migrations/001–006`. Los
+importadores de catálogo y CMDB, el validador, verificador y generador de
+dispositivos están en `apps/api/src/scripts/`; la suite de aceptación y las
+pruebas unitarias/integración/E2E tienen sus comandos en `scripts/` y sus
+carpetas respectivas. Los originales se versionan en `data/` y se montan de
+solo lectura en el harness. `.env.example` es una plantilla; el `.env` local
+se crea al seguir el README y está excluido de Git. No se incluyen secretos ni
+dependencias instaladas.
 
 ## 13. Decisiones y limitaciones conocidas
 
@@ -609,11 +633,16 @@ El comando down -v es destructivo para los datos locales del proyecto. No forma 
 ## 14. Documentación adicional
 
 - [Resolución técnica](docs/RESOLUCION.md)
+- [Modelo entidad-relación y diccionario](docs/MODELO.md)
 - [Jerarquía, diccionario y procedencia de CMDB](docs/CMDB_JERARQUIA.md)
+- [Procesos, tipos, colas, permisos y escalamiento](docs/PROCESOS.md)
+- [Ingeniería con IA: contexto, prompts, harness, loops y grafos](docs/IA.md)
+- [Matriz de requisitos y resultados reales](docs/PRUEBAS.md)
 - [Guía de evaluación y pruebas](docs/GUIA_EVALUACION.md)
 - [Importación y calidad de datos](docs/IMPORTACION.md)
 - [API y reglas de autorización](docs/API.md)
 - [Context engineering](docs/contexto/)
 - [Prompt engineering](docs/prompts/)
 - [Fases de IA: contexto, prompts y harness](docs/ia/)
-- [Harness y ciclo de corrección](docs/evidencias/ciclo-harness.md)
+- [Evidencia detallada P01–P18](docs/evidencias/2026-10-27-punto11.md)
+- [Ciclos observados de corrección](docs/ia/04-loop-engineering.md)

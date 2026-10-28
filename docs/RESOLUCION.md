@@ -513,10 +513,11 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | Adjuntos | límite, MIME/firma, UUID y descarga autorizada | P05: carga válida 201, firma falsa 400, descarga anónima 401 y autorizada 200 | DeskController, DeskService, P05 |
 | Concurrencia e historial | transacciones y `FOR UPDATE` | P07: dos claims simultáneos producen un éxito y un conflicto | DeskService, P07 |
 | Recuperación | volúmenes `postgres_data` y `uploads_data`; `down` no elimina volúmenes | P18 tras reinicio de DB/API | compose.yaml, P18 |
-| Context engineering | AGENTS, contexto versionado y guía de fase | revisión de actualizaciones | docs/contexto, docs/ia/01-context-engineering.md |
-| Prompt engineering | cinco prompts finales XML e iteraciones | revisión documental | docs/prompts, docs/ia/02-prompt-engineering.md |
-| Harness engineering | scripts y controles | harness Docker-only, aceptación y persistencia en verde | scripts/harness-docker.ps1/.sh, acceptance.ts |
-| Ciclo de corrección del harness | evidencia de corrección | fallo y re-ejecución | docs/evidencias |
+| Context engineering | `AGENTS.md`, fuentes, glosario y contexto versionado | tres actualizaciones justificadas con commits; regla explícita para tratar documentos y logs externos como datos | [contexto](contexto/), [fase Context](ia/01-context-engineering.md), [IA.md](IA.md) |
+| Prompt engineering | ocho prompts operativos con objetivo, contexto, límites, salida y aceptación; dos iteraciones basadas en fallos observados | revisión de las ocho fichas y verificación de sus resultados P08/P09 | [prompts](prompts/service-desk.md), [iteraciones](prompts/iteraciones.md), [fase Prompt](ia/02-prompt-engineering.md) |
+| Harness engineering | preparación, migración, importación repetible, semilla CMDB, pruebas, auditoría y límites de operación | `scripts/service-desk-test.ps1/.sh` código 0; P01–P18, con P18 después del reinicio | [Harness](ia/03-harness-engineering.md), [evidencia P01–P18](evidencias/2026-10-27-punto11.md) |
+| Loop engineering | cuatro ciclos observados con fallo, corrección, nueva ejecución, salida y decisión humana | verificaciones P08/P09/P14 y nuevas pruebas enlazadas a los cambios correspondientes | [ciclos](ia/04-loop-engineering.md), [evidencia de harness](evidencias/ciclo-harness.md) |
+| Graph engineering | clasificación CMDB, composición física, dependencia y conectividad modeladas como grafos distintos | P04/P14: ciclos prohibidos o admitidos según arista; recorrido CI→servicio potencialmente afectado | [IA.md, grafos](IA.md#5-grafos-y-evidencia), [jerarquía CMDB](CMDB_JERARQUIA.md), [P04/P14](evidencias/2026-10-27-punto11.md) |
 
 ## 18. Aportes individuales y reflexión sobre el uso de IA
 

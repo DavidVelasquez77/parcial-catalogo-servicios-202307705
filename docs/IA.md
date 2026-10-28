@@ -75,6 +75,11 @@ secuencia no se presenta como un ciclo de fallo automatizado previo. Los
 ciclos completos con fallo observado y nueva verificación están en la tabla
 de Loop Engineering de arriba.
 
+La ejecución reproducible vigente de P04/P14 está registrada junto con P01–P18
+en [la evidencia del 27 de octubre](evidencias/2026-10-27-punto11.md), asociada
+al commit `e8b7b23`. La pirámide Jest/Playwright quedó corregida y registrada en
+`da1658b`; el reporte documental del punto 11 está en `2cf515c`.
+
 ## Commits clave
 
-`3bb3d72`: modelo y generador; `fe4ea55`: tickets, flujos y aceptación; `623e949`: importación del CMDB original y formularios; `146bbe4`: documentos, pruebas y calidad; `85d913f`: tercera actualización de contexto verificada; `677c807`: edición visual de colas/categorías y filtros completos; `77bef42`: transcripción y fuentes CMDB; `13b27c1`: padre físico único, ubicaciones y validación de grafos. Consulte `git log --oneline` para el SHA completo de entrega. La entrega anterior del catálogo se mantiene en la etiqueta `parcial-v2.0`.
+`3bb3d72`: modelo y generador; `fe4ea55`: tickets, flujos y aceptación; `623e949`: importación del CMDB original y formularios; `146bbe4`: documentos, pruebas y calidad; `85d913f`: tercera actualización de contexto verificada; `677c807`: edición visual de colas/categorías y filtros completos; `77bef42`: transcripción y fuentes CMDB; `13b27c1`: padre físico único, ubicaciones y validación de grafos; `e8b7b23`: suite P01–P18 y datos de demostración; `da1658b`: resumen de pruebas con conteos reales; `2cf515c`: evidencia del punto 11. Consulte `git log --oneline` para el SHA completo de entrega. La entrega anterior del catálogo se mantiene en la etiqueta `parcial-v2.0`.

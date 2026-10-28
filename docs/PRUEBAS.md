@@ -76,6 +76,45 @@ El criterio de salida fue código 0 para cada rutina, P01–P18 PASS, 5,000 disp
 
 La matriz aquí vincula requisito → implementación → ejecución → salida verificable. Las decisiones y fórmulas están en [PROCESOS.md](PROCESOS.md), el modelo en [MODELO.md](MODELO.md), y los ciclos de corrección en [IA.md](IA.md).
 
+## Matriz consolidada requisito → implementación → prueba → evidencia
+
+La columna de evidencia enlaza el informe de ejecución con fecha y commit, o
+con el documento versionado que explica el criterio. Los resultados de código
+se apoyan en las ejecuciones reales indicadas; los documentos de ingeniería
+son evidencia de proceso y no sustituyen una demostración funcional.
+
+| Requisito / rúbrica | Implementación entregada | Prueba o comprobación | Evidencia y resultado registrado |
+|---|---|---|---|
+| Integración con parcial 2, catálogo, organización y autenticación (8 puntos) | Migración `001_init.sql`, importador de `data/CatalogoServicios.xlsx`, organización y roles locales | Suite P01–P02; verificaciones heredadas del catálogo | [P01–P02](evidencias/2026-10-27-punto11.md): 12/46, 3 en revisión, sin duplicados; autenticación y autorización pasan. |
+| Tickets, colas, roles, asignación y auditoría (16 puntos) | `apps/api/src/desk/`, grants, orden por prioridad/antigüedad, transacciones y bitácora | P05–P08 y P15: referencias, permisos, reclamo concurrente, transferencia, escalamiento, reapertura | [P05–P08/P15](evidencias/2026-10-27-punto11.md): PASS; reclamo concurrente produjo 201/409 y las operaciones quedaron auditadas. |
+| Siete procesos y parámetros de la lección 25 (18 puntos) | `process-rules.ts`, reglas de incidentes/eventos, notificaciones y métricas | P09–P13 y P17 | [P09–P13/P17](evidencias/2026-10-27-punto11.md): siete rutas, rechazos de aprobación, E0–E3, I0–I6, vínculos y métricas controladas; PASS. |
+| CMDB, jerarquía fiel a las fuentes y 5,000 dispositivos (16 puntos) | Importador CMDB, categorías con procedencia, generador con semilla y relaciones tipadas | P03, P04, P14, P16 y P18 | [P03/P04/P14/P16/P18](evidencias/2026-10-27-punto11.md): 5,000 códigos únicos; cargas repetidas sin duplicar; ciclos y paginación comprobados; persistencia PASS. Fuentes/mapeo: [MODELO](MODELO.md) y [jerarquía](CMDB_JERARQUIA.md). |
+| Prompt Engineering (4 puntos) | Ocho fichas con objetivo, contexto, límites, salida esperada, herramienta/modelo y aceptación; iteraciones separadas | Revisión de las ocho fichas y resultados enlazados | [Prompts](prompts/service-desk.md) y [iteraciones](prompts/iteraciones.md); cambios y resultados enlazados a commits en cada ficha. |
+| Context Engineering (4 puntos) | `AGENTS.md`, contexto maestro, glosario/fuentes/reglas y actualizaciones versionadas | Verificación documental de tres actualizaciones motivadas y regla de confianza de fuentes | [Contexto](contexto/) y [fase Context](ia/01-context-engineering.md), con commits identificados en [IA.md](IA.md). |
+| Harness Engineering (4 puntos) | Scripts Windows/Linux/macOS, Compose aislado, migraciones, importadores, semilla, pruebas y auditoría | Ejecución `scripts/service-desk-test.ps1` o `.sh`; código 0 en P01–P18 | [Informe de aceptación](evidencias/2026-10-27-punto11.md) y [guía del harness](ia/03-harness-engineering.md). |
+| Loop Engineering (4 puntos) | Cuatro ciclos documentados con defecto/hallazgo, cambio, criterio, intervención y commit | Repetición de controles que detectaron los problemas; salidas P09/P14, entre otras | [Ciclos](ia/04-loop-engineering.md); no se reportan fallos deliberados. |
+| Preguntas aleatorias (6 puntos) | Guía de defensa con rutas de navegación y explicación de decisiones | Defensa oral individual; no es un escenario automatizable | [Guía de evaluación](GUIA_EVALUACION.md), junto con [modelo](MODELO.md), [procesos](PROCESOS.md) e [IA](IA.md). El estudiante debe explicar el código y resultados. |
+| Pruebas y seguridad (10 puntos) | Jest, integración PostgreSQL, Playwright, P01–P18, autorización en servidor y controles de adjuntos/sesiones | `scripts/test-pyramid.ps1 all`/`.sh all` y suite aislada P01–P18 | [P01–P18](evidencias/2026-10-27-punto11.md): código 0; [pirámide vigente](#pruebas-unitarias-integración-y-navegador): 14 unitarias, 2 integración, 3 E2E en `da1658b`. |
+| Docker, documentación y defensa individual (10 puntos) | Dockerfiles, Compose, `.dockerignore`, `.env.example`, migraciones, fuentes y documentos solicitados | Build/arranque descritos en README; persistencia comprobada por P18; revisión de índice/enlaces | [README](../README.md), [resolución](RESOLUCION.md), [MODELO](MODELO.md), [PROCESOS](PROCESOS.md), [IA](IA.md), esta matriz y [P18](evidencias/2026-10-27-punto11.md). |
+
+## Inventario de entregables del punto 12
+
+| Entregable solicitado | Ubicación versionada | Qué permite comprobar |
+|---|---|---|
+| Código fuente y migraciones | `apps/api/`, `apps/web/`, `database/migrations/001–006` | API, interfaz y esquema reproducible desde una base vacía. |
+| Docker y configuración de ejemplo | `compose.yaml`, `apps/*/Dockerfile`, `e2e/Dockerfile`, `.dockerignore`, `.env.example` | Construcción y operación en contenedores; la configuración real queda local. |
+| Archivos originales y mapeo | `data/CatalogoServicios.xlsx`, `data/fuentes/`; `MODELO.md`, `CMDB_JERARQUIA.md`, `IMPORTACION.md` | Procedencia, reglas de interpretación y conservación de fuentes. |
+| Importadores y generador | `apps/api/src/scripts/import-catalog.ts`, `import-cmdb.ts`, `validate-import.ts`, `verify-import.ts`, `generate-cmdb.ts` | Validar, importar y generar datos de forma repetible. |
+| Pruebas y automatización | `apps/api/test/`, `e2e/`, `scripts/test-pyramid.*`, `scripts/service-desk-test.*` | Ejecutar suites separadas y aceptación P01–P18. |
+| README desde clon limpio y cuentas locales | [README.md](../README.md) | Configuración, URL, preparación, comandos por sistema operativo y cuentas demo locales. |
+| Resolución y modelo | [RESOLUCION.md](RESOLUCION.md), [MODELO.md](MODELO.md), [CMDB_JERARQUIA.md](CMDB_JERARQUIA.md) | Alcance, arquitectura, limitaciones, ER, diccionario, jerarquía y fuentes. |
+| Procesos e ingeniería con IA | [PROCESOS.md](PROCESOS.md), [IA.md](IA.md), `docs/ia/`, `docs/prompts/` | Tipos, colas, permisos, flujos, prompts, contexto, harness, loops y grafos. |
+| Pruebas, matriz y evidencia | Este archivo y `docs/evidencias/` | Comandos, entradas, resultados, fecha y commits observados. |
+
+La rúbrica suma 100 puntos. Esta tabla localiza evidencia para cada criterio;
+no predice la nota: las preguntas aleatorias y la defensa individual dependen
+de que el estudiante pueda explicar y demostrar la solución.
+
 Controles adicionales sobre `677c807`: `npm run lint`, `npm run typecheck`, `npm run audit:secrets` y `npm audit --audit-level=high` terminaron con código 0; la auditoría informó `found 0 vulnerabilities`.
 
 ## Revisión de fuentes y corrección CMDB (26 de octubre de 2026, Guatemala)
