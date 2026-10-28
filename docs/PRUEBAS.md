@@ -213,3 +213,49 @@ el servicio sintético que ella creó al cerrar el caso; no se cambió el
 importador ni se tocó la base normal. Se retiró del volumen aislado el único
 fixture de esa primera ejecución y la repetición completa acabó con código 0,
 12/46 y P18 PASS. Este ciclo no fue un fallo deliberado.
+
+## Apartado 8: CMDB y 5,000 dispositivos (27 de octubre de 2026)
+
+La revisión completó la trazabilidad de los campos del libro, la consulta de
+CI y la evidencia del generador. El commit de implementación probado es `f16e6d39aa25ca45ed698ddd469023718fc11780`; esta evidencia se añadió en un commit documental posterior. El archivo
+fuente `data/fuentes/CMDB.xlsx` conservó su SHA-256
+`d182796bb40b492be2cb87e2c5fe19a8f910f2e754183dc48b5e89bd360464dc`.
+La jerarquía y la separación entre datos de origen y decisiones del proyecto
+están descritas en [CMDB_JERARQUIA.md](CMDB_JERARQUIA.md) y [MODELO.md](MODELO.md).
+
+| Comprobación | Criterio y alcance | Resultado observado |
+|---|---|---|
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` | Suite de aceptación P01–P18 en el Compose aislado, incluyendo generador, consultas CMDB, permisos y persistencia | Código 0; todos los escenarios PASS. P03 confirmó 5,000 dispositivos con 5,000 códigos únicos, cuatro categorías de Hardware con 1,250 dispositivos por clase, Hardware = 5,000 y Software = 0. P04 comprobó los CI originales y sus atributos/procedencia del Excel. |
+| P14 dentro de la suite | Integridad, relaciones, detalle del CI e impacto | PASS: categoría y relaciones jerárquicas sin ciclos; `DEPENDS_ON` y `HOSTED_ON` rechazan ciclos; `CONNECTED_TO` permite ciclos; el recorrido atraviesa dependencias en varios saltos y encuentra un servicio potencialmente afectado. La ficha no revela tickets de colas que el usuario no puede consultar. |
+| P16 dentro de la suite | Filtros, búsqueda y paginación sobre el conjunto persistido | PASS: 25 filas por página; “Hardware” incluye sus subcategorías; búsqueda por código devuelve el CI esperado y los filtros de ubicación y estado devuelven resultados coherentes. La consulta interna observada fue de 7.8 ms en una ejecución puntual; no representa una prueba de carga. |
+| P18 dentro de la suite | Reinicio de PostgreSQL y API sin borrar el volumen | PASS. Persistieron 12 servicios de nivel 1, 46 de nivel 2 y los 5,000 dispositivos. Tickets, bitácoras y colas de esa ejecución provenían de un volumen de pruebas reutilizado y sus cantidades son acumuladas. |
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 all` | Unitarias, integración con base/datos y flujos E2E en navegador | Código 0; Jest pasó 13 pruebas unitarias y 2 de integración; Playwright pasó 3 pruebas E2E, incluida la búsqueda del CI del Excel, la ficha de origen y la navegación hacia un ticket relacionado. Salida: `{"ok":true,"suite":"all","pyramid":"70/20/10"}`. |
+| `npm run lint`, `npm run typecheck` y `git diff --check` | Calidad estática y formato del cambio | Los tres controles terminaron con código 0. |
+| `docker compose up --build -d` y GET a `http://localhost:8080/` | Actualización de la aplicación de evaluación habitual, conservando el volumen normal | API y web reconstruidas y reiniciadas; PostgreSQL conservó el volumen. La web respondió HTTP 200. |
+
+El generador se repitió con la semilla `EVAL2026`: la última corrida observada
+informó `created=0`, `updated=0`, `skipped=5000` y `totalForSeed=5000`, sin
+duplicados. En una ejecución previa de esta revisión, 2,500 responsables
+antiguos de la misma semilla se normalizaron a la cuenta local `admin.demo`;
+el generador informó esas modificaciones como `updated` y dejó registro
+`SYNTHETIC_OWNER_NORMALIZE` en la bitácora del CI. La siguiente repetición fue
+idempotente. El generador no asigna usuarios personales, no elimina datos al
+arrancar y no exige una dirección IP para todas las clases.
+
+### Fallos encontrados y correcciones durante la revisión
+
+El filtro por una categoría padre solo buscaba coincidencia directa y por eso
+no encontraba las categorías hijas; se cambió a recorrer el subárbol y se
+añadió una aserción de aceptación. La lista mostraba el identificador numérico
+del responsable y la ficha resumía los campos de origen; ahora presenta el
+nombre o etiqueta y los atributos del Excel junto con hoja/fila. La prueba de
+aceptación verifica ambos casos. El detalle también filtraba los tickets por
+visibilidad solo en la tabla general; se aplicó la misma autorización al
+detalle del CI y se probó el rechazo de lectura de una cola ajena.
+
+La prueba de actualización detectó que los campos opcionales `acquiredOn` y
+`documentationUrl` no podían limpiarse porque el servidor interpretaba `null`
+como “conservar valor”. Se corrigió el manejo explícito de `null` y P14 ahora
+prueba tanto su establecimiento como su eliminación. Ninguno de estos fallos
+se introdujo deliberadamente. Las pruebas usaron un proyecto y un volumen
+aislados; la reconstrucción normal final no ejecutó `down -v` ni eliminó datos.
