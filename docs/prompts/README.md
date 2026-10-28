@@ -18,13 +18,16 @@ La fecha se registra para que el revisor distinga el contexto disponible durante
 
 ## Inventario
 
+Las cinco fichas numeradas a continuación pertenecen al prompt set histórico del catálogo del parcial 2 (30 de septiembre, Codex/GPT-5 según el registro de esa fase). La ampliación Service Desk tiene ocho prompts operativos adicionales en service-desk.md (26–27 de octubre, Codex/GPT-6; versión menor no expuesta). Sus temas, criterios y resultados se registran ahí; no se mezclan los modelos ni las fechas de ambas fases.
+
 | Archivo | Pregunta que resuelve | Evidencia |
 |---|---|---|
 | 01-analisis-excel.md | ¿Qué significa cada fila y dónde están las anomalías? | hoja, rangos y conteos |
 | 02-modelo-datos.md | ¿Cómo representar relaciones y restricciones? | migration 001 |
 | 03-autenticacion.md | ¿Cómo proteger sesión y roles? | AuthGuard, RolesGuard, smoke |
 | 04-importador.md | ¿Cómo lograr una carga repetible? | importador y verify |
-| 05-pruebas-docker.md | ¿Cómo demostrar reproducibilidad? | harness y Compose |
+| 05-pruebas-docker.md | ¿Cómo demostrar reproducibilidad del catálogo original? | harness y Compose |
+| service-desk.md | ¿Cómo dirigir la ampliación nueva? | ocho prompts: requisitos, CMDB, modelo, colas, procesos, seguridad, grafos y pruebas |
 
 ## Estructura de cada ficha
 

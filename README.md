@@ -24,7 +24,7 @@ docker compose exec -T -e CMDB_SEED=EVAL2026 -e CMDB_COUNT=5000 api node apps/ap
 docker compose exec -T api node apps/api/dist/scripts/seed-service-desk.js
 ```
 
-En **Linux/macOS**, sustituya únicamente la copia del archivo por `cp .env.example .env`; los comandos `docker compose` son los mismos. La API aplica las migraciones 001–005 al iniciar. La web queda en **http://localhost:8080/**; `http://localhost:8080/api` es la API por el proxy web. Si el puerto 8080 ya está ocupado, defina `WEB_PORT=8081` y `WEB_ORIGIN=http://localhost:8081` en `.env` antes de iniciar y use **http://localhost:8081/**. Las contraseñas de demostración están en `.env.example` y se pueden cambiar en `.env` antes de sembrar; no use credenciales reales.
+En **Linux/macOS**, sustituya únicamente la copia del archivo por `cp .env.example .env`; los comandos `docker compose` son los mismos. La API aplica las migraciones 001–006 al iniciar. La web queda en **http://localhost:8080/**; `http://localhost:8080/api` es la API por el proxy web. Si el puerto 8080 ya está ocupado, defina `WEB_PORT=8081` y `WEB_ORIGIN=http://localhost:8081` en `.env` antes de iniciar y use **http://localhost:8081/**. Las contraseñas de demostración están en `.env.example` y se pueden cambiar en `.env` antes de sembrar; no use credenciales reales.
 
 | Cuenta | Contraseña predeterminada | Uso |
 |---|---|---|
@@ -464,15 +464,15 @@ sh scripts/test-pyramid.sh e2e
 sh scripts/test-pyramid.sh all
 ~~~
 
-`all` ejecuta las 10 pruebas de la pirámide: 7 unitarias, 2 de integración y 1 E2E. El resultado final esperado contiene `{"ok":true,"suite":"all","pyramid":"70/20/10"}`. Las pruebas de aceptación P01–P11 y el harness Docker siguen siendo controles funcionales adicionales, no se cuentan artificialmente dentro de ese porcentaje.
+El comando all ejecuta 13 unitarias, 2 integraciones y 3 E2E. La base histórica 7/2/1 conserva el protocolo 70/20/10; las pruebas adicionales de Service Desk se informan separadamente y el resumen no atribuye ese porcentaje al total ampliado. La aceptación P01–P18 se ejecuta con scripts/service-desk-test.ps1 o .sh.
 
-### Harness completo
+### Harness completo del catálogo original (histórico)
 
 ~~~bash
 sh scripts/harness-docker.sh
 ~~~
 
-El harness oficial ejecuta todo dentro de contenedores: construcción de API y frontend, auditoría, Compose, validación del Excel, seed, importación, reimportación idéntica, aceptación, smoke y persistencia. En Windows PowerShell:
+Este comando corresponde al harness del catálogo original del parcial 2. Para Service Desk, use los scripts aislados documentados en Pruebas reproducibles. En Windows PowerShell:
 
 ~~~powershell
 & .\scripts\harness-docker.ps1

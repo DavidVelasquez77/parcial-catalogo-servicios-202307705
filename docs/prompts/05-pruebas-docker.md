@@ -1,5 +1,7 @@
 # Prompt 05: pruebas, Docker y harness
 
+> Esta ficha documenta el prompt del harness del catálogo original del parcial 2. Para la ampliación Service Desk, la instrucción P8 y la rutina vigente están en service-desk.md y docs/ia/03-harness-engineering.md; no atribuir los antiguos P01–P11 a la suite actual.
+
 ## Propósito
 
 Crear una rutina que permita a otra persona levantar, verificar y repetir el proyecto sin depender de una herramienta de IA.

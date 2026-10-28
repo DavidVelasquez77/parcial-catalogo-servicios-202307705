@@ -1,5 +1,7 @@
 # Contexto 04: criterios de verificación y límites
 
+> **Contexto histórico del parcial 2:** este archivo conserva el checklist original de catálogo (P01–P11). Para Service Desk, el contexto vigente está en AGENTS.md y docs/IA.md; la aceptación ampliada es P01–P18 y la suite actual se ejecuta en un Compose aislado.
+
 ## 1. Motivo de la actualización
 
 Después de completar la primera versión funcional se necesitaba un contexto operativo: una modificación visual, una nueva regla de importación o un cambio de Docker no debe romper silenciosamente los invariantes del parcial.

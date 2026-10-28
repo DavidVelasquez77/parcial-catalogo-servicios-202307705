@@ -25,17 +25,17 @@ prepare_backend() {
 }
 
 run_unit() {
-  run 'unitarias Jest (70%)' run --build --rm -T api node_modules/.bin/jest --config apps/api/test/jest.unit.config.js --runInBand
+  run 'unitarias Jest (base 70% + extensión)' run --build --rm -T api node_modules/.bin/jest --config apps/api/test/jest.unit.config.js --runInBand
 }
 
 run_integration() {
   prepare_backend
-  run 'integración Jest (20%)' run --rm -T api node_modules/.bin/jest --config apps/api/test/jest.integration.config.js --runInBand
+  run 'integración Jest (base 20%)' run --rm -T api node_modules/.bin/jest --config apps/api/test/jest.integration.config.js --runInBand
 }
 
 run_e2e() {
   prepare_backend
-  run 'E2E Playwright (10%)' --profile tests run --build --rm -T e2e
+  run 'E2E Playwright (base 10% + extensión)' --profile tests run --build --rm -T e2e
 }
 
 case "$SUITE" in
@@ -54,4 +54,8 @@ case "$SUITE" in
 esac
 
 run 'detener contenedores de prueba (el volumen aislado se conserva)' down
-printf '{"ok":true,"suite":"%s","pyramid":"70/20/10"}\n' "$SUITE"
+if [ "$SUITE" = all ]; then
+  printf '%s\n' '{"ok":true,"suite":"all","corePyramid":"70/20/10","coreTests":{"unit":7,"integration":2,"e2e":1},"extensions":{"unit":6,"integration":0,"e2e":2},"executedTotal":{"unit":13,"integration":2,"e2e":3}}'
+else
+  printf '{"ok":true,"suite":"%s"}\n' "$SUITE"
+fi

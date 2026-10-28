@@ -21,28 +21,17 @@ Los ocho prompts operativos y sus criterios están en [prompts/service-desk.md](
 
 ## 3. Harness Engineering
 
-El harness es el conjunto `AGENTS.md` + `compose.yaml` + migraciones 001–005 + importadores + generador + semillas + `scripts/service-desk-test.ps1/.sh` + Jest + Playwright + auditoría de secretos. Su rutina aislada hace, en orden:
+El harness actual combina AGENTS.md, compose.yaml, migraciones 001–006, validadores e importadores, generador, semillas, scripts/service-desk-test.ps1/.sh, Jest, Playwright y auditoría de secretos. La rutina Service Desk opera en el proyecto Compose aislado service-desk-suite-202307705: valida e importa los dos Excel, genera y repite 5,000 CI con EVAL2026, prepara flujos, ejecuta P01–P17 y reinicia DB/API para P18. La API aplica las migraciones al arrancar; no se necesita instalar Node ni PostgreSQL en el host.
 
-1. Construir PostgreSQL y API y esperar salud; la API ejecuta las migraciones.
-2. Crear organización y cuentas; validar/importar catálogo dos veces y verificar 12/46.
-3. Importar `CMDB.xlsx` dos veces, con observaciones; generar 5,000 dispositivos dos veces con la misma semilla.
-4. Crear ocho colas (siete procesos y una cola de incidentes de nivel 2) y 37 tickets de ejemplo; ejecutar P01–P17 con códigos de salida.
-5. Tomar una huella de conteos, reiniciar PostgreSQL/API y comparar la huella para P18.
+Los comandos de aceptación son powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1 en Windows y sh scripts/service-desk-test.sh en Linux/macOS. Las pruebas unitarias, integración y navegador se ejecutan por separado o juntas mediante scripts/test-pyramid.ps1 [unit|integration|e2e|all] y sh scripts/test-pyramid.sh [unit|integration|e2e|all]. Los volúmenes aislados se conservan y el arranque no ejecuta down -v. El detalle de comandos, salidas y límites está en harness engineering (ia/03-harness-engineering.md) y PRUEBAS.md.
 
-La rutina no borra volúmenes. `DESK_TEST_ISOLATED=1` impide ejecutar la aceptación por accidente sobre la instalación normal. Los Excel se montan de solo lectura, el auditor revisa secretos versionados y `.env` permanece ignorado. Los comandos y salidas reales se consignan en [PRUEBAS.md](PRUEBAS.md). La aplicación funciona después de construirse sin claves ni suscripción de IA.
+La pirámide base del parcial anterior es 7/2/1 (70/20/10). Service Desk añadió seis pruebas unitarias y dos recorridos de navegador; la suite ampliada ejecuta 13/2/3. El resumen actualizado del harness presenta por separado la base, las ampliaciones y el total, sin atribuir porcentajes falsos al total ampliado.
 
 ## 4. Loop Engineering
 
-Se realizaron ciclos acotados de objetivo → cambio → ejecución → evaluación → corrección → nueva verificación. El límite operativo fue corregir la causa concreta y repetir el escenario afectado; una nueva falla daba lugar a otro ciclo, nunca a afirmar éxito sin salida. El estudiante fijó el alcance, eligió no usar Prisma y conservó los Excel originales. No se introdujeron fallos deliberadamente.
+Se documentaron cuatro ciclos reales de corrección: un fallo SQL al recorrer los siete procesos, el filtro CMDB que no incluía subcategorías, la normalización de responsables sintéticos y la visibilidad de tickets desde la ficha CI. Cada ciclo conserva entrada, resultado observado, cambio, nueva verificación, criterio de salida, decisión humana y commit en ia/04-loop-engineering.md. No se introdujeron fallos deliberadamente.
 
-| Ciclo | Entrada, fallo observado | Corrección y nueva salida | Criterio de cierre |
-|---|---|---|---|
-| 1. Transferencia/permiso | P07 elegía por orden alfabético una cola privada creada por P06; un agente sin permiso obtenía 403 cuando la prueba quería demostrar concurrencia en la cola común. | La prueba pasó a seleccionar `Q-INCIDENT` por código; la corrida final devolvió un 201 y un 409 para los dos agentes. | Solo un reclamo, orden estable y permiso real sin relajar la API. |
-| 2. Transición funcional | P09 falló con PostgreSQL `inconsistent types deduced for parameter $1` al escribir un estado nuevo. | Se convirtió `$1` explícitamente a `text` en el `UPDATE`; P09 recorrió y cerró los siete procesos. | Todas las rutas válidas pasan y las inválidas siguen rechazadas. |
-| 3. Contrato HTTP y verificación | P08 esperaba 200 para un POST de Nest que devuelve 201. P14 comparó un `bigint` textual de PostgreSQL con un número JavaScript. Ambas eran fallas del oráculo de prueba, no de los datos. | Se corrigieron las expectativas y la conversión del ID; P08 y P14 dieron PASS sin cambiar el contrato de la API. | Prueba fiel a la respuesta y relación verificable. |
-| 4. Datos CMDB | La fuente menciona `Base de Datos1` en dos filas sin incluir ese CI ni definir tipo de arista. | Se conservó el valor en `technical_attributes` y se registraron dos observaciones por importación; repetición final: `skipped=2`, `observed=2`, ningún CI ficticio. | Preservar los dos originales y no inventar enlaces. |
-
-Los ciclos 1 y 2 cubren permiso/datos y defecto funcional respectivamente; el ciclo 3 muestra corrección del harness. El criterio humano de aceptación fue que un tercero pudiera clonar, ejecutar, inspeccionar las fuentes y explicar ambos grafos. Las pruebas no sustituyen la defensa individual.
+El límite histórico no estaba implementado como contador. Para trabajo posterior queda documentado un máximo de tres correcciones enfocadas al mismo defecto; si sigue fallando, se detiene y el estudiante decide el siguiente paso. La intervención humana fija alcance, conserva requisitos de seguridad y fuentes, y acepta la evidencia después de comprobar los resultados.
 
 ## 5. Grafos y evidencia
 

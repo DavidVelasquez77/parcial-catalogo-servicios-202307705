@@ -33,17 +33,17 @@ function Prepare-Backend {
 }
 
 function Run-Unit {
-  Invoke-ComposeStep 'unitarias Jest (70%)' @('run', '--build', '--rm', '-T', 'api', 'node_modules/.bin/jest', '--config', 'apps/api/test/jest.unit.config.js', '--runInBand')
+  Invoke-ComposeStep 'unitarias Jest (base 70% + extensión)' @('run', '--build', '--rm', '-T', 'api', 'node_modules/.bin/jest', '--config', 'apps/api/test/jest.unit.config.js', '--runInBand')
 }
 
 function Run-Integration {
   Prepare-Backend
-  Invoke-ComposeStep 'integración Jest (20%)' @('run', '--rm', '-T', 'api', 'node_modules/.bin/jest', '--config', 'apps/api/test/jest.integration.config.js', '--runInBand')
+  Invoke-ComposeStep 'integración Jest (base 20%)' @('run', '--rm', '-T', 'api', 'node_modules/.bin/jest', '--config', 'apps/api/test/jest.integration.config.js', '--runInBand')
 }
 
 function Run-E2E {
   Prepare-Backend
-  Invoke-ComposeStep 'E2E Playwright (10%)' @('--profile', 'tests', 'run', '--build', '--rm', '-T', 'e2e')
+  Invoke-ComposeStep 'E2E Playwright (base 10% + extensión)' @('--profile', 'tests', 'run', '--build', '--rm', '-T', 'e2e')
 }
 
 switch ($Suite) {
@@ -58,4 +58,8 @@ switch ($Suite) {
 }
 
 Invoke-ComposeStep 'detener contenedores de prueba (el volumen aislado se conserva)' @('down')
-Write-Host "`n{`"ok`":true,`"suite`":`"$Suite`",`"pyramid`":`"70/20/10`"}"
+if ($Suite -eq 'all') {
+  Write-Host '{"ok":true,"suite":"all","corePyramid":"70/20/10","coreTests":{"unit":7,"integration":2,"e2e":1},"extensions":{"unit":6,"integration":0,"e2e":2},"executedTotal":{"unit":13,"integration":2,"e2e":3}}'
+} else {
+  Write-Host "`n{`"ok`":true,`"suite`":`"$Suite`"}"
+}

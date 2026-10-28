@@ -132,7 +132,9 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 - Criticidades.
 - Tipos.
 
-## Matriz P01–P12
+## Matriz histórica P01–P12 del parcial práctico 2
+
+Esta matriz corresponde al catálogo del parcial 2 y se conserva como evidencia de la primera entrega. Para evaluar la ampliación Service Desk, utilizar P01–P18 descritos al inicio de esta guía y en `docs/PRUEBAS.md`.
 
 | ID | Escenario | Procedimiento | Resultado esperado | Evidencia |
 |---|---|---|---|---|
@@ -157,7 +159,7 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 - `acceptance.js` es una prueba de integración/extremo a extremo de la API: usa HTTP, sesión, guards, reglas de negocio y base de datos real dentro de Docker.
 - `smoke.js` es un recorrido corto de integración para login, logout, permisos y filtros.
 - `harness-docker.ps1/.sh` incluye la prueba operativa que reinicia los servicios y verifica el volumen persistente. `persistence-check.mjs` queda como atajo local opcional.
-- Además, la solución incluye una pirámide automatizada con Jest y ts-jest: 7 pruebas unitarias con dependencias simuladas y 2 pruebas de integración contra PostgreSQL y el Excel original. Playwright ejecuta 1 recorrido E2E del navegador. Estas 10 pruebas se distribuyen 70/20/10 y complementan, no sustituyen, los escenarios P01–P12 con datos reales y resultados observables.
+- La pirámide base del catálogo contiene 7 unitarias, 2 integraciones y 1 E2E (70/20/10). La ampliación añade 6 unitarias y 2 recorridos de navegador; la suite completa actual ejecuta 13 unitarias, 2 integraciones y 3 E2E. La aceptación Service Desk P01–P18 es un control separado.
 
 ### Harness
 
@@ -165,11 +167,11 @@ ADMIN puede agregar una etiqueta y cambiar su estado en:
 & .\scripts\harness-docker.ps1
 ~~~
 
-Ejecuta sin Node instalado en el host la construcción de API y frontend, auditoría de secretos, Compose, validación estructural del Excel, seed, importación, reimportación idéntica, aceptación funcional P01–P11, smoke y persistencia. En Linux o macOS usar `sh scripts/harness-docker.sh`.
+El harness-docker.ps1/.sh conserva el flujo histórico del catálogo parcial 2 y corre en el Compose predeterminado. Para evaluar Service Desk sin tocar la base normal, use scripts/service-desk-test.ps1/.sh (P01–P18) y scripts/test-pyramid.ps1/.sh (unit, integration, e2e o all); sus detalles y límites están en docs/ia/03-harness-engineering.md. En Linux o macOS usar `sh scripts/harness-docker.sh`.
 
 ## Pirámide de pruebas 70/20/10
 
-La solución usa Jest con ts-jest para unitarias e integración, y Playwright para la prueba E2E de navegador. La suite tiene 10 casos: 7 unitarios, 2 de integración y 1 E2E.
+El núcleo histórico del catálogo tiene 7 unitarias, 2 integraciones y 1 E2E (70/20/10). Service Desk añade 6 unitarias y 2 E2E; los comandos ejecutan las suites completas actuales y all presenta por separado la base, las ampliaciones y el total 13/2/3.
 
 ~~~powershell
 # Windows PowerShell

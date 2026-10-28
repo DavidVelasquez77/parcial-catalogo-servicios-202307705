@@ -1,82 +1,102 @@
 # Fase 3: Harness Engineering
 
-## 1. Definición aplicada al proyecto
+## Qué se entrega
 
-Harness Engineering es el diseño del entorno de controles que permite ejecutar, observar y repetir un cambio con seguridad. Incluye Docker, migraciones, scripts, pruebas, auditorías, datos controlados, persistencia y documentación de resultados.
+El harness es el entorno repetible que permite levantar la aplicación, preparar fuentes y datos de evaluación, ejecutar controles y observar con claridad si cada etapa pasó. Docker es una pieza del harness; también incluye migraciones, importadores, generador con semilla, pruebas, controles de calidad, aislamiento, límites operativos y evidencia versionada.
 
-El harness no es únicamente un script de pruebas ni depende de que la IA esté disponible. Debe servirle a otra persona que clone el repositorio y necesite comprobar el sistema.
+## Componentes y responsabilidades
 
-## 2. Componentes del harness
-
-| Componente | Función |
+| Componente | Responsabilidad verificable |
 |---|---|
-| `compose.yaml` | levanta API, frontend y PostgreSQL de forma reproducible |
-| Dockerfiles | generan imágenes con rutas y artefactos conocidos |
-| migración | crea el modelo y sus restricciones |
-| `seed-demo.js` | prepara cuentas y organización de evaluación |
-| `validate-import.js` | valida Excel antes de tocar la base |
-| `import-catalog.js` | sincroniza nuevos, modificados e idénticos |
-| `verify-import.js` | comprueba conteos y duplicados |
-| `acceptance.js` | prueba contratos P01–P11 por HTTP y base real |
-| `smoke.js` | ejecuta un recorrido corto de autenticación y filtros |
-| `persistence-check.mjs` | reinicia servicios y comprueba el volumen |
-| `audit-secrets.mjs` | detecta secretos accidentales versionados |
-| `harness-docker.ps1/.sh` | ejecuta el flujo oficial sin Node.js en el host y detiene ante fallos |
-| `harness.mjs` | atajo opcional para desarrollo local con Node.js |
-| Jest + ts-jest | ejecuta 7 unitarias y 2 integraciones reproducibles dentro del contenedor API |
-| Playwright | ejecuta 1 recorrido E2E del navegador dentro de su contenedor oficial |
+| `compose.yaml` y Dockerfiles | PostgreSQL 16, API, web y contenedor Playwright; los Excel se montan de solo lectura. |
+| `apps/api/dist/scripts/migrate.js` | Aplica las migraciones versionadas 001–006 al arrancar la API. |
+| `seed-demo.js`, `seed-service-desk.js` | Preparan cuentas, organización, colas y datos demostrativos repetibles. |
+| `validate-import.js`, `import-catalog.js`, `verify-import.js` | Validan el Excel de catálogo antes de importar; informan altas/cambios/omisiones y comprueban 12/46 e incidencias. |
+| `import-cmdb.js` | Valida e importa los CI originales de `CMDB.xlsx`, conserva la procedencia y registra referencias no resueltas. |
+| `generate-cmdb.js` | Crea o sincroniza dispositivos sintéticos identificados por `CMDB_SEED` y `CMDB_COUNT`; repetir semilla no duplica. |
+| `scripts/service-desk-test.ps1/.sh` | Harness de aceptación P01–P18 en el proyecto Compose aislado `service-desk-suite-202307705`. |
+| `scripts/test-pyramid.ps1/.sh` | Ejecuta las pruebas unitarias, de integración o navegador dentro de `service-desk-pyramid-202307705`. |
+| Jest + ts-jest | Pruebas unitarias y de integración con la API; PostgreSQL se usa en integración. |
+| Playwright | Recorridos reales de navegador en un contenedor dedicado. |
+| `npm run lint`, `npm run typecheck`, `npm run audit:secrets` | Comprueban estilo/tipos y buscan secretos accidentales versionados. |
+| `docs/PRUEBAS.md` | Conserva fechas, commit, comandos, conteos, fallos y resultados realmente observados. |
 
-## 3. Orden de control
+## Preparación de una evaluación Service Desk
 
-~~~text
-COMPOSE-CONFIG → BUILD/UP/MIGRATE → IMPORT-VALIDATION → SEED
-    → IMPORT → REIMPORT → VERIFY → ACCEPTANCE → SMOKE
-    → SECRET-AUDIT → PERSISTENCE
-~~~
+Desde la raíz del clon, con Docker Compose v2 activo:
 
-Cada paso tiene una entrada, una salida observable y un código de salida. El siguiente paso no debe ocultar el fallo del anterior.
+```powershell
+# Windows PowerShell
+Copy-Item .env.example .env
+docker compose up --build -d
+docker compose exec -T api node apps/api/dist/scripts/seed-demo.js
+docker compose exec -T api node apps/api/dist/scripts/validate-import.js
+docker compose exec -T api node apps/api/dist/scripts/import-catalog.js
+docker compose exec -T api node apps/api/dist/scripts/import-cmdb.js
+docker compose exec -T -e CMDB_SEED=EVAL2026 -e CMDB_COUNT=5000 api node apps/api/dist/scripts/generate-cmdb.js
+docker compose exec -T api node apps/api/dist/scripts/seed-service-desk.js
+```
 
-## 4. Tipos de resultado
+En Linux/macOS, sustituir la copia inicial por `cp .env.example .env`; los comandos Docker restantes son iguales. La API aplica las migraciones automáticamente. No se necesita instalar Node.js ni PostgreSQL en el host.
 
-- **Éxito:** código 0 y salida compatible con `ok: true`.
-- **Advertencia:** el proceso puede terminar, pero deja una observación que debe revisarse, por ejemplo un nombre alternativo de SE.12.
-- **Fallo bloqueante:** código distinto de cero; se detiene el flujo para evitar contaminar la evidencia.
+La rutina completa de aceptación repite cargas y generación, ejecuta P01–P17, reinicia PostgreSQL y API sin borrar el volumen y comprueba P18:
 
-La validación del Excel es un control especialmente importante: si fallan hoja, encabezados, tipos o estructura, no se crea `import_runs` y no se modifican servicios.
+```powershell
+# Windows PowerShell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1
+```
 
-## 5. Datos controlados y no destructividad
+```sh
+# Linux/macOS
+sh scripts/service-desk-test.sh
+```
 
-La aceptación crea datos con prefijo `ACC-` y limpia únicamente lo que creó cuando termina correctamente. La verificación de persistencia reinicia contenedores sin ejecutar `docker compose down -v`. El volumen de PostgreSQL no se destruye automáticamente porque forma parte de lo que se quiere comprobar.
+El script devuelve código 0 y `ok: true` al terminar, y un código distinto de cero ante una etapa fallida. Es idempotente respecto a catálogo y datos CMDB de muestra. Usa el proyecto aislado `service-desk-suite-202307705`, no el volumen de la aplicación normal, y detiene la ejecución en caso de error. No borra el volumen de pruebas.
 
-## 6. Ciclo de corrección
+## Comandos por tipo de prueba
 
-El ciclo utilizado dentro del harness es:
+Los comandos aceptan `unit`, `integration`, `e2e` o `all`. `all` es la opción para la demostración integrada:
 
-~~~text
-PLAN → ACT → OBSERVE → EVALUATE → CORRECT → RE-EVALUATE
-~~~
+```powershell
+# Windows PowerShell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 unit
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 integration
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 e2e
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 all
+```
 
-| Etapa | Aplicación práctica |
-|---|---|
-| Plan | definir el cambio y sus invariantes |
-| Act | editar código, configuración o documentación |
-| Observe | ejecutar logs, typecheck, build o prueba afectada |
-| Evaluate | comparar la salida con la aceptación |
-| Correct | corregir la causa, no ocultar el síntoma |
-| Re-evaluate | repetir el control y registrar el resultado |
+```sh
+# Linux/macOS
+sh scripts/test-pyramid.sh unit
+sh scripts/test-pyramid.sh integration
+sh scripts/test-pyramid.sh e2e
+sh scripts/test-pyramid.sh all
+```
 
-Este ciclo es parte de Harness Engineering; no se presenta como una cuarta disciplina exigida por el enunciado.
+La pirámide original del catálogo mantiene una base 70/20/10: siete unitarias (tres de autenticación y cuatro de servicios), dos integraciones de importación y una E2E del catálogo. La ampliación Service Desk añade seis unitarias de reglas y dos recorridos E2E; por ello la ejecución completa actual observa **13 unitarias, 2 integraciones y 3 E2E**. El reporte presenta por separado la base 70/20/10, las ampliaciones y el total, sin afirmar que el total ampliado conserve esos porcentajes. Cada ejecución de integración/E2E prepara su propio conjunto; Playwright usa el puerto aislado 18081. Al terminar se paran los contenedores, pero el volumen aislado se conserva.
 
-## 7. Comandos principales
+Controles adicionales desde el host si Node.js está instalado:
 
-~~~powershell
-& .\scripts\harness-docker.ps1
-~~~
+```sh
+npm run lint
+npm run typecheck
+npm run audit:secrets
+git diff --check
+```
 
-En Linux o macOS se ejecuta `sh scripts/harness-docker.sh`. Este es el flujo oficial y no requiere Node.js en el host: la construcción ocurre en Docker y los scripts de seed, importación, reimportación, aceptación, smoke, auditoría y persistencia se ejecutan dentro de contenedores. `npm run harness` y `npm run persistence:check` quedan como atajos opcionales para desarrollo local.
+Esos controles devuelven código cero al pasar; `audit:secrets` informa los archivos que escaneó. Para verificar configuración y estado de Docker: `docker compose config`, `docker compose ps` y `docker compose logs api`.
 
-La pirámide de pruebas se ejecuta con `scripts/test-pyramid.ps1` o `scripts/test-pyramid.sh`. Sus 10 casos se distribuyen como 7 unitarias Jest, 2 integraciones Jest contra PostgreSQL y 1 E2E Playwright. Los comandos aceptan `unit`, `integration`, `e2e` o `all`; la última opción imprime el resultado `70/20/10`.
+## Límites de operación
 
-## 8. Criterio de aceptación de esta fase
+- Las pruebas Service Desk usan nombres de proyecto Compose distintos de la aplicación normal. No dirigirlas al volumen de evaluación.
+- El arranque y las pruebas no ejecutan `down -v`; la comprobación P18 reinicia servicios conservando datos.
+- No reemplazar ni editar `data/CatalogoServicios.xlsx` o `data/fuentes/CMDB.xlsx` como parte de una prueba. Los montajes de Compose son de solo lectura.
+- No publicar `.env` ni contraseñas reales; `npm run audit:secrets` es un control antes del commit.
+- No borrar manualmente registros que no pertenezcan al fixture de una prueba.
+- El harness no usa modelos, suscripciones ni claves de proveedores de IA.
 
-El harness cumple su objetivo cuando una persona puede levantar el proyecto, validar el Excel, importar, comprobar la API, ejecutar aceptación, reiniciar la base sin perder datos y recibir un resultado inequívoco ante un fallo.
+`harness-docker.ps1/.sh` es el control histórico del catálogo del parcial 2 y ejecuta su aceptación P01–P11 en el Compose predeterminado. Para la evaluación actual de Service Desk deben usarse los scripts aislados descritos arriba. La diferencia evita confundir una prueba histórica con la suite ampliada o ejecutarla por accidente contra la base normal.
+
+## Criterio de cierre
+
+Un cambio se acepta cuando el control afectado pasa, las pruebas de aceptación pertinentes conservan las reglas negativas, la salida tiene código 0, el resultado queda fechado y vinculado a un commit, y la documentación identifica los límites que no se probaron. La evidencia actual está en [PRUEBAS.md](../PRUEBAS.md) y los ciclos de corrección completos en [04-loop-engineering.md](04-loop-engineering.md).

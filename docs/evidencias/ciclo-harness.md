@@ -1,5 +1,7 @@
 # Evidencia del harness y ciclo de corrección
 
+> **Evidencia histórica del parcial 2:** P01–P11 y la pirámide 7/2/1 de este archivo corresponden al harness original del catálogo. Para la ampliación Service Desk, consultar docs/ia/03-harness-engineering.md, docs/ia/04-loop-engineering.md y docs/PRUEBAS.md.
+
 ## 1. Qué se considera harness en este proyecto
 
 El harness no es únicamente Docker. Es el conjunto coordinado de:

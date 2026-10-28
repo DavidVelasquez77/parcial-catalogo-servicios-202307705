@@ -1,5 +1,7 @@
 # Fase 1: Context Engineering
 
+> El contexto inicial de este documento corresponde al catálogo. Para la ampliación Service Desk, AGENTS.md incluye actualizaciones motivadas por CMDB, colas, flujos, lección 25 y permisos/consultas; el resumen por fase, las fuentes entregadas y los tres commits de actualización seleccionados están en docs/IA.md.
+
 ## 1. Definición aplicada al proyecto
 
 Context Engineering es la preparación deliberada del material que un asistente necesita para trabajar con precisión. No consiste en copiar todos los archivos disponibles dentro de un prompt. Consiste en seleccionar información relevante, ordenarla por autoridad, separar hechos de decisiones y señalar los límites que no deben romperse.

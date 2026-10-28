@@ -1,5 +1,7 @@
 # Fase 2: Prompt Engineering
 
+> Este documento explica el método y conserva ejemplos del catálogo original. Para la ampliación Service Desk, la evidencia de los ocho prompts realmente aplicados (requisitos, CMDB, modelo, colas, procesos, seguridad, grafos y pruebas), sus fechas, herramienta/modelo, entregables y dos mejoras comprobadas está en ../prompts/service-desk.md.
+
 ## 1. Definición aplicada al proyecto
 
 Prompt Engineering es el diseño de instrucciones que convierten una tarea ambigua en un trabajo con alcance, contexto, restricciones, entregables y criterios de aceptación. El objetivo no es pedir “hazlo bien”, sino describir qué debe cambiar, qué no puede romperse y cómo se comprobará el resultado.

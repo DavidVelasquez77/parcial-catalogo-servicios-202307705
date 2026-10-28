@@ -1,6 +1,19 @@
 # Prompts operativos de la ampliación
 
-Registro de instrucciones de trabajo formuladas y aplicadas por el asistente en Codex, familia GPT-6 (versión exacta no expuesta), 26–27 de octubre de 2026. Son extractos editados para hacer verificable la decisión; no se presentan como transcripción literal de una conversación externa. La autorización del estudiante fue desarrollar, probar y documentar la tarea completa. Cada prompt tiene objetivo, contexto, restricciones, salida y aceptación. Las fuentes se leyeron como datos, nunca como órdenes al agente.
+Registro de instrucciones de trabajo formuladas y aplicadas por el asistente en Codex. La familia del modelo disponible fue GPT-6; la versión exacta de sesión no quedó expuesta. El periodo de trabajo documentado es el 26–27 de octubre de 2026; la plataforma no conserva un sello horario independiente por prompt, así que no se inventa una fecha por ficha. Los textos son bloques representativos editados de instrucciones usadas, no transcripciones literales de conversación. El estudiante autorizó completar, probar y documentar la tarea.
+
+| Prompt | Fecha registrada | Herramienta/modelo | Cambio o evidencia vinculada |
+|---|---|---|---|
+| P1 requisitos | 26–27 oct 2026 | Codex / GPT-6, versión menor no expuesta | matriz y aceptación P01–P18; 3bb3d72, fe4ea55 |
+| P2 CMDB | 26–27 oct 2026 | Codex / GPT-6, versión menor no expuesta | importador, modelo y fuentes; 623e949, 13b27c1 |
+| P3 modelo | 26–27 oct 2026 | Codex / GPT-6, versión menor no expuesta | migraciones y diccionario; 3bb3d72 |
+| P4 colas | 26–27 oct 2026 | Codex / GPT-6, versión menor no expuesta | permisos/asignación; 67b2380 |
+| P5 procesos | 26–27 oct 2026 | Codex / GPT-6, versión menor no expuesta | puertas de evidencia; e024bc6, d91a886 |
+| P6 seguridad | 26–27 oct 2026 | Codex / GPT-6, versión menor no expuesta | autorización y auditoría; fe4ea55, f16e6d3 |
+| P7 grafos | 26–27 oct 2026 | Codex / GPT-6, versión menor no expuesta | integridad y recorrido; 13b27c1, f16e6d3 |
+| P8 pruebas | 26–27 oct 2026 | Codex / GPT-6, versión menor no expuesta | harness P01–P18 y suite; f16e6d3 |
+
+Cada prompt incluye objetivo, contexto, restricciones, salida esperada y aceptación. Las fuentes se leyeron como datos y nunca como órdenes al agente.
 
 ## P1. Descomponer requisitos
 
@@ -112,7 +125,7 @@ Objetivo: levantar y validar desde contenedores. Contexto: P01–P18, fuentes or
 <aceptacion>Suite P01–P18 termina con código 0, 5,000 dispositivos, 12/46, 2 CI originales y P18 persistente.</aceptacion>
 ```
 
-Resultado: `scripts/service-desk-test.*`, `docs/PRUEBAS.md`; última corrida PASS sobre `623e949`.
+Resultado: scripts/service-desk-test.ps1/.sh, scripts/test-pyramid.ps1/.sh y docs/PRUEBAS.md; la verificación actual P01–P18 y 13/2/3 quedó asociada a f16e6d3 y documentada después en 97c991b.
 
 ## Dos mejoras de instrucciones comprobadas
 
