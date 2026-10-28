@@ -141,3 +141,38 @@ ganó el otro y la aserción de la *prueba* falló aunque la exclusión mutua
 funcionaba. Se corrigió la prueba para leer al ganador y dirigir la
 reasignación al otro agente. La siguiente ejecución completa pasó. Este
 fallo no fue introducido deliberadamente ni se atribuye al producto.
+
+## Siete procesos y evidencia de sus puertas (27 de octubre de 2026, Guatemala)
+
+El código de los controles y de aceptación está en el commit `791cd76`.
+La revisión del apartado 6 llevó a exigir las evidencias del flujo en la API,
+además de conservar las transiciones de `process-rules.ts`. La regla por etapa
+y proceso está explicada en [PROCESOS.md](PROCESOS.md#evidencia-obligatoria-y-puertas-de-transición).
+
+| Proceso | Caso positivo comprobado | Rechazo o puerta comprobada |
+|---|---|---|
+| Nuevos servicios | Completa análisis, aprobación, vincula un servicio activo y también crea una propuesta en `REVIEW`; el ticket conserva el ID aprobado. | Rechaza código existente/duplicado e implementación o resolución sin el servicio aprobado y el resultado correspondiente. El ID aprobado se asigna por servidor y la base de aprobación queda bloqueada. |
+| Cambios | Completa impacto, riesgo, CI, aprobación, planificación, ejecución y validación. | Intentar ejecutar sin transición de aprobación registrada devuelve 409; exige CI, riesgo, plan de pruebas, reversión y resultados de ejecución/validación. No permite alterar ese alcance ni agregar CI después de la aprobación. |
+| Incidentes | Completa clasificación I0–I6, atención, solución y duración real cuando hubo interrupción. | Rechaza categoría sin indicador, duración cero o incompatible con I1–I5 y resolución sin solución o duración real. |
+| Eventos | Evalúa E0–E3; E2/E3 generan un incidente enlazado y notificación, requieren respuesta y luego cierre. | E2/E3 no cierran directamente desde evaluación; una evaluación repetida no crea otra transición ni otro incidente. |
+| Problemas | Vincula un incidente, investiga, registra solución temporal, error conocido y solución definitiva. | Cada evidencia se exige antes de su estado; `IMPLEMENTS` se permite entre problema y cambio, no con un incidente. |
+| Accesos | Completa beneficiario, recurso, permiso, GRANT/REVOKE, aprobación, provisión/revocación y validación. | Faltan datos u operación, la provisión o validación está sin evidencia, o el solicitante intenta autoaprobar: se rechaza. Recurso, permiso y operación aprobados no se alteran después de aprobar. |
+| Servicios de tecnología | Valida una requisición sobre servicio existente, asigna agente, registra cumplimiento y confirmación. | Impide asignar sin agente/validación, cumplir sin agente, confirmar sin entrega o resolver sin confirmación. |
+
+| Comando / prueba | Resultado observado |
+|---|---|
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` | Código 0; P01–P18 PASS. P09 recorrió los siete procesos e incluyó vinculación y creación de un servicio nuevo; P10 y P11–P13 pasaron sus rechazos y controles específicos. Salida final: `{"ok":true,"suite":"Service Desk P01-P18","isolatedProject":"service-desk-suite-202307705"}`. |
+| P18 tras reiniciar PostgreSQL y API del proyecto aislado | PASS; 12 servicios nivel 1, 46 nivel 2, 5,000 dispositivos, 2 CI fuente, 545 tickets, 2,251 entradas de historial y 47 colas. El volumen de pruebas ya se había reutilizado: tickets, historial y colas son acumulados; los conteos base 12/46/5,000/2 sí se comprobaron exactamente. |
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 all` | Código 0; salida `{"ok":true,"suite":"all","pyramid":"70/20/10"}`. Jest: 13 unitarias y 2 de integración pasadas; Playwright: 3 recorridos de navegador pasados. |
+| `npm run lint`, `npm run typecheck`, `npm run audit:secrets`, `git diff --check` | Código 0 en los cuatro; auditoría `{"ok":true,"scanned":"source, configuration and documentation"}`. El build de la API en Docker también terminó correctamente durante P01–P18. |
+| `docker compose up --build -d`; seed de `seed-service-desk.js`; GET `http://localhost:8080/` | Build normal completado, semilla idempotente (`created=0`, 37 tickets de muestra y 8 colas), base healthy, API y web activos; respuesta HTTP 200. Se conservó el volumen normal. |
+
+### Corrección observada durante la verificación
+
+La primera ejecución del caso de propuesta nueva aprobó correctamente el
+servicio, pero dejó el fixture en la base aislada y P18 detectó 47 servicios
+nivel 2 en lugar de los 46 originales. Se ajustó la prueba para borrar solo
+el servicio sintético que ella creó al cerrar el caso; no se cambió el
+importador ni se tocó la base normal. Se retiró del volumen aislado el único
+fixture de esa primera ejecución y la repetición completa acabó con código 0,
+12/46 y P18 PASS. Este ciclo no fue un fallo deliberado.

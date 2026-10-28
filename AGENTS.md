@@ -115,10 +115,12 @@ La aprobación de nuevo servicio puede vincular uno activo o crear uno en
 registrada; eventos E2/E3 generan un incidente vinculado sin repetirlo; el
 acceso exige GRANT/REVOKE y bloquea la autoaprobación; y la solicitud de
 tecnología requiere agente, entrega y confirmación. `desk-acceptance.ts` amplía
-P09–P13 para probar éxitos y rechazos. La prueba de crear un servicio limpia
-solo su propio fixture en la base aislada, preservando los 46 importados para
-P18. Consultar `docs/PROCESOS.md` para las reglas y `docs/PRUEBAS.md` para el
-comando, resultados y límites observados.
+P09–P13 para probar éxitos y rechazos. Tras aprobar, se bloquean las decisiones
+de alcance de nuevos servicios, cambios y accesos, y no se permite agregar CI
+a un cambio aprobado. La prueba que crea un servicio limpia solo su propio
+fixture en la base aislada, preservando los 46 importados para P18. Consultar
+`docs/PROCESOS.md` para las reglas y `docs/PRUEBAS.md` para el comando,
+resultados y límites observados.
 
 ## 4. Restricciones técnicas
 

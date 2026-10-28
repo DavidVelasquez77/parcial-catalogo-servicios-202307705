@@ -11,7 +11,8 @@
 - Repositorio: [parcial-catalogo-servicios-202307705](https://github.com/DavidVelasquez77/parcial-catalogo-servicios-202307705).
 - Commit de entrega: el commit apuntado por la etiqueta `parcial-v2.0`.
 - Etiqueta de entrega: parcial-v2.0.
-- Fecha de última verificación documentada: 30 de septiembre de 2026.
+- Fecha de verificación de la entrega original del catálogo: 30 de septiembre de 2026.
+- Verificación de las puertas de los siete procesos y despliegue normal: 27 de octubre de 2026, código `791cd76`; resultados detallados en [PRUEBAS.md](PRUEBAS.md).
 
 El objetivo del proyecto es transformar el archivo CatalogoServicios.xlsx en una aplicación web de gestión de servicios de TI. La solución no se limita a mostrar el Excel: normaliza su información, conserva su trazabilidad, incorpora una estructura organizacional, permite asignar responsables y ofrece autenticación local con autorización en el servidor.
 
@@ -28,9 +29,9 @@ El archivo de origen es útil como catálogo inicial, pero presenta limitaciones
 
 La aplicación atiende estas necesidades con un frontend web, una API, PostgreSQL y un importador repetible.
 
-## 3. Alcance
+## 3. Alcance del parcial práctico 2 (catálogo)
 
-### Incluido
+### Incluido en la primera etapa
 
 - Login y logout local.
 - Sesiones persistidas en PostgreSQL.
@@ -50,14 +51,18 @@ La aplicación atiende estas necesidades con un frontend web, una API, PostgreSQ
 - Documentación de context engineering, prompt engineering y harness engineering.
 - Registro ampliado de las tres fases en `docs/ia/`, con prompts finales en XML.
 
-### Fuera de alcance
+### Fuera de alcance de esa primera etapa, incorporado en la ampliación Service Desk
 
-- Gestión de tickets o incidentes.
 - Facturación.
 - Consumo o contratación de servicios.
 - Inicio de sesión con Google, GitHub u otro proveedor.
 - Un modelo de IA dentro de la aplicación en tiempo de ejecución.
 - Edición del archivo Excel original desde la aplicación.
+
+La gestión de tickets dejó de estar fuera de alcance al iniciar el parcial
+práctico 3: se implementa con los siete procesos descritos en
+[PROCESOS.md](PROCESOS.md), y su evidencia de aceptación está en
+[PRUEBAS.md](PRUEBAS.md#siete-procesos-y-evidencia-de-sus-puertas-27-de-octubre-de-2026-guatemala).
 
 ## 4. Supuestos y decisiones humanas
 

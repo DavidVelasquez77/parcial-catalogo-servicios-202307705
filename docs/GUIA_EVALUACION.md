@@ -8,6 +8,37 @@ En cinco minutos, mostrar: (1) **Tickets**, filtros, un detalle con bitácora, C
 
 Si se solicita harness, ejecutar `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` en Windows o `sh scripts/service-desk-test.sh` en Linux/macOS. La salida muestra P01–P18 y P18 tras reiniciar PostgreSQL. Para la evidencia de IA, abrir `docs/IA.md` y `docs/prompts/service-desk.md`; explicar un prompt revisado y una actualización de `AGENTS.md`. El proyecto de pruebas usa otro nombre Compose y no modifica la instalación normal. El recorrido antiguo del catálogo continúa debajo.
 
+### Cómo demostrar el punto 6: los siete procesos
+
+En **Colas**, señalar que hay al menos una cola activa para cada proceso. En
+**Tickets**, filtrar por proceso y abrir un ticket de muestra; el detalle
+muestra los datos específicos guardados y la bitácora. Explicar que los pasos
+y campos obligatorios completos se encuentran en [PROCESOS.md](PROCESOS.md),
+y que la interfaz ayuda a capturar datos pero la API repite las validaciones.
+
+Para una demostración breve, describir un control distintivo por flujo:
+
+1. **Nuevo servicio:** analizar necesidad y viabilidad; tras aprobar, vincular
+   uno activo o crear la propuesta en revisión, sin duplicar código.
+2. **Cambio:** mostrar CI afectados, riesgo, prueba y reversión; indicar que no
+   se puede ejecutar sin aprobación registrada y planificar.
+3. **Incidente:** mostrar categoría I0–I6, afectación y solución; la categoría
+   se valida con la duración y la resolución deja el tiempo real cuando aplica.
+4. **Evento:** mostrar E0–E3; E2/E3 generan el incidente enlazado y deben tener
+   respuesta antes del cierre.
+5. **Problema:** mostrar el incidente relacionado y la cadena de causa raíz,
+   solución temporal/error conocido y solución definitiva; el cambio correctivo
+   queda vinculado con `IMPLEMENTS`.
+6. **Acceso:** distinguir conceder de revocar, beneficiario y permiso; mencionar
+   la aprobación separada y el bloqueo de autoaprobación.
+7. **Servicio de tecnología:** mostrar la solicitud sobre servicio existente,
+   asignación de agente, cumplimiento y confirmación del solicitante.
+
+Para probar las puertas y rechazos con evidencia repetible, ejecutar la suite
+P01–P18; P09 recorre los siete flujos y P10–P13 verifican aprobaciones,
+eventos, clasificación y vínculos. El comando no usa la base normal de la
+aplicación. Los resultados de la repetición están en [PRUEBAS.md](PRUEBAS.md#siete-procesos-y-evidencia-de-sus-puertas-27-de-octubre-de-2026-guatemala).
+
 ## Objetivo
 
 Esta guía permite evaluar la solución desde cero y relacionar cada escenario del enunciado con un comando, una acción de interfaz y un resultado esperado.
