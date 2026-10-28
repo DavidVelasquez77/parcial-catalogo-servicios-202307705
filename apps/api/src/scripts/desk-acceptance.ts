@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { Pool } from 'pg';
+import { incidentLessonReference } from '../desk/incident-rules';
 
 if (process.env.DESK_TEST_ISOLATED !== '1') throw new Error('Esta suite solo se ejecuta con DESK_TEST_ISOLATED=1 en un proyecto Compose de pruebas.');
 const base = 'http://127.0.0.1:3000/api';
@@ -44,6 +45,44 @@ async function main() {
     const agent1 = await login('agente1.demo',process.env.DEMO_AGENT1_PASSWORD ?? 'Agente123!');
     const agent2 = await login('agente2.demo',process.env.DEMO_AGENT2_PASSWORD ?? 'Agente123!');
     const approver = await login('aprobador.demo',process.env.DEMO_APPROVER_PASSWORD ?? 'Aprueba123!');
+    const requiredDemoRoles = [
+      [`${process.env.DEMO_ADMIN_USERNAME ?? 'admin.demo'}`,'ADMIN'],
+      [`${process.env.DEMO_QUERY_USERNAME ?? 'consulta.demo'}`,'CONSULTA'],
+      ['solicitante.demo','SOLICITANTE'],['agente1.demo','AGENTE'],['agente2.demo','AGENTE'],['aprobador.demo','APROBADOR'],
+    ];
+    const roleRows = await pool.query(`SELECT u.username,ur.role FROM users u JOIN user_roles ur ON ur.user_id=u.id
+      WHERE u.active AND u.username=ANY($1::text[])`,[requiredDemoRoles.map(([username])=>username)]);
+    const rolePairs = new Set(roleRows.rows.map((row)=>`${row.username}:${row.role}`));
+    truth(requiredDemoRoles.every(([username,role])=>rolePairs.has(`${username}:${role}`)),
+      'cuentas de evaluación de administrador, consulta, solicitante, agente y aprobador');
+    const demoTicketRows = await pool.query(`SELECT process,COUNT(*)::int AS count,COUNT(DISTINCT state)::int AS states
+      FROM tickets WHERE number LIKE 'DEMO-%' GROUP BY process ORDER BY process`);
+    const expectedProcesses = ['ACCESS','CHANGE','EVENT','INCIDENT','NEW_SERVICE','PROBLEM','TECH_SERVICE'];
+    eq(demoTicketRows.rows.length,7,'siete procesos con tickets de muestra');
+    truth(demoTicketRows.rows.reduce((sum,row)=>sum+row.count,0)>=35,'35 tickets de demostración');
+    truth(demoTicketRows.rows.every((row)=>row.count>=5 && row.states>=2),'cinco tickets y varios estados por proceso');
+    const demoQueues = await pool.query(`SELECT DISTINCT process FROM support_queues WHERE active ORDER BY process`);
+    truth(expectedProcesses.every((process)=>demoQueues.rows.some((row)=>row.process===process)),
+      'una cola activa por proceso');
+    const demoEventCategories = await pool.query(`SELECT DISTINCT process_data->>'eventCategory' AS category
+      FROM tickets WHERE number LIKE 'DEMO-EVT-%' ORDER BY category`);
+    eq(demoEventCategories.rows.map((row)=>row.category).join(','),'E0,E1,E2,E3','categorías de evento de demostración');
+    const demoEventFixtures = await pool.query(`SELECT number,state,process_data FROM tickets
+      WHERE number LIKE 'DEMO-EVT-%' ORDER BY number`);
+    eq(demoEventFixtures.rows.length,5,'cinco tickets de evento de demostración');
+    const seededE0Fixture = demoEventFixtures.rows.find((row)=>row.number==='DEMO-EVT-01');
+    truth(seededE0Fixture?.state==='CLOSED' && !('assessment' in seededE0Fixture.process_data) &&
+      !('response' in seededE0Fixture.process_data),'E0 de muestra solo registra el evento');
+    const seededE1Fixtures = demoEventFixtures.rows.filter((row)=>row.process_data.eventCategory==='E1');
+    truth(seededE1Fixtures.length===2 && seededE1Fixtures.every((row)=>row.state==='EVALUATED' &&
+      Boolean(row.process_data.assessment) && !('response' in row.process_data)),
+      'E1 de muestra conserva evaluación y no inventa respuesta operativa');
+    const pendingImpactEvents = demoEventFixtures.rows.filter((row)=>['E2','E3'].includes(String(row.process_data.eventCategory)));
+    truth(pendingImpactEvents.length===2 && pendingImpactEvents.every((row)=>row.state==='SUBMITTED' &&
+      !('response' in row.process_data)),'E2/E3 de muestra esperan evaluación y respuesta operativa');
+    const demoIncidentCategories = await pool.query(`SELECT DISTINCT process_data->>'incidentCategory' AS category
+      FROM tickets WHERE number LIKE 'DEMO-INC-%' ORDER BY category`);
+    eq(demoIncidentCategories.rows.map((row)=>row.category).join(','),'I0,I1,I2,I3,I4,I5,I6','categorías de incidente de demostración');
     await status('/desk/queues',200,'GET',undefined,consulta);
     await status('/desk/queues',403,'POST',{code:`TEST-${stamp}`,name:'No',process:'EVENT'},consulta);
     const position = await pool.query('SELECT id FROM positions ORDER BY id LIMIT 1');
@@ -53,7 +92,8 @@ async function main() {
     await status('/auth/login',401,'POST',{identifier:inactiveName,password:'Test12345!'});
     await status('/auth/logout',201,'POST',{},consulta);
     await status('/desk/tickets',401,'GET',undefined,consulta);
-    done('P01');
+    done('P01',{demoRoles:requiredDemoRoles,tickets:demoTicketRows.rows,queues:demoQueues.rows.map((row)=>row.process),
+      eventCategories:demoEventCategories.rows.map((row)=>row.category),incidentCategories:demoIncidentCategories.rows.map((row)=>row.category)});
 
     const counts = await pool.query(`SELECT
       (SELECT COUNT(*)::int FROM service_level_1) AS level1,
@@ -493,6 +533,11 @@ async function main() {
         await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'RESPONDED'},agent1);
         const notifications = await status('/desk/notifications',200,'GET',undefined,admin) as Array<Record<string,any>>;
         truth(notifications.some((n) => n.ticketId===event.id && String(n.message).includes(event.number)),`notificación verificable ${category}`);
+        const notificationCount = await pool.query(`SELECT COUNT(*)::int AS count FROM ticket_notifications WHERE ticket_id=$1`,[event.id]);
+        eq(notificationCount.rows[0].count,1,`una sola notificación para ${category}`);
+        const linkedIncident = await pool.query(`SELECT COUNT(*)::int AS count FROM ticket_links
+          WHERE ticket_id=$1 AND link_type='GENERATED_INCIDENT'`,[event.id]);
+        eq(linkedIncident.rows[0].count,1,`un solo incidente generado para ${category}`);
       }
       if (category==='E0') continue;
     }
@@ -500,7 +545,12 @@ async function main() {
 
     const categoriesIncident = await pool.query(`SELECT process_data->>'incidentCategory' AS category FROM tickets
       WHERE number LIKE 'DEMO-INC-%' ORDER BY number`);
-    eq(new Set(categoriesIncident.rows.map((row) => row.category)).size,7,'I0-I6 en muestra');
+    eq([...new Set(categoriesIncident.rows.map((row) => row.category))].sort().join(','),
+      'I0,I1,I2,I3,I4,I5,I6','I0-I6 en muestra');
+    const seededI6 = await pool.query(`SELECT process_data->>'securityImpact' AS security_impact,
+      process_data->>'solution' AS solution,state FROM tickets WHERE number='DEMO-INC-07'`);
+    truth(seededI6.rows[0]?.security_impact==='true' && seededI6.rows[0]?.solution && seededI6.rows[0]?.state==='CLOSED',
+      'el I6 de demostración conserva impacto de seguridad y solución antes del cierre');
     const gap = await status('/desk/incident-classification',201,'POST',{securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:10081},admin);
     eq(gap.category,'I4','decisión complementaria para el hueco temporal');
     eq(gap.rule,'PROJECT_GAP_RULE_7_TO_30_DAYS','regla del vacío temporal');
@@ -514,7 +564,35 @@ async function main() {
       {securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:0},admin);
     eq(zeroDuration.category,null,'duración cero requiere revisión manual');
     eq(zeroDuration.rule,'MANUAL_REVIEW','duración cero no se atribuye a la lección');
-    done('P12');
+    for (const [minutes,expected,rule] of [[43199,'I4','PROJECT_GAP_RULE_7_TO_30_DAYS'],
+      [43200,'I5','PROJECT_30_DAY_MONTH_THRESHOLD']] as Array<[number,string,string]>) {
+      const suggestion = await status('/desk/incident-classification',201,'POST',
+        {securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:minutes},admin);
+      eq(suggestion.category,expected,`umbral mensual ${minutes} min`);eq(suggestion.rule,rule,`regla mensual ${minutes} min`);
+    }
+    const securityCategory = await status('/desk/incident-classification',201,'POST',
+      {securityImpact:true,interruptsOrDegrades:false,estimatedMinutes:null},admin);
+    eq(securityCategory.category,'I6','seguridad prevalece sobre duración');
+    const noInterruption = await status('/desk/incident-classification',201,'POST',
+      {securityImpact:false,interruptsOrDegrades:false,estimatedMinutes:null},admin);
+    eq(noInterruption.category,'I0','incidente sin interrupción');
+    const incidentSamples = await pool.query(`SELECT process_data->>'incidentCategory' AS category,
+      process_data->>'redundancyAvailable' AS redundancy,priority FROM tickets
+      WHERE number LIKE 'DEMO-INC-%' ORDER BY process_data->>'incidentCategory'`);
+    eq(incidentSamples.rows.length,7,'siete casos de demostración I0-I6');
+    truth(incidentSamples.rows.every((row)=>Number.isInteger(row.priority) && row.priority>=1 && row.priority<=5),
+      'prioridad operativa 1-5 registrada aparte de la equivalencia visual');
+    truth(incidentSamples.rows.every((row)=>['true','false'].includes(row.redundancy)),
+      'redundancia registrada como hecho explícito en los casos de demostración');
+    eq(incidentSamples.rows.find((row)=>row.category==='I0')?.redundancy,'true','I0 de muestra refleja redundancia de la referencia');
+    truth(incidentSamples.rows.filter((row)=>row.category!=='I0').every((row)=>row.redundancy==='false'),
+      'I1-I6 de muestra reflejan la referencia sin automatizar la prioridad');
+    eq(Object.keys(incidentLessonReference).sort().join(','),'I0,I1,I2,I3,I4,I5,I6','mapeo docente de prioridad y redundancia');
+    done('P12',{durationRules:['180/181','480/481','2880/2881','10080/10081','43199/43200'],
+      zeroDuration:'MANUAL_REVIEW',securityCategory:securityCategory.category,
+      operationalPriorities:incidentSamples.rows.map((row)=>({category:row.category,priority:row.priority,
+        referencePriority:incidentLessonReference[row.category as keyof typeof incidentLessonReference].priorityGroup,
+        redundancy:row.redundancy})),i6:seededI6.rows[0]});
 
     const problem = await create('PROBLEM',{rootCause:'Causa de prueba'});
     await status(`/desk/tickets/${problem.id}/links`,201,'POST',{relatedTicketId:incident.id,linkType:'RELATED'},admin);

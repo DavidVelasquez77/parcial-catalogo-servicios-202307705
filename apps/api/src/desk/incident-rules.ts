@@ -8,6 +8,18 @@ export const incidentLabels: Record<string,string> = {
   I6: 'Seguridad de recursos o información',
 };
 
+// Equivalencia visual de la diapositiva 16; sirve para documentación y evaluación.
+// No asigna prioridad operativa ni cambia el dato de redundancia observado en un ticket.
+export const incidentLessonReference = {
+  I0:{priorityGroup:'Baja',redundancyAvailable:true},
+  I1:{priorityGroup:'Media',redundancyAvailable:false},
+  I2:{priorityGroup:'Media',redundancyAvailable:false},
+  I3:{priorityGroup:'Alta',redundancyAvailable:false},
+  I4:{priorityGroup:'Alta',redundancyAvailable:false},
+  I5:{priorityGroup:'Alta',redundancyAvailable:false},
+  I6:{priorityGroup:'Alta',redundancyAvailable:false},
+} as const;
+
 export function suggestIncidentCategory(input: {
   securityImpact: boolean;
   interruptsOrDegrades: boolean;

@@ -1,5 +1,5 @@
 import { canTransition, processType, processes } from '../../src/desk/process-rules';
-import { suggestIncidentCategory } from '../../src/desk/incident-rules';
+import { incidentLessonReference, suggestIncidentCategory } from '../../src/desk/incident-rules';
 
 describe('Reglas de Service Desk', () => {
   it('mapea exactamente siete procesos a tipos de ticket admitidos', () => {
@@ -47,5 +47,17 @@ describe('Reglas de Service Desk', () => {
     expect(suggestIncidentCategory({securityImpact:true,interruptsOrDegrades:false,estimatedMinutes:null}).category).toBe('I6');
     expect(suggestIncidentCategory({securityImpact:false,interruptsOrDegrades:false,estimatedMinutes:null}).category).toBe('I0');
     expect(suggestIncidentCategory({securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:null}).rule).toBe('MANUAL_REVIEW');
+  });
+
+  it('conserva la equivalencia docente de prioridad y redundancia sin convertirla en asignación automática', () => {
+    expect(incidentLessonReference).toEqual({
+      I0:{priorityGroup:'Baja',redundancyAvailable:true},
+      I1:{priorityGroup:'Media',redundancyAvailable:false},
+      I2:{priorityGroup:'Media',redundancyAvailable:false},
+      I3:{priorityGroup:'Alta',redundancyAvailable:false},
+      I4:{priorityGroup:'Alta',redundancyAvailable:false},
+      I5:{priorityGroup:'Alta',redundancyAvailable:false},
+      I6:{priorityGroup:'Alta',redundancyAvailable:false},
+    });
   });
 });

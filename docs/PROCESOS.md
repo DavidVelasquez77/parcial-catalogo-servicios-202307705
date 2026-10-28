@@ -72,6 +72,12 @@ La agrupación visual de la **diapositiva 16** se transcribe así; se verificó 
 
 La prioridad operativa del ticket se registra aparte en una escala configurable 1–5; la tabla anterior es una **equivalencia docente de referencia**, no una asignación automática rígida. La disponibilidad de redundancia se registra explícitamente por caso y puede diferir de la ilustración. No se sobrescribe un dato observado para hacerlo coincidir con la diapositiva.
 
+La equivalencia también está codificada como `incidentLessonReference` en
+`apps/api/src/desk/incident-rules.ts`; la prueba unitaria verifica que I0 sea
+Baja/con redundancia, I1–I2 Media/sin redundancia e I3–I6 Alta/sin redundancia.
+La prioridad operativa 1–5 y el dato booleano de redundancia siguen siendo
+campos del ticket y no se derivan automáticamente de esa referencia.
+
 La diferencia de niveles se resuelve manteniendo configurable la escala 0–4 de la diapositiva 11 y registrando que las diapositivas 12–13 muestran 0–3 y sitúan proveedores en 3. La equivalencia y el uso en esta aplicación son:
 
 | Nivel configurable | Nombre de la diapositiva 11 | Equivalencia operativa en el sistema | Diferencia que se conserva |
