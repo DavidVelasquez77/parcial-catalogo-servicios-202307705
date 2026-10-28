@@ -55,7 +55,7 @@ esac
 
 run 'detener contenedores de prueba (el volumen aislado se conserva)' down
 if [ "$SUITE" = all ]; then
-  printf '%s\n' '{"ok":true,"suite":"all","corePyramid":"70/20/10","coreTests":{"unit":7,"integration":2,"e2e":1},"extensions":{"unit":6,"integration":0,"e2e":2},"executedTotal":{"unit":13,"integration":2,"e2e":3}}'
+  printf '%s\n' '{"ok":true,"suite":"all","corePyramid":"70/20/10","coreTests":{"unit":7,"integration":2,"e2e":1},"extensions":{"unit":7,"integration":0,"e2e":2},"executedTotal":{"unit":14,"integration":2,"e2e":3}}'
 else
   printf '{"ok":true,"suite":"%s"}\n' "$SUITE"
 fi

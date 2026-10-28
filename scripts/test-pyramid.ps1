@@ -59,7 +59,7 @@ switch ($Suite) {
 
 Invoke-ComposeStep 'detener contenedores de prueba (el volumen aislado se conserva)' @('down')
 if ($Suite -eq 'all') {
-  Write-Host '{"ok":true,"suite":"all","corePyramid":"70/20/10","coreTests":{"unit":7,"integration":2,"e2e":1},"extensions":{"unit":6,"integration":0,"e2e":2},"executedTotal":{"unit":13,"integration":2,"e2e":3}}'
+  Write-Host '{"ok":true,"suite":"all","corePyramid":"70/20/10","coreTests":{"unit":7,"integration":2,"e2e":1},"extensions":{"unit":7,"integration":0,"e2e":2},"executedTotal":{"unit":14,"integration":2,"e2e":3}}'
 } else {
   Write-Host "`n{`"ok`":true,`"suite`":`"$Suite`"}"
 }
