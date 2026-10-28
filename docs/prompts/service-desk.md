@@ -125,7 +125,7 @@ Objetivo: levantar y validar desde contenedores. Contexto: P01–P18, fuentes or
 <aceptacion>Suite P01–P18 termina con código 0, 5,000 dispositivos, 12/46, 2 CI originales y P18 persistente.</aceptacion>
 ```
 
-Resultado: scripts/service-desk-test.ps1/.sh, scripts/test-pyramid.ps1/.sh y docs/PRUEBAS.md; la verificación actual P01–P18 y 13/2/3 quedó asociada a f16e6d3 y documentada después en 97c991b.
+Resultado en esa fase: scripts/service-desk-test.ps1/.sh, scripts/test-pyramid.ps1/.sh y docs/PRUEBAS.md; P01–P18 y 13/2/3 correspondían al contenido de `f16e6d3` y se documentaron después en `97c991b`. La evidencia vigente de P01–P18 y la ampliación unitaria a 14/2/3 se actualizó en [docs/evidencias/2026-10-27-punto11.md](../evidencias/2026-10-27-punto11.md).
 
 ## Dos mejoras de instrucciones comprobadas
 

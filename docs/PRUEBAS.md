@@ -1,5 +1,22 @@
 # Pruebas y evidencia reproducible
 
+## Registro vigente del punto 11 (27 de octubre de 2026)
+
+La evidencia íntegra P01–P18, con **entrada, resultado esperado, resultado
+obtenido, comando, fecha y commit para cada fila**, está en
+[evidencias del punto 11](evidencias/2026-10-27-punto11.md). La suite pasó con
+código 0 sobre `e8b7b23d1613a61551172bdd9f7a526d67e0ca50`; confirmó 37 tickets
+de muestra en varios estados, ocho colas demo, roles de evaluación, eventos
+E0–E3 e incidentes I0–I6. También aprobó P18 después de reiniciar DB/API sin
+borrar el volumen. La suite usa un proyecto Compose aislado y no toca los
+volúmenes de evaluación normal.
+
+La pirámide complementaria pasó sobre `da1658b`: 14 unitarias, 2 integraciones
+y 3 E2E. La pirámide 70/20/10 base se conserva por separado como 7/2/1. Los
+apartados cronológicos siguientes conservan ejecuciones previas; cuando sus
+conteos o tiempos difieran, el registro vigente del punto 11 es el resultado
+más reciente para esta comprobación.
+
 ## Entorno, fecha y comandos
 
 El 26 de octubre de 2026 (Guatemala; salida UTC del contenedor: 27 de octubre), sobre el contenido versionado en `677c807`, se ejecutó la suite en el proyecto Compose **aislado** `service-desk-suite-202307705`: PowerShell `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1`. La variante Linux/macOS es `sh scripts/service-desk-test.sh`. Usa PostgreSQL 16 Alpine, API Node 22 y los Excel originales montados de solo lectura. El proyecto de pruebas no comparte los volúmenes de la aplicación normal. La salida final fue `{"ok":true,"suite":"Service Desk P01-P18","isolatedProject":"service-desk-suite-202307705"}` y código 0. Una falla lanza error y termina distinto de 0.
@@ -49,13 +66,13 @@ sh scripts/test-pyramid.sh e2e
 sh scripts/test-pyramid.sh all
 ```
 
-Estos comandos heredados del catálogo ejecutan Jest (unitarias e integración) y Playwright en contenedores. La proporción 70/20/10 describe su conjunto original de 7/2/1 escenarios; la ampliación añade 6 unitarias de reglas Service Desk y dos recorridos Playwright adicionales, así que la proporción aritmética del conjunto total cambia. No se presentan porcentajes artificiales para la ampliación. La suite P01–P18 es aceptación de API y persistencia separada.
+Estos comandos heredados del catálogo ejecutan Jest (unitarias e integración) y Playwright en contenedores. La proporción 70/20/10 describe su conjunto original de 7/2/1 escenarios; la ampliación actual añade 7 unitarias de reglas Service Desk y dos recorridos Playwright adicionales, así que la proporción aritmética del conjunto total cambia. No se presentan porcentajes artificiales para la ampliación. La suite P01–P18 es aceptación de API y persistencia separada.
 
-Comprobaciones ejecutadas de la ampliación: `docker compose -p service-desk-suite-202307705 exec -T api node_modules/.bin/jest --config apps/api/test/jest.unit.config.js --runInBand`: **3 suites y 13 pruebas pasadas** (salida 27 de octubre UTC); `WEB_PORT=8081 docker compose -p service-desk-suite-202307705 --profile tests run --build --rm -T e2e`: **3 pruebas Playwright pasadas** (Playwright 1.64.1, imagen `v1.64.1-noble`), catálogo, portal Service Desk y mantenimiento visual de categoría/cola. En PowerShell, defina primero `$env:WEB_PORT='8081'` si ejecuta ese comando suelto y ya está ocupado el 8080. `npm run typecheck` pasó en API y web. Para auditar archivos versionados sin Node en el anfitrión: `docker run --rm --mount type=bind,source="${PWD}",target=/workspace,readonly --workdir /workspace node:22-alpine node scripts/audit-secrets.mjs` (en PowerShell, `${PWD}` se puede reemplazar por `$((Get-Location).Path)`).
+Comprobaciones anteriores registraron tres suites y 13 pruebas unitarias antes de incorporar el chequeo de la equivalencia I0–I6. La ejecución vigente de la suite completa está en [evidencias del punto 11](evidencias/2026-10-27-punto11.md): Jest pasó 14 pruebas unitarias, integración 2 y Playwright 3 E2E. En PowerShell, defina primero `$env:WEB_PORT='8081'` si ejecuta el comando E2E por separado y ya está ocupado el 8080. `npm run typecheck` pasó en API y web. Para auditar archivos versionados sin Node en el anfitrión: `docker run --rm --mount type=bind,source="${PWD}",target=/workspace,readonly --workdir /workspace node:22-alpine node scripts/audit-secrets.mjs` (en PowerShell, `${PWD}` se puede reemplazar por `$((Get-Location).Path)`).
 
 ## Criterio de salida y límites
 
-El criterio de salida fue código 0 para cada rutina, P01–P18 PASS, 5,000 dispositivos únicos, 12/46 de catálogo, dos CI originales, tres pruebas Playwright y 13 Jest. `scripts/service-desk-test.*` nunca ejecuta `down -v`. Para reiniciar solo el conjunto desechable, use explícitamente `docker compose -p service-desk-suite-202307705 down -v`; esto **destruye datos de ese proyecto de pruebas**. Las pruebas de interfaz cubren recorrido principal; no afirman inspección visual manual exhaustiva ni una prueba de carga.
+El criterio de salida fue código 0 para cada rutina, P01–P18 PASS, 5,000 dispositivos únicos, 12/46 de catálogo, dos CI originales, tres pruebas Playwright y 14 Jest en la ejecución vigente. `scripts/service-desk-test.*` nunca ejecuta `down -v`. Para reiniciar solo el conjunto desechable, use explícitamente `docker compose -p service-desk-suite-202307705 down -v`; esto **destruye datos de ese proyecto de pruebas**. Las pruebas de interfaz cubren recorrido principal; no afirman inspección visual manual exhaustiva ni una prueba de carga.
 
 La matriz aquí vincula requisito → implementación → ejecución → salida verificable. Las decisiones y fórmulas están en [PROCESOS.md](PROCESOS.md), el modelo en [MODELO.md](MODELO.md), y los ciclos de corrección en [IA.md](IA.md).
 
@@ -325,3 +342,15 @@ no integra antivirus; las garantías demostradas aquí son límite, tipo/firma,
 sesión, autorización del ticket y trazabilidad. Las cuentas de `.env.example`
 son exclusivamente de evaluación local y no deben exponerse con sus contraseñas
 predeterminadas.
+
+## Apartado 11: datos de demostración y pruebas mínimas (27 de octubre de 2026)
+
+La semilla de evaluación valida por sí misma la presencia de siete procesos,
+varios estados por proceso, 37 tickets, ocho colas demo, seis roles de cuenta,
+E0–E3 e I0–I6. Los fixtures de eventos y el I6 tienen estados y evidencia
+coherentes con su categoría; las reparaciones a fixtures antiguos se anotan en
+la bitácora. La suite P01–P18 incluye pruebas aisladas con entradas marcadas y
+el reinicio de DB/API sin borrar volúmenes. El detalle por requisito está en
+[la evidencia P01–P18](evidencias/2026-10-27-punto11.md); las salidas reales
+de aceptación están ligadas al commit `e8b7b23`, y el resumen de la pirámide
+corregido al commit `da1658b`.

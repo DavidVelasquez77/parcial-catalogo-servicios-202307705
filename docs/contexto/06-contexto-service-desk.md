@@ -84,8 +84,8 @@ En Linux/macOS, usar cp .env.example .env y sustituir los dos comandos
 PowerShell de suite por sh scripts/service-desk-test.sh y
 sh scripts/test-pyramid.sh all. Las pruebas de Service Desk usan proyectos
 Compose aislados y no ejecutan down -v. La suite separa el núcleo 70/20/10
-(7/2/1) de la ampliación actual (6 unitarias y 2 E2E); el total ejecutado es
-13/2/3. Revisar docs/ia/03-harness-engineering.md y docs/PRUEBAS.md antes de
+(7/2/1) de la ampliación actual (7 unitarias y 2 E2E); el total ejecutado es
+14/2/3. Revisar docs/ia/03-harness-engineering.md y docs/PRUEBAS.md antes de
 repetir controles o explicar su salida.
 
 ## Actualizaciones contextuales versionadas
@@ -94,6 +94,8 @@ repetir controles o explicar su salida.
 - 623e949: añadió hallazgos de CMDB original y trazabilidad transaccional de importación.
 - 85d913f: actualizó reglas de verificación después de pruebas y documentó repetir controles afectados.
 - f16e6d3: corrigió filtros de subárbol, ficha legible, autorización desde CI y responsables sintéticos; esta revisión amplía AGENTS.md con el hallazgo para futuras tareas.
+- e8b7b23: precisó los fixtures de demostración E0–E3 e I0–I6, añadió aserciones para roles/colas/tickets y probó la referencia de prioridad/redundancia sin automatizarla.
+- da1658b: corrigió el resumen del harness para que refleje las 14 pruebas unitarias ejecutadas, además de las 2 de integración y 3 E2E.
 
 En docs/IA.md se explica por qué se proporcionó cada fuente por fase y cómo
 separar precedencia académica, documentación del proyecto y datos de entrada.

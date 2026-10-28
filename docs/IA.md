@@ -25,7 +25,7 @@ El harness actual combina AGENTS.md, compose.yaml, migraciones 001–006, valida
 
 Los comandos de aceptación son powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1 en Windows y sh scripts/service-desk-test.sh en Linux/macOS. Las pruebas unitarias, integración y navegador se ejecutan por separado o juntas mediante scripts/test-pyramid.ps1 [unit|integration|e2e|all] y sh scripts/test-pyramid.sh [unit|integration|e2e|all]. Los volúmenes aislados se conservan y el arranque no ejecuta down -v. El detalle de comandos, salidas y límites está en harness engineering (ia/03-harness-engineering.md) y PRUEBAS.md.
 
-La pirámide base del parcial anterior es 7/2/1 (70/20/10). Service Desk añadió seis pruebas unitarias y dos recorridos de navegador; la suite ampliada ejecuta 13/2/3. El resumen actualizado del harness presenta por separado la base, las ampliaciones y el total, sin atribuir porcentajes falsos al total ampliado.
+La pirámide base del parcial anterior es 7/2/1 (70/20/10). Service Desk añadió siete pruebas unitarias y dos recorridos de navegador; la suite ampliada ejecuta 14/2/3. El resumen actualizado del harness presenta por separado la base, las ampliaciones y el total, sin atribuir porcentajes falsos al total ampliado.
 
 ## 4. Loop Engineering
 

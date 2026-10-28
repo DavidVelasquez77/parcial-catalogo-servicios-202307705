@@ -20,7 +20,7 @@ FUENTES → CONTEXTO → PROMPT → CAMBIO → HARNESS → EVALUACIÓN/LOOP → 
 | 6 | [../IA.md](../IA.md) | resumen de fuentes, contextos, prompts, harness y grafos |
 | 7 | [../PRUEBAS.md](../PRUEBAS.md) | comandos, fechas, commits, resultados y fallos corregidos |
 
-`../evidencias/ciclo-harness.md` conserva la evidencia histórica del harness del catálogo del parcial 2. Sus P01–P11 y 7/2/1 describen aquella entrega, no sustituyen los P01–P18 ni las 13/2/3 pruebas actuales de Service Desk.
+`../evidencias/ciclo-harness.md` conserva la evidencia histórica del harness del catálogo del parcial 2. Sus P01–P11 y 7/2/1 describen aquella entrega, no sustituyen los P01–P18 ni las 14/2/3 pruebas actuales de Service Desk.
 
 ## Herramientas y límites de evidencia
 

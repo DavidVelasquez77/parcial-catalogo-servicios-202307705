@@ -501,7 +501,7 @@ sh scripts/test-pyramid.sh e2e
 sh scripts/test-pyramid.sh all
 ~~~
 
-El comando all ejecuta 13 unitarias, 2 integraciones y 3 E2E. La base histórica 7/2/1 conserva el protocolo 70/20/10; las pruebas adicionales de Service Desk se informan separadamente y el resumen no atribuye ese porcentaje al total ampliado. La aceptación P01–P18 se ejecuta con scripts/service-desk-test.ps1 o .sh.
+El comando all ejecuta 14 unitarias, 2 integraciones y 3 E2E. La base histórica 7/2/1 conserva el protocolo 70/20/10; las pruebas adicionales de Service Desk se informan separadamente y el resumen no atribuye ese porcentaje al total ampliado. La aceptación P01–P18 se ejecuta con scripts/service-desk-test.ps1 o .sh.
 
 ### Harness completo del catálogo original (histórico)
 

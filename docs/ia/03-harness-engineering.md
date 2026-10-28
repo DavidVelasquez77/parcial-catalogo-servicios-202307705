@@ -73,7 +73,7 @@ sh scripts/test-pyramid.sh e2e
 sh scripts/test-pyramid.sh all
 ```
 
-La pirámide original del catálogo mantiene una base 70/20/10: siete unitarias (tres de autenticación y cuatro de servicios), dos integraciones de importación y una E2E del catálogo. La ampliación Service Desk añade seis unitarias de reglas y dos recorridos E2E; por ello la ejecución completa actual observa **13 unitarias, 2 integraciones y 3 E2E**. El reporte presenta por separado la base 70/20/10, las ampliaciones y el total, sin afirmar que el total ampliado conserve esos porcentajes. Cada ejecución de integración/E2E prepara su propio conjunto; Playwright usa el puerto aislado 18081. Al terminar se paran los contenedores, pero el volumen aislado se conserva.
+La pirámide original del catálogo mantiene una base 70/20/10: siete unitarias (tres de autenticación y cuatro de servicios), dos integraciones de importación y una E2E del catálogo. La ampliación Service Desk añade siete unitarias de reglas y dos recorridos E2E; por ello la ejecución completa actual observa **14 unitarias, 2 integraciones y 3 E2E**. El reporte presenta por separado la base 70/20/10, las ampliaciones y el total, sin afirmar que el total ampliado conserve esos porcentajes. Cada ejecución de integración/E2E prepara su propio conjunto; Playwright usa el puerto aislado 18081. Al terminar se paran los contenedores, pero el volumen aislado se conserva.
 
 Controles adicionales desde el host si Node.js está instalado:
 

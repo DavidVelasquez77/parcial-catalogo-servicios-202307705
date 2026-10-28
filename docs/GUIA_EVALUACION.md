@@ -159,7 +159,7 @@ Esta matriz corresponde al catálogo del parcial 2 y se conserva como evidencia 
 - `acceptance.js` es una prueba de integración/extremo a extremo de la API: usa HTTP, sesión, guards, reglas de negocio y base de datos real dentro de Docker.
 - `smoke.js` es un recorrido corto de integración para login, logout, permisos y filtros.
 - `harness-docker.ps1/.sh` incluye la prueba operativa que reinicia los servicios y verifica el volumen persistente. `persistence-check.mjs` queda como atajo local opcional.
-- La pirámide base del catálogo contiene 7 unitarias, 2 integraciones y 1 E2E (70/20/10). La ampliación añade 6 unitarias y 2 recorridos de navegador; la suite completa actual ejecuta 13 unitarias, 2 integraciones y 3 E2E. La aceptación Service Desk P01–P18 es un control separado.
+- La pirámide base del catálogo contiene 7 unitarias, 2 integraciones y 1 E2E (70/20/10). La ampliación añade 7 unitarias y 2 recorridos de navegador; la suite completa actual ejecuta 14 unitarias, 2 integraciones y 3 E2E. La aceptación Service Desk P01–P18 es un control separado.
 
 ### Harness
 
@@ -171,7 +171,7 @@ El harness-docker.ps1/.sh conserva el flujo histórico del catálogo parcial 2 y
 
 ## Pirámide de pruebas 70/20/10
 
-El núcleo histórico del catálogo tiene 7 unitarias, 2 integraciones y 1 E2E (70/20/10). Service Desk añade 6 unitarias y 2 E2E; los comandos ejecutan las suites completas actuales y all presenta por separado la base, las ampliaciones y el total 13/2/3.
+El núcleo histórico del catálogo tiene 7 unitarias, 2 integraciones y 1 E2E (70/20/10). Service Desk añade 7 unitarias y 2 E2E; los comandos ejecutan las suites completas actuales y all presenta por separado la base, las ampliaciones y el total 14/2/3.
 
 ~~~powershell
 # Windows PowerShell
