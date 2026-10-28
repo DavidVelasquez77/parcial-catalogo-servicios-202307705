@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { BarChart3, Building2, CheckCircle2, ChevronRight, Database, Eye, FileSpreadsheet, LayoutDashboard, LogOut, Menu, Plus, RefreshCw, Search, Settings2, ShieldCheck, Users, X } from 'lucide-react';
 import { api, del, patch, post } from './api';
 import Level1Page from './Level1Page';
@@ -197,8 +197,10 @@ function ImportsPage() {
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null); const [checking, setChecking] = useState(true); const [page, setPage] = useState('dashboard');
+  const [initialTicketId,setInitialTicketId] = useState<number | null>(null);
+  const clearInitialTicket = useCallback(() => setInitialTicketId(null),[]);
   useEffect(() => { api<{ user: User }>('/auth/me').then((result) => setUser(result.user)).catch(() => undefined).finally(() => setChecking(false)); }, []);
-  const content = useMemo(() => { if (!user) return null; if (page === 'tickets') return <TicketsPage user={user} />; if (page === 'desk-metrics') return <DeskMetricsPage />; if (page === 'cmdb') return <CmdbPage user={user} />; if (page === 'knowledge') return <KnowledgePage user={user} />; if (page === 'queues' && user.role === 'ADMIN') return <QueuesPage user={user} />; if (page === 'services') return <ServicesPage user={user} />; if (page === 'level1' && user.role === 'ADMIN') return <Level1Page />; if (page === 'organization') return <OrganizationPage user={user} />; if (page === 'users' && user.role === 'ADMIN') return <UsersPage />; if (page === 'catalogs' && user.role === 'ADMIN') return <CatalogsPage />; if (page === 'imports' && user.role === 'ADMIN') return <ImportsPage />; return <DashboardPage setPage={setPage} />; }, [page, user]);
+  const content = useMemo(() => { if (!user) return null; if (page === 'tickets') return <TicketsPage user={user} initialTicketId={initialTicketId} onTicketOpened={clearInitialTicket} />; if (page === 'desk-metrics') return <DeskMetricsPage />; if (page === 'cmdb') return <CmdbPage user={user} onOpenTicket={(id) => {setInitialTicketId(id);setPage('tickets');}} />; if (page === 'knowledge') return <KnowledgePage user={user} />; if (page === 'queues' && user.role === 'ADMIN') return <QueuesPage user={user} />; if (page === 'services') return <ServicesPage user={user} />; if (page === 'level1' && user.role === 'ADMIN') return <Level1Page />; if (page === 'organization') return <OrganizationPage user={user} />; if (page === 'users' && user.role === 'ADMIN') return <UsersPage />; if (page === 'catalogs' && user.role === 'ADMIN') return <CatalogsPage />; if (page === 'imports' && user.role === 'ADMIN') return <ImportsPage />; return <DashboardPage setPage={setPage} />; }, [page, user, initialTicketId, clearInitialTicket]);
   if (checking) return <div className="loading-screen">Cargando aplicación...</div>; if (!user) return <Login onLogin={setUser} />;
   async function logout() { await post('/auth/logout', {}); setUser(null); }
   return <Layout user={user} onLogout={() => void logout()} page={page} setPage={setPage}>{content}</Layout>;

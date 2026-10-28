@@ -15,6 +15,25 @@ test('portal Service Desk: ticket, CMDB, indicadores y conocimientos', async ({ 
   await expect(ci.getByRole('heading', { level: 2 }).first()).toBeVisible();
   await ci.getByRole('button', { name: 'Cerrar' }).click();
 
+  await page.getByLabel('Categoría', { exact: true }).selectOption({ label: 'Hardware' });
+  await page.getByLabel('Estado del CI').selectOption('ACTIVE');
+  await page.getByLabel('Tipo de elemento').selectOption('true');
+  await expect(page.locator('.pagination')).toContainText('CI');
+  await page.getByLabel('Buscar CI').fill('CMDB-XLSX-5');
+  await page.getByRole('button', { name: 'Buscar', exact: true }).click();
+  const originalCiRow = page.locator('table tbody tr').filter({ hasText: 'CMDB-XLSX-5' });
+  await expect(originalCiRow).toBeVisible();
+  await originalCiRow.click();
+  const originalCi = page.getByRole('dialog', { name: 'Detalle de CI' });
+  await expect(originalCi).toContainText('Servidor de Aplicaciones');
+  await expect(originalCi).toContainText('Equipo de Infraestructura');
+  await expect(originalCi).toContainText('Trazabilidad del Excel');
+  const relatedTicket = originalCi.locator('section').filter({ hasText: 'Tickets relacionados' }).getByRole('button').first();
+  await expect(relatedTicket).toBeVisible();
+  await relatedTicket.click();
+  await expect(page.getByRole('dialog', { name: 'Ficha de ticket' })).toBeVisible();
+  await page.getByRole('dialog', { name: 'Ficha de ticket' }).getByRole('button', { name: 'Cerrar', exact: true }).first().click();
+
   await page.getByRole('button', { name: 'Tickets', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Tickets' })).toBeVisible();
   await page.getByRole('button', { name: 'Nuevo ticket' }).click();

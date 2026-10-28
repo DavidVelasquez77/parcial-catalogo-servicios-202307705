@@ -18,7 +18,7 @@ export class CmdbController {
   @Post('locations') @Roles('ADMIN') createLocation(@Body() body: Record<string, unknown>) { return this.service.createLocation(body); }
   @Patch('locations/:id') @Roles('ADMIN') updateLocation(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: Request & { user: AuthenticatedUser }) { return this.service.updateLocation(id, body, req.user.id); }
   @Get('items') items(@Query() query: Record<string, string | undefined>) { return this.service.items(query); }
-  @Get('items/:id') item(@Param('id', ParseIntPipe) id: number) { return this.service.item(id); }
+  @Get('items/:id') item(@Param('id', ParseIntPipe) id: number, @Req() req: Request & { user: AuthenticatedUser }) { return this.service.item(id, req.user); }
   @Post('items') @Roles('ADMIN') createItem(@Body() body: Record<string, unknown>, @Req() req: Request & { user: AuthenticatedUser }) { return this.service.createItem(body, req.user.id); }
   @Patch('items/:id') @Roles('ADMIN') updateItem(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: Request & { user: AuthenticatedUser }) { return this.service.updateItem(id, body, req.user.id); }
   @Post('relations') @Roles('ADMIN') createRelation(@Body() body: Record<string, unknown>) { return this.service.createRelation(body); }

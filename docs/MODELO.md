@@ -97,9 +97,24 @@ se conserva byte a byte.
 
 ## Campos añadidos por el proyecto
 
-`configuration_items.code`, `is_device`, `category_id`, `location_id`,
-`responsible_user_id`, `technical_attributes`, `synthetic_seed` y marcas
-de tiempo son campos operativos nuevos. No se presentan como campos del Excel.
+Estos campos implementan requisitos operativos y no se atribuyen a CMDB.xlsx:
+
+| Campo/estructura | Motivo y regla |
+|---|---|
+| `configuration_items.id`, `code` | Identificador interno y etiqueta única. Para las filas del Excel, el importador usa `CMDB-XLSX-<fila>`; para los sintéticos, `SYN-<semilla>-<secuencia>`. |
+| `category_id`, `ci_categories.parent_id` | Clasificación jerárquica mantenible. Hardware y Software proceden del Excel; cuatro subcategorías de Hardware son una decisión identificada como `PROJECT`. |
+| `is_device` | Permite contar equipos sin confundirlos con todas las categorías, tickets, relaciones u otros CI. |
+| `location_id`, `ci_locations` | Catálogo controlado opcional; el texto `location` de origen se conserva aunque no exista una ubicación normalizada equivalente. |
+| `responsible_user_id`, `responsible_label` | Referencia a una cuenta local existente o etiqueta de equipo cuando la fuente nombra un grupo y no una persona. La ficha presenta nombre/etiqueta, no el ID interno. |
+| `technical_attributes` | Objeto JSON para atributos técnicos que dependen de la clase, datos de procedencia y texto original de relaciones, cambios, documentación e incidentes que no puede convertirse en una relación verificable. |
+| `source_reference`, `synthetic_seed` | Trazabilidad de fila/rango del Excel o identidad reproducible del conjunto de prueba. La semilla solo identifica datos sintéticos. |
+| `created_at`, `updated_at` | Marcas de tiempo operativas; no reemplazan las fechas históricas escritas en CMDB.xlsx. |
+| `ci_relations`, `ci_services`, `ticket_ci`, `ci_history` | Relaciones técnicas, vínculo a servicios, vínculos con tickets e historial del sistema, respectivamente; son tablas añadidas por el proyecto. |
+
+El archivo original contiene valores de atributos y ejemplos en dos filas. La
+inspección del libro no encontró listas de opciones mediante validación de
+celdas; no se fabrican listas de origen. Las opciones de estado y clase que
+requiere la aplicación se identifican como catálogos o reglas del proyecto.
 
 ## Reglas de integridad
 
@@ -113,6 +128,48 @@ de tiempo son campos operativos nuevos. No se presentan como campos del Excel.
   la relación no prueba una interrupción real.
 - El generador solo cuenta `is_device=true` y la semilla identifica el
   conjunto. Una segunda ejecución con la misma semilla omite códigos existentes.
+
+## Generación, distribución y consulta de los 5,000 dispositivos
+
+`apps/api/src/scripts/generate-cmdb.ts` acepta `CMDB_SEED` y `CMDB_COUNT`.
+Con la semilla `EVAL2026` y cantidad `5000`, produce códigos deterministas
+`SYN-EVAL2026-000001` a `SYN-EVAL2026-005000`, y divide el conjunto en cuatro
+clases bajo la categoría original Hardware: servidor, estación de trabajo,
+equipo de red y almacenamiento (1,250 cada una). Todas usan como responsable
+la cuenta sintética controlada `admin.demo`; las ubicaciones, categorías y
+servicios también deben existir. Cada clase
+tiene su propio conjunto de atributos técnicos. No se exige ni se inventa
+una dirección IP universal.
+
+El informe JSON del comando distingue `created`, `skipped`, total para la
+semilla, cantidad por clase y cantidad agregada por nivel/categoría. Incluye
+categorías activas con cero dispositivos —por ejemplo Software— para que el
+reporte no omita una rama de la jerarquía. `COUNT` mide filas únicas de
+`configuration_items` con `is_device=true` y esa semilla; no cuenta relaciones,
+servicios, tickets, clases ni repeticiones de componentes. Si se repite la
+misma semilla, `ON CONFLICT(code) DO NOTHING` evita duplicados y vuelve a crear
+solo vínculos de servicio faltantes. Los registros antiguos de esa semilla con
+responsable distinto se actualizan a `admin.demo` dentro de la transacción,
+quedan en `ci_history` como `SYNTHETIC_OWNER_NORMALIZE` y se reflejan en
+`updated`; las repeticiones siguientes los cuentan como omitidos. Una cantidad
+mayor con la misma semilla extiende el rango; no borra equipos. El arranque
+normal tampoco borra datos sintéticos. El borrado se reserva a la limpieza
+explícita del volumen aislado de pruebas.
+
+La lista CMDB admite búsqueda por código/nombre, filtro por subárbol de
+clasificación, estado, ubicación y tipo de elemento, con paginación de 25.
+Filtrar por una categoría padre incluye todos sus descendientes. La ficha
+muestra la cadena de clasificación, campos originales del Excel, atributos
+técnicos, responsable con nombre legible, relaciones con CI navegables,
+servicios, historial y hasta 50 tickets que el usuario esté autorizado a
+consultar. Esto evita convertir la ficha del CI en una vía para leer tickets
+de colas ajenas.
+
+El recorrido de impacto invierte `DEPENDS_ON` y `HOSTED_ON` y atraviesa las
+aristas transitivamente para listar CI y servicios potencialmente afectados.
+No incluye `CONNECTED_TO`, porque conectividad por sí sola no prueba dependencia
+de servicio, ni `PARENT_OF`, que describe composición física. El resultado es
+una hipótesis de impacto para análisis, no una afirmación de caída efectiva.
 
 ## Verificación inicial en Docker aislado
 

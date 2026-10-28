@@ -46,6 +46,37 @@ por separado. La [transcripción y comparación de fuentes](docs/CMDB_JERARQUIA.
 explican por qué las cuatro subcategorías de los dispositivos sintéticos no
 se atribuyen al material docente.
 
+La CMDB permite buscar código/nombre, filtrar por categoría (incluye sus
+subcategorías), estado, ubicación y si se trata de un dispositivo; la tabla
+pagina 25 filas. Abre un CI para revisar la clasificación completa, atributos
+del Excel, responsable, servicios, relaciones navegables, bitácora y tickets
+relacionados que tu cuenta tenga permiso de consultar. El botón **Recorrer
+dependencias** examina relaciones `DEPENDS_ON` y `HOSTED_ON` en varios saltos y
+presenta servicios potencialmente afectados; es una ayuda de análisis, no una
+confirmación de interrupción.
+
+La generación admite semilla y cantidad. Para crear otra colección aislada,
+usa un valor nuevo en `CMDB_SEED`; repetir el mismo valor reutiliza las mismas
+etiquetas y no duplica CI. En la salida JSON, `byCategory` presenta las hojas
+y `byLevelAndCategory` agrega cada dispositivo a todos los niveles de su ruta
+de clasificación, incluyendo categorías con conteo cero. El campo `totalForSeed`
+solo cuenta dispositivos persistidos de esa semilla.
+
+```powershell
+docker compose exec -T -e CMDB_SEED=EVAL2026 -e CMDB_COUNT=5000 api node apps/api/dist/scripts/generate-cmdb.js
+```
+
+El mismo comando funciona en Linux y macOS. En una carga limpia, el conjunto
+`EVAL2026` se reparte en 1,250 servidores, 1,250 estaciones de trabajo, 1,250
+equipos de red y 1,250 unidades de almacenamiento, todos bajo Hardware. El
+reporte jerárquico muestra Hardware = 5,000 y Software = 0. Todos los CI
+sintéticos quedan asignados a la cuenta local de demostración `admin.demo`; el
+generador no usa cuentas personales que pudieran existir en otra instalación.
+Si detecta registros antiguos de la misma semilla con otro responsable, los
+actualiza una vez, informa `updated` y registra la normalización en el historial
+del CI. La carga no elimina ni modifica el Excel original ni borra conjuntos de
+otras semillas.
+
 ### Pruebas reproducibles
 
 Las suites de Service Desk usan el proyecto Compose separado `service-desk-suite-202307705`; no eliminan el volumen de la aplicación normal. En PowerShell:

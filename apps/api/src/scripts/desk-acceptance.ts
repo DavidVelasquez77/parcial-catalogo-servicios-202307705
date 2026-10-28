@@ -67,19 +67,81 @@ async function main() {
     const devices = await pool.query(`SELECT COUNT(*)::int AS total,COUNT(DISTINCT code)::int AS unique_codes
       FROM configuration_items WHERE is_device AND synthetic_seed='EVAL2026'`);
     eq(devices.rows[0].total,5000,'dispositivos');eq(devices.rows[0].unique_codes,5000,'códigos de dispositivo');
-    done('P03',devices.rows[0]);
+    const byCategory = await pool.query(`SELECT cc.code,COUNT(*)::int AS count
+      FROM configuration_items ci JOIN ci_categories cc ON cc.id=ci.category_id
+      WHERE ci.is_device AND ci.synthetic_seed='EVAL2026' GROUP BY cc.code ORDER BY cc.code`);
+    eq(byCategory.rows.length,4,'cuatro clases sintéticas de hardware');
+    truth(byCategory.rows.every((row) => row.count===1250),'distribución reproducible de 1,250 por clase');
+    const generatorIntegrity = await pool.query(`SELECT
+      COUNT(*) FILTER(WHERE ci.location_id IS NULL OR owner.id IS NULL)::int AS missing_reference,
+      COUNT(*) FILTER(WHERE owner.username IS DISTINCT FROM 'admin.demo')::int AS non_demo_owner,
+      COUNT(*) FILTER(WHERE NOT EXISTS(SELECT 1 FROM ci_services cs WHERE cs.ci_id=ci.id))::int AS missing_service,
+      COUNT(*) FILTER(WHERE ci.technical_attributes ? 'ipAddress')::int AS invented_required_ip,
+      COUNT(*) FILTER(WHERE NOT (
+        (cc.code='HW-SERVER' AND ci.technical_attributes ?& ARRAY['cpuCores','memoryGb','rackUnit']) OR
+        (cc.code='HW-WORKSTATION' AND ci.technical_attributes ?& ARRAY['cpuCores','memoryGb','formFactor']) OR
+        (cc.code='HW-NETWORK' AND ci.technical_attributes ?& ARRAY['ports','managed','protocol']) OR
+        (cc.code='HW-STORAGE' AND ci.technical_attributes ?& ARRAY['capacityTb','driveCount'])
+      ))::int AS invalid_class_attributes
+      FROM configuration_items ci JOIN ci_categories cc ON cc.id=ci.category_id
+      LEFT JOIN users owner ON owner.id=ci.responsible_user_id
+      WHERE ci.is_device AND ci.synthetic_seed='EVAL2026'`);
+    eq(generatorIntegrity.rows[0].missing_reference,0,'referencias existentes de ubicación y responsable');
+    eq(generatorIntegrity.rows[0].non_demo_owner,0,'responsable sintético sin personas reales');
+    eq(generatorIntegrity.rows[0].missing_service,0,'servicio existente asociado a cada dispositivo de muestra');
+    eq(generatorIntegrity.rows[0].invented_required_ip,0,'dirección IP no obligatoria');
+    eq(generatorIntegrity.rows[0].invalid_class_attributes,0,'atributos técnicos de acuerdo con la clase');
+    const categoryTree = await pool.query(`WITH RECURSIVE category_path(id,code,name,level_no,path) AS (
+        SELECT id,code,name,0,ARRAY[id] FROM ci_categories WHERE parent_id IS NULL AND active
+        UNION ALL SELECT child.id,child.code,child.name,parent.level_no+1,parent.path||child.id
+        FROM ci_categories child JOIN category_path parent ON child.parent_id=parent.id WHERE child.active
+      )
+      SELECT ancestor.level_no AS level,ancestor.code AS category_code,COUNT(DISTINCT ci.id)::int AS count
+      FROM category_path ancestor
+      LEFT JOIN category_path leaf ON ancestor.id=ANY(leaf.path)
+      LEFT JOIN configuration_items ci ON ci.category_id=leaf.id AND ci.is_device AND ci.synthetic_seed='EVAL2026'
+      WHERE ancestor.code=ANY(ARRAY['HARDWARE','SOFTWARE','HW-SERVER','HW-WORKSTATION','HW-NETWORK','HW-STORAGE']::text[])
+      GROUP BY ancestor.level_no,ancestor.code ORDER BY ancestor.level_no,ancestor.code`);
+    eq(categoryTree.rows.find((row) => row.category_code==='HARDWARE')?.count,5000,'recuento real por categoría raíz');
+    eq(categoryTree.rows.find((row) => row.category_code==='SOFTWARE')?.count,0,'categoría sin dispositivos muestra el cero');
+    done('P03',{...devices.rows[0],byCategory:byCategory.rows,byLevelAndCategory:categoryTree.rows});
 
     const categories = await status('/cmdb/categories',200,'GET',undefined,admin) as Array<Record<string,any>>;
     truth(categories.some((c) => c.sourceKind==='EXCEL' && c.name==='Hardware'),'raíz Hardware del Excel');
     truth(categories.some((c) => c.sourceKind==='EXCEL' && c.name==='Software'),'raíz Software del Excel');
     truth(categories.filter((c) => c.code?.startsWith('HW-')).every((c) => c.sourceKind==='PROJECT'),
       'subcategorías sintéticas identificadas como decisión del proyecto');
-    const sourceCi = await pool.query(`SELECT code,technical_attributes FROM configuration_items
-      WHERE code IN ('CMDB-XLSX-5','CMDB-XLSX-6') ORDER BY code`);
+    const sourceCi = await pool.query(`SELECT ci.*,category.name AS category_name FROM configuration_items ci
+      JOIN ci_categories category ON category.id=ci.category_id
+      WHERE ci.code IN ('CMDB-XLSX-5','CMDB-XLSX-6') ORDER BY ci.code`);
     eq(sourceCi.rows.length,2,'CI originales del Excel');
     truth(sourceCi.rows.every((row) => row.technical_attributes.sourceSheet==='CMDB'),'trazabilidad de origen CMDB');
     truth(sourceCi.rows.every((row) => !row.technical_attributes.originalParentsChildren),
       'J5:J6 no aporta relaciones padre/hijo');
+    const originalServer = sourceCi.rows.find((row) => row.name==='Servidor1');
+    truth(originalServer,'registro de Servidor1 del Excel');
+    eq(originalServer.category_name,'Hardware','tipo de CI original');
+    eq(originalServer.description,'Servidor de Aplicaciones','descripción original');
+    eq(originalServer.serial_number,'SN123456','serie original');
+    eq(originalServer.version,'v1.0','versión original');
+    truth(new Date(originalServer.acquired_on).toISOString().startsWith('2022-01-01'),'fecha de adquisición original');
+    eq(originalServer.location,'Sala de Servidores 1','ubicación física original');
+    eq(originalServer.responsible_label,'Equipo de Infraestructura','responsable original');
+    eq(originalServer.security_level,'Alto','nivel de seguridad original');
+    eq(originalServer.compliance_status,'Cumple','cumplimiento original');
+    eq(originalServer.configuration_status,'Aprobado','estado de configuración original');
+    eq(originalServer.license_number,'ABC123','licencia original');
+    truth(new Date(originalServer.license_expires_on).toISOString().startsWith('2023-01-01'),'vencimiento original');
+    eq(originalServer.technical_attributes.originalRelations,'Base de Datos1','relación original ambigua conservada');
+    eq(originalServer.technical_attributes.sourceChangeDate,'2022-02-01','fecha de cambio original conservada');
+    eq(originalServer.technical_attributes.sourceChangeDescription,'Actualización de Software','cambio original conservado');
+    eq(originalServer.technical_attributes.originalDocumentation,'[Enlace a Manual](url)','documentación original conservada');
+    eq(originalServer.technical_attributes.originalIncidentLinks,'[Enlace a Incidente](url)','enlace de incidente original conservado');
+    const originalDetail = await status(`/cmdb/items/${originalServer.id}`,200,'GET',undefined,admin);
+    eq(originalDetail.responsible_label,'Equipo de Infraestructura','detalle muestra el responsable de origen legible');
+    truth(originalDetail.classificationPath.some((item:Record<string,unknown>)=>item.name==='Hardware'),'detalle muestra la clasificación completa');
+    eq(originalDetail.technical_attributes.sourceSheet,'CMDB','ficha conserva la hoja de origen');
+    eq(originalDetail.technical_attributes.sourceRow,5,'ficha conserva la fila de origen');
     await status('/cmdb/categories',400,'POST',{code:`BAD-${stamp}`,name:'Huérfana',parentId:999999999},admin);
     const root = await status('/cmdb/categories',201,'POST',{code:`RT-${stamp}`,name:'Raíz de prueba'},admin);
     const child = await status('/cmdb/categories',201,'POST',{code:`CH-${stamp}`,name:'Hija de prueba',parentId:root.id},admin);
@@ -472,10 +534,24 @@ async function main() {
     truth(renamedCi.history.some((item:Record<string,unknown>)=>item.action==='LOCATION_RENAME'),
       'cambio de ubicación en historial');
     await status(`/cmdb/locations/${controlledLocation.id}`,409,'PATCH',{active:false},admin);
-    const changedCi = await status(`/cmdb/items/${testCi1.id}`,200,'PATCH',{name:'CI origen editado',isDevice:false},admin);
+    const changedCi = await status(`/cmdb/items/${testCi1.id}`,200,'PATCH',{
+      name:'CI origen editado',isDevice:false,acquiredOn:'2026-10-27',documentationUrl:'https://example.test/ci-doc',
+    },admin);
     eq(changedCi.is_device,false,'edición de CI no dispositivo');
+    truth(new Date(changedCi.acquired_on).toISOString().startsWith('2026-10-27'),'fecha de adquisición editable');
+    eq(changedCi.documentation_url,'https://example.test/ci-doc','documentación relacionada editable');
+    const clearedCi = await status(`/cmdb/items/${testCi1.id}`,200,'PATCH',{acquiredOn:null,documentationUrl:null},admin);
+    eq(clearedCi.acquired_on,null,'fecha de adquisición opcional se puede limpiar');
+    eq(clearedCi.documentation_url,null,'documentación opcional se puede limpiar');
     const ciDetail = await status(`/cmdb/items/${testCi1.id}`,200,'GET',undefined,admin);
     truth(Array.isArray(ciDetail.classificationPath) && ciDetail.classificationPath.length===2,'ruta jerárquica del CI');
+    const linkedTicket = await create('INCIDENT',{incidentCategory:'I1'},{ciIds:[Number(testCi1.id)]});
+    const linkedCiDetail = await status(`/cmdb/items/${testCi1.id}`,200,'GET',undefined,admin);
+    truth(linkedCiDetail.tickets.some((ticket:Record<string,unknown>) => Number(ticket.id)===Number(linkedTicket.id)),
+      'historial de tickets consultable desde el CI');
+    const requesterCiDetail = await status(`/cmdb/items/${testCi1.id}`,200,'GET',undefined,requester);
+    truth(!requesterCiDetail.tickets.some((ticket:Record<string,unknown>) => Number(ticket.id)===Number(linkedTicket.id)),
+      'ficha del CI no revela tickets de colas no autorizadas');
     await status('/cmdb/services',201,'POST',{ciId:testCi1.id,serviceId},admin);
     await status('/cmdb/relations',201,'POST',{fromCiId:testCi1.id,toCiId:testCi2.id,relationType:'DEPENDS_ON'},admin);
     await status('/cmdb/relations',409,'POST',{fromCiId:testCi2.id,toCiId:testCi1.id,relationType:'DEPENDS_ON'},admin);
@@ -483,11 +559,15 @@ async function main() {
     await status('/cmdb/relations',201,'POST',{fromCiId:testCi1.id,toCiId:testCi3.id,relationType:'PARENT_OF'},admin);
     await status('/cmdb/relations',409,'POST',{fromCiId:testCi2.id,toCiId:testCi3.id,relationType:'PARENT_OF'},admin);
     await status('/cmdb/relations',409,'POST',{fromCiId:testCi3.id,toCiId:testCi1.id,relationType:'PARENT_OF'},admin);
+    await status('/cmdb/relations',201,'POST',{fromCiId:testCi1.id,toCiId:testCi2.id,relationType:'CONNECTED_TO'},admin);
+    await status('/cmdb/relations',201,'POST',{fromCiId:testCi2.id,toCiId:testCi1.id,relationType:'CONNECTED_TO'},admin);
+    await status('/cmdb/relations',201,'POST',{fromCiId:testCi3.id,toCiId:testCi1.id,relationType:'DEPENDS_ON'},admin);
     const parents = await pool.query(`SELECT COUNT(*)::int AS total FROM ci_relations
       WHERE to_ci_id=$1 AND relation_type='PARENT_OF'`,[testCi3.id]);
     eq(parents.rows[0].total,1,'componente con padre único');
     const impact = await status(`/cmdb/items/${testCi2.id}/impact`,200,'GET',undefined,admin);
     truth(impact.potentiallyAffected.some((item:Record<string,any>) => Number(item.id)===Number(testCi1.id)),'recorrido de dependencia');
+    truth(impact.potentiallyAffected.some((item:Record<string,any>) => Number(item.id)===Number(testCi3.id)),'recorrido transitivo de dependencias');
     truth(impact.potentiallyAffected.some((item:Record<string,any>) => Number(item.service_id)===serviceId),'servicio potencialmente afectado');
     done('P14');
 
@@ -519,7 +599,16 @@ async function main() {
     const page2 = await status('/cmdb/items?page=2&pageSize=25',200,'GET',undefined,admin);
     truth(page1.total>=5000,'paginación sobre 5000');eq(page1.data.length,25,'25 por página');
     truth(page1.data[0].id!==page2.data[0].id,'páginas diferentes');
-    done('P16',{observedMs,environment:'Docker Compose, API interna, PostgreSQL 16-alpine'});
+    const hardwareRoot = await pool.query('SELECT id FROM ci_categories WHERE code=$1',['HARDWARE']);
+    const hardwarePage = await status(`/cmdb/items?page=1&pageSize=25&categoryId=${hardwareRoot.rows[0].id}&isDevice=true&status=ACTIVE`,200,'GET',undefined,admin);
+    truth(hardwarePage.total>=5000,'filtro de categoría raíz incluye sus subcategorías');
+    const searched = await status('/cmdb/items?search=SYN-EVAL2026-000001&isDevice=true',200,'GET',undefined,admin);
+    eq(searched.total,1,'búsqueda por código en el conjunto de dispositivos');
+    const locationId = Number(hardwarePage.data[0].locationId);
+    const locationPage = await status(`/cmdb/items?locationId=${locationId}&isDevice=true`,200,'GET',undefined,admin);
+    truth(locationPage.total>0,'filtro por ubicación paginable');
+    done('P16',{observedMs,filteredCategoryTotal:hardwarePage.total,searchTotal:searched.total,
+      locationTotal:locationPage.total,environment:'Docker Compose, API interna, PostgreSQL 16-alpine'});
 
     const metricTicket = await create('INCIDENT',{incidentCategory:'I2'});
     await pool.query(`UPDATE tickets SET created_at=NOW()-INTERVAL '2 hours',

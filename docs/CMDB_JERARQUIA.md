@@ -17,7 +17,7 @@ Fuentes sin editar:
 | Lección 22, diapositiva 12 | mismo PDF, página 12 | CI clasificados y rastreados; CMS puede integrar varias CMDB físicas. |
 | Lección 22, explicación oral | `data/fuentes/transcripciónTransición.md`, 21:37–22:01 y 27:11–32:19 | Un CI componente pertenece a un solo servidor; SKMS → CMS → CMDB, con una CMDB por centro de datos o centralizada según la decisión de la organización. |
 | Lección 25, aclaración oral | `data/fuentes/transcripciónServiceDesck.md`, 10:26–11:16 | Para el práctico, la jerarquía de CMDB alude a los campos, tablas, CRUD e integridad referencial; no exige implementar una KDB de errores conocidos. |
-| Excel original | `data/fuentes/CMDB.xlsx`, hoja `CMDB`, B4:U4 y B5:U6 | Veinte columnas, dos CI de ejemplo y tipos `Hardware`/`Software`. La columna `Padres/Hijos` está vacía en J5:J6. |
+| Excel original | `data/fuentes/CMDB.xlsx`, hoja `CMDB`, encabezados B4:U4, registros B5:U6; rango nombrado `cmdb` = B4:U8 | Veinte columnas, dos CI de ejemplo y tipos `Hardware`/`Software`. La columna `Padres/Hijos` está vacía en J5:J6. La inspección del libro no encontró rangos con validación de celdas que contengan listas de opciones. |
 | Tarea del parcial 3 | `data/fuentes/Tarea_Service_Desk.pdf`, apartados 2 y 8 | Exige clasificación jerárquica, relaciones técnicas separadas, 5,000 dispositivos, ciclos controlados y recorrido de impacto. Son requisitos de la tarea, no texto de las lecciones. |
 
 Las transcripciones son apoyo para localizar las explicaciones orales; las

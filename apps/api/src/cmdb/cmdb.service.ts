@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { AuthenticatedUser } from '../auth/auth.types';
 import { DatabaseService } from '../database/database.service';
 
 const relationTypes = ['DEPENDS_ON', 'CONNECTED_TO', 'HOSTED_ON', 'PARENT_OF'] as const;
@@ -128,30 +129,64 @@ export class CmdbService {
     const categoryId = query.categoryId ? positiveId(query.categoryId, 'Categoría') : null;
     const status = query.status?.trim() || null;
     if (status && !itemStatuses.includes(status as typeof itemStatuses[number])) throw new BadRequestException('Estado no válido.');
+    const deviceFilter = query.isDevice?.trim() || null;
+    if (deviceFilter && !['true','false'].includes(deviceFilter)) throw new BadRequestException('El filtro de dispositivo debe ser true o false.');
+    const isDevice = deviceFilter === null ? null : deviceFilter === 'true';
+    const locationId = query.locationId ? positiveId(query.locationId, 'Ubicación') : null;
+    const categoryScope = `WITH RECURSIVE category_scope(id) AS (
+      SELECT id FROM ci_categories WHERE $2::int IS NOT NULL AND id=$2
+      UNION
+      SELECT child.id FROM ci_categories child JOIN category_scope parent ON child.parent_id=parent.id
+    )`;
     const where = `WHERE ($1='' OR ci.code ILIKE '%'||$1||'%' OR ci.name ILIKE '%'||$1||'%')
-      AND ($2::int IS NULL OR ci.category_id=$2)
-      AND ($3::text IS NULL OR ci.status=$3)`;
-    const values = [search, categoryId, status];
+      AND ($2::int IS NULL OR ci.category_id IN (SELECT id FROM category_scope))
+      AND ($3::text IS NULL OR ci.status=$3)
+      AND ($4::boolean IS NULL OR ci.is_device=$4)
+      AND ($5::int IS NULL OR ci.location_id=$5)`;
+    const values = [search, categoryId, status, isDevice, locationId];
     const [count, rows] = await Promise.all([
-      this.db.query(`SELECT COUNT(*)::int AS total FROM configuration_items ci ${where}`, values),
-      this.db.query(`SELECT ci.id,ci.code,ci.name,ci.status,ci.location,
+      this.db.query(`${categoryScope} SELECT COUNT(*)::int AS total FROM configuration_items ci ${where}`, values),
+      this.db.query(`${categoryScope} SELECT ci.id,ci.code,ci.name,ci.status,ci.location,ci.location_id AS "locationId",
         ci.category_id AS "categoryId",cc.name AS "categoryName",
-        ci.responsible_user_id AS "responsibleUserId"
+        ci.responsible_user_id AS "responsibleUserId",ci.responsible_label AS "responsibleLabel",
+        owner.name AS "responsibleUserName",ci.is_device AS "isDevice"
         FROM configuration_items ci JOIN ci_categories cc ON cc.id=ci.category_id
-        ${where} ORDER BY ci.id LIMIT $4 OFFSET $5`, [...values, pageSize, (page - 1) * pageSize]),
+        LEFT JOIN users owner ON owner.id=ci.responsible_user_id
+        ${where} ORDER BY ci.id LIMIT $6 OFFSET $7`, [...values, pageSize, (page - 1) * pageSize]),
     ]);
     return { data: rows.rows, total: count.rows[0].total, page, pageSize };
   }
 
-  async item(id: number) {
-    const result = await this.db.query(`SELECT ci.*,cc.code AS category_code,cc.name AS category_name
-      FROM configuration_items ci JOIN ci_categories cc ON cc.id=ci.category_id WHERE ci.id=$1`, [id]);
+  async item(id: number, user: AuthenticatedUser) {
+    const result = await this.db.query(`SELECT ci.*,cc.code AS category_code,cc.name AS category_name,
+      owner.name AS responsible_user_name,owner.username AS responsible_username,location.code AS location_code
+      FROM configuration_items ci JOIN ci_categories cc ON cc.id=ci.category_id
+      LEFT JOIN users owner ON owner.id=ci.responsible_user_id
+      LEFT JOIN ci_locations location ON location.id=ci.location_id
+      WHERE ci.id=$1`, [id]);
     if (!result.rows[0]) throw new NotFoundException('CI no encontrado.');
+    const allTickets = user.roles.includes('ADMIN') || user.roles.includes('CONSULTA');
     const [relations, services, tickets, history, classification] = await Promise.all([
-      this.db.query('SELECT * FROM ci_relations WHERE from_ci_id=$1 OR to_ci_id=$1 ORDER BY id', [id]),
+      this.db.query(`SELECT relation.*,source.code AS from_code,source.name AS from_name,
+        target.code AS to_code,target.name AS to_name
+        FROM ci_relations relation
+        JOIN configuration_items source ON source.id=relation.from_ci_id
+        JOIN configuration_items target ON target.id=relation.to_ci_id
+        WHERE relation.from_ci_id=$1 OR relation.to_ci_id=$1 ORDER BY relation.id`, [id]),
       this.db.query(`SELECT s.id,s.code,s.name FROM ci_services cs JOIN service_level_2 s ON s.id=cs.service_id WHERE cs.ci_id=$1`, [id]),
-      this.db.query(`SELECT t.id,t.number,t.title,t.state FROM ticket_ci tc JOIN tickets t ON t.id=tc.ticket_id WHERE tc.ci_id=$1 ORDER BY t.created_at DESC LIMIT 50`, [id]),
-      this.db.query('SELECT * FROM ci_history WHERE ci_id=$1 ORDER BY created_at DESC LIMIT 100', [id]),
+      this.db.query(`SELECT t.id,t.number,t.title,t.state,t.created_at AS "createdAt",
+        last_action.action AS "lastAction",last_action.created_at AS "lastActivityAt"
+        FROM ticket_ci tc JOIN tickets t ON t.id=tc.ticket_id
+        LEFT JOIN LATERAL (SELECT h.action,h.created_at FROM ticket_history h WHERE h.ticket_id=t.id
+          ORDER BY h.created_at DESC,h.id DESC LIMIT 1) last_action ON TRUE
+        WHERE tc.ci_id=$1 AND ($2::boolean OR t.requester_id=$3 OR EXISTS(
+          SELECT 1 FROM queue_grants grant_row WHERE grant_row.queue_id=t.queue_id AND grant_row.can_view
+            AND (grant_row.user_id=$3 OR grant_row.role=ANY($4::text[]))))
+        ORDER BY t.created_at DESC LIMIT 50`, [id,allTickets,user.id,user.roles]),
+      this.db.query(`SELECT history.id,history.action,history.old_values,history.new_values,
+        history.description,history.created_at,owner.name AS actor_name
+        FROM ci_history history LEFT JOIN users owner ON owner.id=history.actor_id
+        WHERE history.ci_id=$1 ORDER BY history.created_at DESC,history.id DESC LIMIT 100`, [id]),
       this.db.query(`WITH RECURSIVE chain AS (
         SELECT id,code,name,parent_id,0 AS depth FROM ci_categories WHERE id=$1
         UNION ALL SELECT p.id,p.code,p.name,p.parent_id,c.depth+1
@@ -254,10 +289,10 @@ export class CmdbService {
         WHERE id=$18 RETURNING *`,
         [body.name === undefined ? old.name : textValue(body.name, 'Nombre'),categoryId,
           body.description ?? old.description,body.serialNumber ?? old.serial_number,
-          body.version ?? old.version,body.acquiredOn ?? old.acquired_on,status,
+          body.version ?? old.version,body.acquiredOn === undefined ? old.acquired_on : body.acquiredOn,status,
           location,
           responsibleUserId,responsibleLabel,
-          body.documentationUrl ?? old.documentation_url,body.securityLevel ?? old.security_level,
+          body.documentationUrl === undefined ? old.documentation_url : body.documentationUrl,body.securityLevel ?? old.security_level,
           body.complianceStatus ?? old.compliance_status,body.configurationStatus ?? old.configuration_status,
           body.licenseNumber ?? old.license_number,body.licenseExpiresOn ?? old.license_expires_on,
           JSON.stringify(technical),id,body.isDevice === undefined ? old.is_device : body.isDevice === true,locationId]);
