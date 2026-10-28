@@ -47,6 +47,16 @@ AGENTS.md. Los archivos originales se conservan sin modificación.
 6. Una dependencia permite enumerar servicios potencialmente afectados, no certificar una caída.
 7. Las fuentes docentes no dictan las cantidades o pruebas nuevas del enunciado; las reglas de la tarea se implementan como requisitos del proyecto.
 
+## Ejecución y seguridad
+
+- Compose construye API, web y E2E desde `apps/api/Dockerfile`, `apps/web/Dockerfile` y `e2e/Dockerfile`. `.dockerignore` excluye `.env*`, dependencias y compilados; Git ignora los `.env*` locales y mantiene versionado `.env.example`.
+- Solo se publica Nginx en el puerto 8080 por defecto. PostgreSQL 16 y la API solo escuchan dentro de la red Compose. `postgres_data` y `uploads_data` sobreviven al apagado normal.
+- La API espera la salud de PostgreSQL y aplica migraciones 001–006 antes de escuchar. Los comandos de seeds, importación, verificación y pruebas se ejecutan dentro de contenedores.
+- La sesión usa PostgreSQL, cookie `HttpOnly`/`SameSite=Lax`, regeneración al iniciar sesión, destrucción al cerrar y expiración de ocho horas. Producción activa cookie `Secure`, confía únicamente en el proxy Nginx y rechaza secretos y contraseñas de demostración.
+- Los adjuntos se limitan a 5 MiB y tipos con firma admitida; se guardan por UUID fuera del sitio estático y requieren autorización del ticket para descargarse.
+- Claim, asignación, transferencia, escalamiento, transición, aprobación y carga de adjunto usan transacción; las filas de ticket se bloquean para serializar operaciones concurrentes.
+- Las cuentas de `.env.example` son datos de evaluación local, no credenciales para una instancia expuesta. No ejecutar `down -v` sobre el entorno que se desea conservar.
+
 Los esquemas completos están en docs/MODELO.md y docs/PROCESOS.md; la
 transcripción y el mapeo de las veinte columnas de CMDB.xlsx están en
 docs/CMDB_JERARQUIA.md.

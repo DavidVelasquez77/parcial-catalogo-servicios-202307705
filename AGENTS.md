@@ -282,3 +282,17 @@ service-desk.md contiene glosario, fuentes, modelo, reglas, decisiones y
 comandos; docs/IA.md enlaza los tres commits de contexto seleccionados. El
 cambio de documentación y el resumen del script deben verificarse con
 scripts/test-pyramid.ps1 all, lint, typecheck y git diff --check.
+
+## Actualización de contexto 11: ejecución y seguridad del despliegue (27 de octubre de 2026)
+
+La revisión del punto 10 confirmó Compose, Dockerfiles por servicio, migración
+automática 001–006, PostgreSQL saludable, puertos internos, volúmenes de datos
+y adjuntos, y comandos de operación desde contenedores. Se corrigió el
+`trust proxy` de producción detrás de Nginx, se añadieron rechazos al arrancar
+con secretos o contraseñas demo y se amplió `.dockerignore`/`.gitignore` para
+excluir todas las variantes `.env*`. README y RESOLUCION explican que las
+credenciales del ejemplo son solo locales. P05 verifica validación y permisos
+de adjuntos; P07 comprueba la carrera de claim; P18 comprueba persistencia
+después de reiniciar; `docker compose up --build -d` se ejecutó con HTTP 200.
+Cambios en `main.ts`, archivos ignore y documentación: repetir typecheck,
+lint, audit:secrets, `docker compose config --quiet` y aceptación aislada.

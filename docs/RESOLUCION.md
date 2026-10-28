@@ -83,6 +83,9 @@ flowchart LR
     W -->|/api| A[NestJS API]
     A -->|SQL parametrizado| D[(PostgreSQL 16)]
     A -->|solo lectura| X[data/CatalogoServicios.xlsx]
+    A -->|solo lectura| C[data/fuentes/CMDB.xlsx]
+    A -->|archivos con UUID| U[(uploads_data)]
+    D --> P[(postgres_data)]
     A --> V[seed, import, verify, smoke]
     V --> D
 ~~~
@@ -108,15 +111,18 @@ Ubicación: apps/api/src.
 - RolesGuard para exigir ADMIN cuando la operación modifica datos.
 - Servicios de dominio para autenticación, organización, usuarios, catálogos, servicios e importaciones.
 - Validaciones en el servidor; la interfaz no es la única barrera.
+- Las rutas Service Desk verifican sesión, rol, grants de cola y propiedad del ticket en la API.
+- Las transiciones críticas registran cambio e historial dentro de una transacción PostgreSQL.
 
 #### Base de datos
 
 Ubicación: database/migrations/001_init.sql.
 
 - PostgreSQL 16.
-- Migración versionada y registrada en schema_migrations.
+- Migraciones versionadas 001–006 y registradas en schema_migrations antes de iniciar NestJS.
 - Restricciones de claves foráneas, unicidad, estado y umbrales.
 - Volumen Docker llamado postgres_data.
+- Las sesiones HTTP se almacenan en PostgreSQL con `connect-pg-simple`.
 
 #### Infraestructura
 
@@ -124,7 +130,9 @@ Ubicación: database/migrations/001_init.sql.
 - La API espera a que PostgreSQL esté healthy.
 - El contenedor API migra antes de iniciar NestJS.
 - Nginx entrega el build de React y reenvía /api al backend.
-- data/CatalogoServicios.xlsx se monta en el API en modo de solo lectura.
+- Solo el puerto web se publica al host; PostgreSQL y la API quedan en la red Compose.
+- Los Excel fuente se montan en el API en modo de solo lectura; los volúmenes `postgres_data` y `uploads_data` preservan datos y adjuntos.
+- Compose utiliza los Dockerfiles `apps/api/Dockerfile`, `apps/web/Dockerfile` y `e2e/Dockerfile`; `.dockerignore` excluye `.env*`.
 
 ## 6. Modelo de datos
 
@@ -274,6 +282,16 @@ POST /api/auth/logout destruye la sesión. La misma cookie no puede reutilizarse
 ### Información protegida
 
 La API nunca devuelve password_hash en los listados de usuarios. Las contraseñas demo se generan localmente y no se publican como secretos de producción.
+
+### Protección de sesión y adjuntos en la ampliación Service Desk
+
+`express-session` usa `connect-pg-simple`; las sesiones permanecen en PostgreSQL, no en memoria del proceso. La cookie es `HttpOnly`, `SameSite=Lax`, tiene vigencia de ocho horas y solo se marca `Secure` cuando `NODE_ENV=production`. El login regenera el identificador de sesión y el logout destruye el registro. En producción, el API confía en un salto de proxy, correspondiente al Nginx de Compose, para que Express interprete correctamente HTTPS y emita la cookie `Secure`. Además, la API no inicia en producción si se conserva la clave de sesión de muestra, si esta tiene menos de 32 caracteres, si se conserva la contraseña PostgreSQL demo o si alguna contraseña demo permanece sin cambiar. El modo del repositorio está pensado para evaluación local y no debe exponerse a una red con las credenciales de `.env.example`.
+
+Cada contraseña configurada para cuentas de evaluación también debe tener al menos 12 caracteres antes de habilitar producción.
+
+La validación del servidor combina `ValidationPipe`, validaciones de dominio, consultas SQL parametrizadas y restricciones de PostgreSQL. Los adjuntos de tickets se limitan a 5 MiB y PDF, PNG, JPEG o texto plano. Se comprueba el tipo declarado y su firma básica; el archivo se guarda con nombre UUID en `uploads_data`, fuera del directorio web, y se descarga como binario adjunto después de autorizar la lectura del ticket. La carga escribe archivo, metadatos e historial; si falla la transacción SQL, el archivo recién creado se elimina. No se incorpora análisis antivirus.
+
+Las operaciones sensibles de colas y tickets usan transacciones PostgreSQL y bloquean la fila con `FOR UPDATE`: claim, asignación, transferencia, escalamiento, cambio de estado, aprobación y registro de adjunto. Así, el cambio y su entrada de auditoría se confirman juntos y dos agentes no pueden reclamar el mismo ticket.
 
 ## 10. Reglas de negocio
 
@@ -490,6 +508,11 @@ La corrección fue ajustar el script de migración a la ruta real del contenedor
 | SE.12 | regla canónica y observaciones | tres servicios REVIEW | docs/IMPORTACION.md |
 | Persistencia | volumen postgres_data | reinicio sin pérdida | compose.yaml |
 | Docker | Dockerfiles y Compose | build y ps | compose.yaml |
+| Service Desk | migraciones 001–006, API y web en Compose | P01–P18 y pirámide de pruebas en proyecto aislado | compose.yaml, scripts/service-desk-test.*, scripts/test-pyramid.* |
+| Sesión, credenciales y secretos | PostgreSQL session store, flags de cookie, guard de producción y archivos `.env*` excluidos | login/logout en P01; guard de producción rechaza valores demo; auditoría de secretos | apps/api/src/main.ts, `.dockerignore`, `.gitignore`, P01 |
+| Adjuntos | límite, MIME/firma, UUID y descarga autorizada | P05: carga válida 201, firma falsa 400, descarga anónima 401 y autorizada 200 | DeskController, DeskService, P05 |
+| Concurrencia e historial | transacciones y `FOR UPDATE` | P07: dos claims simultáneos producen un éxito y un conflicto | DeskService, P07 |
+| Recuperación | volúmenes `postgres_data` y `uploads_data`; `down` no elimina volúmenes | P18 tras reinicio de DB/API | compose.yaml, P18 |
 | Context engineering | AGENTS, contexto versionado y guía de fase | revisión de actualizaciones | docs/contexto, docs/ia/01-context-engineering.md |
 | Prompt engineering | cinco prompts finales XML e iteraciones | revisión documental | docs/prompts, docs/ia/02-prompt-engineering.md |
 | Harness engineering | scripts y controles | harness Docker-only, aceptación y persistencia en verde | scripts/harness-docker.ps1/.sh, acceptance.ts |

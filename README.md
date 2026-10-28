@@ -105,6 +105,41 @@ docker compose start
 
 `docker compose down` también conserva los datos. **Solo para reiniciar una evaluación desechable**, `docker compose -p service-desk-suite-202307705 down -v` elimina el volumen aislado de pruebas; nunca use `down -v` sobre la instalación que quiere conservar. Los adjuntos persisten en `uploads_data` y PostgreSQL en `postgres_data`.
 
+### Arquitectura y controles de seguridad de ejecución
+
+Compose construye el API desde `apps/api/Dockerfile`, la interfaz desde
+`apps/web/Dockerfile` y los recorridos de navegador desde `e2e/Dockerfile`.
+`.dockerignore` excluye dependencias locales, compilados y cualquier archivo
+`.env*` del contexto de construcción. El archivo versionado `.env.example`
+contiene valores de evaluación, no secretos de producción; `.env` permanece
+ignorado por Git. Solo se publica el puerto web (8080 por defecto); PostgreSQL
+y el puerto 3000 del API quedan dentro de la red Compose.
+
+PostgreSQL 16 tiene un healthcheck y la API espera a que la base esté saludable;
+antes de iniciar NestJS aplica las migraciones versionadas 001–006. Los
+volúmenes `postgres_data` y `uploads_data` conservan base y adjuntos tras
+`docker compose stop`, `start` o `down` seguido de `up`. Las rutas de semilla,
+importación, generación y pruebas anteriores ejecutan Node dentro de los
+contenedores; no exigen instalar Node.js ni PostgreSQL en el host.
+
+La sesión se guarda en PostgreSQL, expira tras ocho horas y usa cookie
+`HttpOnly` y `SameSite=Lax`; el login regenera el identificador y el logout
+destruye la sesión. En `NODE_ENV=production`, la cookie también lleva `Secure`,
+el API confía en el único proxy Nginx del Compose y el arranque rechaza la
+clave de sesión de demostración o menor de 32 caracteres, la contraseña
+PostgreSQL de demostración o menor de 16 caracteres y contraseñas de evaluación
+sin reemplazar o menores de 12 caracteres. Ese modo
+requiere HTTPS en el proxy. Las cuentas de `.env.example` son solo para la
+evaluación local y deben reemplazarse antes de cualquier exposición en red.
+
+El API valida campos y reglas de negocio además de las restricciones de
+PostgreSQL. Los adjuntos aceptan PDF, PNG, JPEG o texto plano de hasta 5 MiB;
+se comprueba MIME y firma, se asigna un nombre aleatorio fuera del directorio
+público y la descarga vuelve a validar la sesión y visibilidad del ticket.
+`claim`, asignación, transferencia, transición y aprobación usan transacciones
+y bloqueos de fila; el historial se registra en la misma transacción para
+evitar actualizaciones concurrentes sin trazabilidad.
+
 ---
 
 ## Documentación histórica del catálogo original
