@@ -122,6 +122,9 @@ export class DeskService {
       if (estimate === undefined || estimate === null) {
         throw new BadRequestException('Registra la duración estimada para justificar la categoría I1-I5.');
       }
+      if (!Number.isSafeInteger(Number(estimate)) || Number(estimate) < 1) {
+        throw new BadRequestException('La duración estimada debe ser un número entero de minutos mayor que cero.');
+      }
       const suggestion = suggestIncidentCategory({securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:Number(estimate)});
       if (suggestion.category !== category) {
         throw new BadRequestException(`La duración estimada corresponde a ${suggestion.category ?? 'revisión manual'}, no a ${category}.`);

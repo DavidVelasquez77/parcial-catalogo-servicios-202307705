@@ -275,6 +275,11 @@ async function main() {
       processData:{incidentCategory:'I1',interruptsOrDegrades:true,estimatedMinutes:600},
     },admin);
     await status('/desk/tickets',400,'POST',{
+      title:'Incidente con duración cero',description:'Una interrupción requiere duración positiva',serviceId,
+      queueId:queueId('INCIDENT'),noCiReason:'No aplica',
+      processData:{incidentCategory:'I1',interruptsOrDegrades:true,estimatedMinutes:0},
+    },admin);
+    await status('/desk/tickets',400,'POST',{
       title:'Cambio sin riesgo',description:'Prueba de validación del proceso',serviceId,
       queueId:queueId('CHANGE'),noCiReason:'No aplica',processData:{},ciIds:[ci1],
     },admin);
