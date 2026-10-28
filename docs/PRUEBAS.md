@@ -259,3 +259,36 @@ como “conservar valor”. Se corrigió el manejo explícito de `null` y P14 ah
 prueba tanto su establecimiento como su eliminación. Ninguno de estos fallos
 se introdujo deliberadamente. Las pruebas usaron un proyecto y un volumen
 aislados; la reconstrucción normal final no ejecutó `down -v` ni eliminó datos.
+
+## Apartado 9: aplicación verificable de las cuatro ingenierías (27 de octubre de 2026)
+
+La documentación y el ajuste de salida del harness quedaron versionados en el
+commit `f245cb1` (documentación y resumen de la suite). Los cambios funcionales
+a los que apuntan estas evidencias están en los commits indicados en cada
+práctica. La suite se ejecutó antes del commit sobre el mismo contenido de
+scripts y código; luego se registró aquí el resultado exacto. Los detalles y
+límites se enlazan desde [docs/IA.md](IA.md) y [docs/ia/README.md](ia/README.md).
+
+| Práctica | Evidencia y vínculo con cambios reales |
+|---|---|
+| Prompt Engineering | Ocho prompts operativos, para requisitos, CMDB, modelo, colas, procesos, seguridad, grafos y pruebas, están en [service-desk.md](prompts/service-desk.md). Cada ficha incluye objetivo, contexto, restricciones, salida esperada y aceptación, además de herramienta/modelo y periodo de uso. La ficha informa honestamente que los bloques son resúmenes editados de instrucciones aplicadas, no transcripciones literales, y que Codex no expuso la versión menor del modelo. Dos iteraciones enlazan defectos observados y resultados: contrato HTTP de transferencia (P08) y tipo SQL de transición (P09), relacionados con `fe4ea55`. |
+| Context Engineering | `AGENTS.md`, el contexto maestro y [contexto de Service Desk](contexto/06-contexto-service-desk.md) reúnen fuentes, glosario, modelo, decisiones, reglas y comandos. [IA.md](IA.md) registra tres actualizaciones motivadas con commits distintos: alcance y precedencia (`3bb3d72`), hallazgos CMDB (`623e949`) y reglas de verificación (`85d913f`). También explica qué documentos se entregaron por fase y que Excel, PDF, capturas y logs se tratan como datos, no como instrucciones para el agente. |
+| Harness Engineering | [Harness](ia/03-harness-engineering.md) describe los scripts de preparación, migración, importación, generación repetible de 5,000 CI, P01–P18, pirámide, secretos y límites. La aceptación usa un proyecto Compose aislado y reinicia PostgreSQL sin borrar su volumen; el arranque normal no borra los datos. La aplicación no necesita modelos, claves ni suscripción de IA. |
+| Loop Engineering | [Ciclos](ia/04-loop-engineering.md) presenta cuatro casos observados: error SQL de transición, filtro CMDB sin descendientes, responsables incorrectos en datos sintéticos y filtrado de tickets por permisos en una ficha CI. Cada uno registra objetivo, entrada, fallo, corrección, nueva prueba, aceptación, decisión humana y commits (`fe4ea55`, `f16e6d3`). No se inyectaron fallos deliberadamente. La política futura limita a tres ciclos por defecto persistente y exige decisión humana si no se resuelve. |
+
+### Ejecuciones observadas
+
+| Comando o control | Resultado real |
+|---|---|
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 all` | Código 0. Jest: 13 unitarias y 2 de integración pasaron; Playwright: 3 E2E pasaron. La salida fue `{"ok":true,"suite":"all","corePyramid":"70/20/10","coreTests":{"unit":7,"integration":2,"e2e":1},"extensions":{"unit":6,"integration":0,"e2e":2},"executedTotal":{"unit":13,"integration":2,"e2e":3}}`. Los contenedores de prueba se detuvieron y el volumen aislado se conservó. |
+| `npm run lint` | Código 0; ESLint de API y comprobación TypeScript del frontend terminaron correctamente. |
+| `npm run typecheck` | Código 0 en API y frontend. |
+| `npm run audit:secrets` | Código 0; salida `{"ok":true,"scanned":"source, configuration and documentation"}`. |
+| `git diff --check` | Código 0; no detectó errores de whitespace. Git informó avisos de conversión LF/CRLF del entorno Windows. |
+| Aceptación de Service Desk P01–P18 | La salida observada de la suite aislada se conserva en el apartado 8 de este documento: todos los escenarios pasan, incluido P18 tras reiniciar DB/API sin eliminar el volumen. Las correcciones de CMDB ligadas a P03/P04/P14/P16 están versionadas en `f16e6d3`. |
+
+La salida anterior del runner imprimía únicamente `pyramid=70/20/10`, lo
+cual podía confundirse con la proporción de la suite ampliada. Se modificaron
+los runners PowerShell y shell para distinguir la pirámide base 7/2/1, las
+extensiones 6/0/2 y el total observado 13/2/3. La repetición completa confirmó
+que el resumen nuevo coincide con las pruebas realmente ejecutadas.
