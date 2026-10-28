@@ -292,3 +292,36 @@ cual podía confundirse con la proporción de la suite ampliada. Se modificaron
 los runners PowerShell y shell para distinguir la pirámide base 7/2/1, las
 extensiones 6/0/2 y el total observado 13/2/3. La repetición completa confirmó
 que el resumen nuevo coincide con las pruebas realmente ejecutadas.
+
+## Apartado 10: arquitectura, ejecución y seguridad (27 de octubre de 2026)
+
+La corrección de configuración y documentación quedó versionada en
+`7d0c6931ef95f9e21b2dff60fb75bc84439220ba`; esta sección registra los
+controles ejecutados sobre ese código y su build.
+
+La configuración revisada está en `compose.yaml`, los Dockerfiles por servicio
+en `apps/api/Dockerfile`, `apps/web/Dockerfile` y `e2e/Dockerfile`, las
+exclusiones en `.dockerignore` y los parámetros de evaluación en
+`.env.example`. La explicación de operación y seguridad está en el README y
+en [la resolución técnica, sección 5 y controles de sesión](RESOLUCION.md).
+`.env` y sus variantes quedan fuera de Git y del contexto de construcción; el
+ejemplo contiene únicamente valores locales de demostración.
+
+| Requisito/control | Comando o caso observado | Resultado |
+|---|---|---|
+| Configuración Compose | `docker compose config --quiet` | Código 0. PostgreSQL 16 tiene healthcheck; API espera DB saludable y aplica migraciones 001–006; solo se publica web; `postgres_data` y `uploads_data` son volúmenes persistentes. |
+| Build de evaluación normal | `docker compose up --build -d`; `docker compose ps`; GET `/`; GET `/api/auth/me` sin sesión | Código 0; API/web activos y DB healthy; web HTTP 200; endpoint protegido HTTP 401. PostgreSQL no se reconstruyó ni se borró. |
+| Arranque limpio, con la configuración exacta de ejemplo | `docker compose --env-file .env.example -p point10-example-check up --build -d` en puerto auxiliar 18083; seed, importación y verificación con `docker compose exec` | Código 0; los contenedores esperaron a DB, migraron desde una base vacía y sirvieron HTTP 200. Seed exitoso; importación creó 58 filas (12 nivel 1 + 46 nivel 2); verificación `{"ok":true,"level1":12,"level2":46,"duplicates":0,"review":3}`. Se apagó con `down` sin `-v`; se conservaron los volúmenes aislados. |
+| Inicio completo desde una instalación limpia | `docker compose -p point10-clean-build up --build -d`, puerto 18082; comandos de preparación del README dentro de los contenedores | Código 0; migraciones desde cero, 12/46 servicios, 2 CI originales, 5,000 CI sintéticos, 37 tickets, 8 colas, 5 FAQ y web HTTP 200. El proyecto aislado se apagó con `down`, sin borrar volúmenes. |
+| Validación y persistencia | `scripts/service-desk-test.ps1` | Código 0; P01–P18 PASS. P05 comprobó adjunto admitido, firma inválida y descarga protegida (anónima 401, autorizada 200); P07 comprobó dos claims concurrentes (un 201 y un 409); P18 verificó 12/46, 5,000 dispositivos y 2 CI originales después de reiniciar DB/API. El volumen de aceptación ya era reutilizado; en esta repetición dejó 750 tickets, 3,257 entradas de historial y 63 colas, acumulados y no conteos de base limpia. |
+| Pruebas unitarias, integración y navegador | `scripts/test-pyramid.ps1 all` | Código 0 dentro de Docker: 13 unitarias, 2 integraciones y 3 E2E. Los contenedores se retiraron al terminar; el volumen de pruebas se conservó. |
+| Rechazo de valores demo en producción | Cuatro arranques aislados de `NODE_ENV=production`: clave de sesión de muestra corta, plantilla de sesión extendida, contraseña PostgreSQL demo y las seis contraseñas de cuenta demo | Los cuatro controles rechazaron el arranque antes de aceptar tráfico. La clave de sesión debe tener al menos 32 caracteres y no contener marcadores de plantilla; DB, al menos 16 y no demo; cada contraseña de evaluación debe reemplazarse y tener al menos 12 caracteres. En producción el proxy confiable es Nginx y la cookie pasa a `Secure`. |
+| Controles estáticos | `npm run lint`; `npm run typecheck`; `npm run audit:secrets`; `git diff --check`; `git check-ignore .env .env.production.local` | Todos terminaron con código 0. Auditoría: `{"ok":true,"scanned":"source, configuration and documentation"}`; ambas rutas privadas `.env*` quedaron ignoradas. |
+| Logs y cierre | `docker compose logs --tail=40 api`; `docker compose -p point10-clean-build down` | Los logs mostraron `Nest application successfully started`. El apagado normal eliminó contenedores/red del proyecto auxiliar y conservó sus volúmenes; no se ejecutó `down -v`. |
+
+Los archivos de evidencia están fuera del directorio estático, usan identificador
+aleatorio y se entregan como descarga, no como contenido ejecutable. La aplicación
+no integra antivirus; las garantías demostradas aquí son límite, tipo/firma,
+sesión, autorización del ticket y trazabilidad. Las cuentas de `.env.example`
+son exclusivamente de evaluación local y no deben exponerse con sus contraseñas
+predeterminadas.
