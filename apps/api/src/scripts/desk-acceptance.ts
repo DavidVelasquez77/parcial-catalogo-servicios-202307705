@@ -355,11 +355,20 @@ async function main() {
           eq(createdService.rows[0].status,'REVIEW','servicio propuesto queda pendiente de completar');
           const linkedTicket = await pool.query(`SELECT process_data->>'approvedServiceId' AS service_id FROM tickets WHERE id=$1`,[ticket.id]);
           eq(Number(linkedTicket.rows[0]?.service_id),Number(createdService.rows[0].id),'ticket conserva el servicio aprobado');
+          await status(`/desk/tickets/${ticket.id}/process-data`,400,'PATCH',{approvedServiceId:serviceId},admin);
+          await status(`/desk/tickets/${ticket.id}/process-data`,409,'PATCH',{proposedName:'Cambio posterior a aprobación'},admin);
           await status('/desk/tickets',409,'POST',{
             title:'Propuesta duplicada',description:'No debe duplicar un código aprobado',serviceId,
             queueId:queueId('NEW_SERVICE'),noCiReason:'No aplica',
             processData:{need:'Otra solicitud',feasibility:'Viable',proposedCode:item.data.proposedCode,proposedName:'Duplicado'},
           },admin);
+        }
+        if (item.process==='CHANGE' && to==='APPROVED') {
+          await status(`/desk/tickets/${ticket.id}/process-data`,409,'PATCH',{riskAssessment:'Riesgo modificado después de aprobar'},admin);
+          await status(`/desk/tickets/${ticket.id}/ci`,409,'POST',{ciId:ci2},admin);
+        }
+        if (item.process==='ACCESS' && to==='APPROVED') {
+          await status(`/desk/tickets/${ticket.id}/process-data`,409,'PATCH',{accessAction:'REVOKE'},admin);
         }
       }
       const closed = await status(`/desk/tickets/${ticket.id}`,200,'GET',undefined,admin);

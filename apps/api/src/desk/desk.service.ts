@@ -531,8 +531,21 @@ export class DeskService {
       if (!ticket) throw new NotFoundException('Ticket no encontrado.');
       await this.assertAllowed(ticket.queue_id,user,'can_handle',client);
       if (['CLOSED','REJECTED'].includes(ticket.state)) throw new ConflictException('No se modifica un ticket finalizado.');
+      const process = ticket.process as DeskProcess;
+      if (process === 'NEW_SERVICE' && Object.prototype.hasOwnProperty.call(body,'approvedServiceId')) {
+        throw new BadRequestException('El servicio aprobado se asigna automáticamente y no se puede editar.');
+      }
+      const approvalBasis: Partial<Record<DeskProcess,{states:string[];fields:string[]}>> = {
+        NEW_SERVICE:{states:['APPROVED','IMPLEMENTING','RESOLVED'],fields:['need','feasibility','linkedServiceId','proposedCode','proposedName']},
+        CHANGE:{states:['APPROVED','PLANNED','EXECUTING','VALIDATING','RESOLVED'],fields:['riskAssessment','testPlan','rollbackPlan']},
+        ACCESS:{states:['APPROVED','PROVISIONING','VALIDATING','RESOLVED'],fields:['resource','permission','accessAction']},
+      };
+      const locked = approvalBasis[process];
+      if (locked?.states.includes(ticket.state) && Object.keys(body).some((key) => locked.fields.includes(key))) {
+        throw new ConflictException('No se puede cambiar el alcance aprobado; registra una nueva solicitud para volver a evaluarlo.');
+      }
       const merged = { ...ticket.process_data, ...body };
-      this.validateProcessDataShape(ticket.process as DeskProcess,merged);
+      this.validateProcessDataShape(process,merged);
       const updated = await client.query(`UPDATE tickets SET process_data=$1::jsonb,updated_at=NOW()
         WHERE id=$2 RETURNING *`, [JSON.stringify(merged),id]);
       await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values)
@@ -818,11 +831,15 @@ export class DeskService {
   async linkCi(id: number, body: Record<string, unknown>, user: AuthenticatedUser) {
     this.assertWriter(user);
     const ciId = idOf(body.ciId,'CI');
-    const ticket = await this.db.query('SELECT queue_id FROM tickets WHERE id=$1', [id]);
-    if (!ticket.rows[0]) throw new NotFoundException('Ticket no encontrado.');
-    await this.assertAllowed(ticket.rows[0].queue_id,user,'can_handle');
     return this.db.transaction(async (client) => {
-      const current = await client.query('SELECT no_ci_reason FROM tickets WHERE id=$1 FOR UPDATE', [id]);
+      const current = await client.query('SELECT queue_id,process,state,no_ci_reason FROM tickets WHERE id=$1 FOR UPDATE', [id]);
+      if (!current.rows[0]) throw new NotFoundException('Ticket no encontrado.');
+      await this.assertAllowed(current.rows[0].queue_id,user,'can_handle',client);
+      if (['CLOSED','REJECTED'].includes(current.rows[0].state)) throw new ConflictException('No se asocian CI a un ticket finalizado.');
+      if (current.rows[0].process === 'CHANGE' &&
+        ['APPROVED','PLANNED','EXECUTING','VALIDATING','RESOLVED'].includes(current.rows[0].state)) {
+        throw new ConflictException('El cambio ya fue aprobado; los CI afectados no se pueden cambiar sin una nueva evaluación.');
+      }
       const ci = await client.query('SELECT id FROM configuration_items WHERE id=$1', [ciId]);
       if (!ci.rows[0]) throw new BadRequestException('CI inexistente.');
       const inserted = await client.query('INSERT INTO ticket_ci(ticket_id,ci_id) VALUES($1,$2) ON CONFLICT DO NOTHING RETURNING *', [id,ciId]);
