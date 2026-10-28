@@ -112,3 +112,32 @@ estado `ESCALATED` se ubican en la cola de incidentes de nivel 2.
 La suite P01–P18 prueba la API y persistencia; la compilación confirma que el
 nuevo componente de interfaz se empaqueta sin errores. Esta revisión no afirma
 una prueba visual manual completa del nuevo control de escalamiento.
+
+## Colas, permisos y asignación (27 de octubre de 2026, Guatemala)
+
+El cambio de código de este apartado quedó en el commit `67b2380`. Se revisó
+el apartado 5 del enunciado y se completaron tres faltantes observables:
+responsable obligatorio para cada cola, administración delegada mediante
+`can_admin` y dos reglas configurables de orden. Se añadió la asignación
+dirigida a un agente autorizado, además de `claim`. La migración 006 conserva
+las colas anteriores y asigna un responsable activo a las que ya existían;
+la semilla de demostración garantiza acceso individual de consulta y atención
+para ese responsable. La política manual y los bloqueos de baja se describen
+en [PROCESOS.md](PROCESOS.md#colas-autorización-y-asignación).
+
+| Comando o escenario | Resultado observado |
+|---|---|
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` | Código 0. P01–P18 PASS; salida final `{"ok":true,"suite":"Service Desk P01-P18","isolatedProject":"service-desk-suite-202307705"}`. Se reutilizó el volumen aislado de pruebas. |
+| P06 dentro de la suite | PASS. Sin responsable o con responsable `CONSULTA`: 400. Código duplicado: 409. Responsable activo y regla `AGE_PRIORITY`: creación correcta. Su acceso individual se verificó y su revocación: 409. Un agente con `can_admin` editó la cola y gestionó permisos; otro sin el permiso recibió 403. `CONSULTA` no pudo obtener permisos de escritura. La baja de una cola con tickets abiertos y la desactivación de su responsable se rechazaron con 409. |
+| P07 dentro de la suite | PASS. Con filtro de cola `AGE_PRIORITY`, el ticket más antiguo encabezó la lista aunque tuviera prioridad menor; la vista global ordenó por prioridad. Dos agentes intentaron `claim` simultáneamente: respuestas `[201,409]`. Se rechazó asignar desde una cuenta sin `can_admin` y elegir al solicitante; la reasignación válida guardó actor, responsable anterior/nuevo y motivo en `ticket_history`. |
+| P18 dentro de la suite | PASS después de reiniciar PostgreSQL y API sin borrar volúmenes: 12 códigos de nivel 1, 46 servicios de nivel 2, 5,000 dispositivos, dos CI del Excel original, 420 tickets, 1,594 eventos de historial y 37 colas. Los últimos tres totales incluyen ejecuciones previas de la misma suite aislada; no son cantidades de una carga limpia. |
+| `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-pyramid.ps1 e2e` | Código 0; **3 pruebas Playwright pasadas en 23.3 s**. Incluye el mantenimiento visual de una cola con responsable y regla de orden, además de los recorridos del catálogo y del portal Service Desk. |
+| `npm run lint`, `npm run typecheck`, `npm run audit:secrets`, `git diff --check` | Código 0 en cada comando. La auditoría devolvió `{"ok":true,"scanned":"source, configuration and documentation"}`. |
+| `docker compose exec -T api node apps/api/dist/scripts/seed-service-desk.js`, `docker compose ps` y GET `http://localhost:8080/` | Semilla repetida con `created=0`, 37 tickets de demostración y ocho colas. DB healthy, API y web activos; HTTP 200. El volumen normal se conservó. |
+
+Durante la ampliación de P07, la primera versión de la prueba suponía que un
+agente determinado ganaría siempre la carrera de `claim`. En una ejecución
+ganó el otro y la aserción de la *prueba* falló aunque la exclusión mutua
+funcionaba. Se corrigió la prueba para leer al ganador y dirigir la
+reasignación al otro agente. La siguiente ejecución completa pasó. Este
+fallo no fue introducido deliberadamente ni se atribuye al producto.
