@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { AuthenticatedUser } from '../auth/auth.types';
 import { DatabaseService } from '../database/database.service';
 import { canTransition, DeskProcess, processes, processType } from './process-rules';
+import { suggestIncidentCategory } from './incident-rules';
 
 type Permission = 'can_view' | 'can_handle' | 'can_transfer' | 'can_approve' | 'can_admin';
 
@@ -73,6 +74,63 @@ export class DeskService {
       throw new BadRequestException('La regla de orden debe ser prioridad y antigüedad, o antigüedad y prioridad.');
     }
     return rule;
+  }
+
+  private validateProcessDataShape(process: DeskProcess, data: Record<string,unknown>) {
+    const category = process === 'EVENT' ? data.eventCategory : process === 'INCIDENT' ? data.incidentCategory : undefined;
+    if (category !== undefined && category !== null) {
+      const allowed = process === 'EVENT' ? ['E0','E1','E2','E3'] : ['I0','I1','I2','I3','I4','I5','I6'];
+      if (!allowed.includes(String(category))) throw new BadRequestException(`Categoría no válida para ${process}.`);
+    }
+    const booleanFields = process === 'INCIDENT' ? ['interruptsOrDegrades','redundancyAvailable'] : [];
+    for (const key of booleanFields) {
+      if (data[key] !== undefined && data[key] !== null && typeof data[key] !== 'boolean') {
+        throw new BadRequestException(`${key} debe ser verdadero o falso.`);
+      }
+    }
+    if (process === 'INCIDENT') {
+      for (const key of ['estimatedMinutes','actualMinutes']) {
+        const value = data[key];
+        if (value !== undefined && value !== null &&
+          (!Number.isSafeInteger(Number(value)) || Number(value) < 0)) {
+          throw new BadRequestException(`${key} debe ser un número entero de minutos no negativo.`);
+        }
+      }
+    }
+    if (process === 'ACCESS' && data.accessAction !== undefined &&
+      !['GRANT','REVOKE'].includes(String(data.accessAction))) {
+      throw new BadRequestException('La acción de acceso debe ser conceder o revocar.');
+    }
+  }
+
+  private validateIncidentFacts(data: Record<string,unknown>) {
+    const category = String(data.incidentCategory ?? '');
+    if (!['I0','I1','I2','I3','I4','I5','I6'].includes(category)) {
+      throw new BadRequestException('El incidente requiere categoría I0-I6.');
+    }
+    if (typeof data.interruptsOrDegrades !== 'boolean') {
+      throw new BadRequestException('Indica si el incidente causa interrupción o degradación.');
+    }
+    if (category === 'I0' && data.interruptsOrDegrades) {
+      throw new BadRequestException('La categoría I0 corresponde a un caso sin interrupción ni degradación.');
+    }
+    if (['I1','I2','I3','I4','I5'].includes(category) && !data.interruptsOrDegrades) {
+      throw new BadRequestException('Las categorías I1-I5 requieren interrupción o degradación.');
+    }
+    if (['I1','I2','I3','I4','I5'].includes(category)) {
+      const estimate = data.estimatedMinutes;
+      if (estimate === undefined || estimate === null) {
+        throw new BadRequestException('Registra la duración estimada para justificar la categoría I1-I5.');
+      }
+      const suggestion = suggestIncidentCategory({securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:Number(estimate)});
+      if (suggestion.category !== category) {
+        throw new BadRequestException(`La duración estimada corresponde a ${suggestion.category ?? 'revisión manual'}, no a ${category}.`);
+      }
+    }
+  }
+
+  private requireEvidence(data: Record<string,unknown>, key: string, label: string) {
+    return requiredText(data[key],label,5000);
   }
 
   private async assertResponsibleUser(id: number, client: PoolClient) {
@@ -332,12 +390,38 @@ export class DeskService {
       const requester = await client.query('SELECT id FROM users WHERE id=$1 AND active', [requesterId]);
       if (!requester.rows[0]) throw new BadRequestException('Solicitante inexistente o inactivo.');
       const data = processData as Record<string,unknown>;
-      if (process === 'EVENT' && !['E0','E1','E2','E3'].includes(String(data.eventCategory))) throw new BadRequestException('El evento requiere categoría E0-E3.');
-      if (process === 'INCIDENT' && !['I0','I1','I2','I3','I4','I5','I6'].includes(String(data.incidentCategory))) throw new BadRequestException('El incidente requiere categoría I0-I6.');
-      if (process === 'ACCESS' && (!body.beneficiaryId || !data.resource || !data.permission)) throw new BadRequestException('El acceso requiere beneficiario, recurso y permiso.');
-      if (process === 'CHANGE' && !ciIds.length) throw new BadRequestException('Un cambio debe identificar al menos un CI afectado.');
-      if (body.beneficiaryId) {
-        const beneficiaryId = idOf(body.beneficiaryId,'Beneficiario');
+      this.validateProcessDataShape(process,data);
+      const beneficiaryId = body.beneficiaryId == null ? null : idOf(body.beneficiaryId,'Beneficiario');
+      if (process === 'NEW_SERVICE') {
+        this.requireEvidence(data,'need','Necesidad del nuevo servicio');
+        this.requireEvidence(data,'feasibility','Evaluación de viabilidad');
+        if (data.linkedServiceId) {
+          const linkedId = idOf(data.linkedServiceId,'Servicio existente');
+          const linked = await client.query(`SELECT id FROM service_level_2 WHERE id=$1 AND status='ACTIVE'`,[linkedId]);
+          if (!linked.rows[0]) throw new BadRequestException('El servicio vinculado debe existir y estar activo.');
+        } else {
+          const proposedCode = requiredText(data.proposedCode,'Código propuesto',50);
+          this.requireEvidence(data,'proposedName','Nombre propuesto');
+          const duplicate = await client.query('SELECT id FROM service_level_2 WHERE code=$1',[proposedCode]);
+          if (duplicate.rows[0]) throw new ConflictException('El código propuesto ya existe; vincula el servicio del catálogo.');
+        }
+      }
+      if (process === 'CHANGE') {
+        if (!ciIds.length) throw new BadRequestException('Un cambio debe identificar al menos un CI afectado.');
+        this.requireEvidence(data,'riskAssessment','Evaluación de impacto y riesgo');
+        this.requireEvidence(data,'testPlan','Plan de pruebas');
+        this.requireEvidence(data,'rollbackPlan','Plan de reversión');
+      }
+      if (process === 'INCIDENT') this.validateIncidentFacts(data);
+      if (process === 'EVENT' && !['E0','E1','E2','E3'].includes(String(data.eventCategory))) {
+        throw new BadRequestException('El evento requiere categoría E0-E3.');
+      }
+      if (process === 'ACCESS') {
+        if (!beneficiaryId || !data.resource || !data.permission) throw new BadRequestException('El acceso requiere beneficiario, recurso y permiso.');
+        if (!['GRANT','REVOKE'].includes(String(data.accessAction))) throw new BadRequestException('Indica si solicitas provisión o revocación del acceso.');
+      }
+      if (process === 'TECH_SERVICE') this.requireEvidence(data,'request','Prestación solicitada');
+      if (beneficiaryId) {
         const beneficiary = await client.query('SELECT id FROM users WHERE id=$1 AND active', [beneficiaryId]);
         if (!beneficiary.rows[0]) throw new BadRequestException('Beneficiario inexistente o inactivo.');
       }
@@ -350,7 +434,7 @@ export class DeskService {
          state,priority,impact,urgency,channel,process_data,no_ci_reason)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'SUBMITTED',$10,$11,$12,$13,$14::jsonb,$15)
         RETURNING *`,
-        [title,description,requesterId,user.id,body.beneficiaryId ?? null,serviceId,queueId,
+        [title,description,requesterId,user.id,beneficiaryId,serviceId,queueId,
           processType[process],process,priority,impact,urgency,channel,JSON.stringify(data),noCiReason]);
       const ticketId = created.rows[0].id;
       const numbered = await client.query(`UPDATE tickets SET number='T-'||LPAD(id::text,7,'0')
@@ -445,12 +529,7 @@ export class DeskService {
       await this.assertAllowed(ticket.queue_id,user,'can_handle',client);
       if (['CLOSED','REJECTED'].includes(ticket.state)) throw new ConflictException('No se modifica un ticket finalizado.');
       const merged = { ...ticket.process_data, ...body };
-      if (ticket.process === 'EVENT' && !['E0','E1','E2','E3'].includes(String(merged.eventCategory))) {
-        throw new BadRequestException('Categoría de evento E0-E3 requerida.');
-      }
-      if (ticket.process === 'INCIDENT' && !['I0','I1','I2','I3','I4','I5','I6'].includes(String(merged.incidentCategory))) {
-        throw new BadRequestException('Categoría de incidente I0-I6 requerida.');
-      }
+      this.validateProcessDataShape(ticket.process as DeskProcess,merged);
       const updated = await client.query(`UPDATE tickets SET process_data=$1::jsonb,updated_at=NOW()
         WHERE id=$2 RETURNING *`, [JSON.stringify(merged),id]);
       await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values)
@@ -490,27 +569,83 @@ export class DeskService {
       }
       if (to === 'RESOLVED' && !reason) throw new BadRequestException('La resolución requiere descripción de la solución.');
       if (to === 'REJECTED' && !reason) throw new BadRequestException('El rechazo requiere motivo.');
-      if (ticket.process === 'NEW_SERVICE' && to === 'PENDING_APPROVAL' &&
-        (!data.need || !data.feasibility || (!data.linkedServiceId && (!data.proposedCode || !data.proposedName)))) {
-        throw new BadRequestException('Documenta necesidad, viabilidad y servicio propuesto o existente antes de aprobar.');
-      }
-      if (ticket.process === 'CHANGE' && to === 'PENDING_APPROVAL' &&
-        (!data.riskAssessment || !data.testPlan || !data.rollbackPlan)) {
-        throw new BadRequestException('Documenta impacto y riesgo, plan de pruebas y reversión.');
-      }
-      if (ticket.process === 'CHANGE' && to === 'EXECUTING') {
-        if (!data.testPlan || !data.rollbackPlan || !data.riskAssessment || ticket.state !== 'PLANNED') {
-          throw new BadRequestException('El cambio requiere aprobación, riesgo, plan de pruebas y reversión.');
+      if (ticket.process === 'NEW_SERVICE' && to === 'PENDING_APPROVAL') {
+        this.requireEvidence(data,'need','Necesidad del nuevo servicio');
+        this.requireEvidence(data,'feasibility','Evaluación de viabilidad');
+        if (data.linkedServiceId) {
+          const linked = await client.query(`SELECT id FROM service_level_2 WHERE id=$1 AND status='ACTIVE'`,
+            [idOf(data.linkedServiceId,'Servicio existente')]);
+          if (!linked.rows[0]) throw new BadRequestException('Vincula un servicio existente y activo del catálogo.');
+        } else {
+          this.requireEvidence(data,'proposedCode','Código propuesto');
+          this.requireEvidence(data,'proposedName','Nombre propuesto');
         }
       }
+      if (ticket.process === 'NEW_SERVICE' && to === 'IMPLEMENTING' && !data.approvedServiceId) {
+        throw new ConflictException('Aprueba y crea o vincula el servicio del catálogo antes de implementarlo.');
+      }
+      if (ticket.process === 'NEW_SERVICE' && to === 'RESOLVED') {
+        this.requireEvidence(data,'implementationResult','Resultado de implementación');
+      }
+      if (ticket.process === 'CHANGE' && to === 'PENDING_APPROVAL') {
+        this.requireEvidence(data,'riskAssessment','Evaluación de impacto y riesgo');
+        this.requireEvidence(data,'testPlan','Plan de pruebas');
+        this.requireEvidence(data,'rollbackPlan','Plan de reversión');
+        const affected = await client.query('SELECT 1 FROM ticket_ci WHERE ticket_id=$1 LIMIT 1',[id]);
+        if (!affected.rows[0]) throw new BadRequestException('Registra al menos un CI afectado antes de solicitar aprobación.');
+      }
+      if (ticket.process === 'CHANGE' && to === 'EXECUTING') {
+        const approved = await client.query(`SELECT 1 FROM ticket_history
+          WHERE ticket_id=$1 AND action='TRANSITION' AND new_values->>'state'='APPROVED' LIMIT 1`,[id]);
+        if (!approved.rows[0] || ticket.state !== 'PLANNED') {
+          throw new ConflictException('El cambio debe tener una aprobación registrada antes de ejecutarse.');
+        }
+        this.requireEvidence(data,'riskAssessment','Evaluación de impacto y riesgo');
+        this.requireEvidence(data,'testPlan','Plan de pruebas');
+        this.requireEvidence(data,'rollbackPlan','Plan de reversión');
+      }
+      if (ticket.process === 'CHANGE' && to === 'VALIDATING') {
+        this.requireEvidence(data,'executionResult','Resultado de ejecución');
+      }
+      if (ticket.process === 'CHANGE' && to === 'RESOLVED') {
+        this.requireEvidence(data,'executionResult','Resultado de ejecución');
+        this.requireEvidence(data,'validationResult','Resultado de validación');
+      }
+      if (ticket.process === 'INCIDENT' && ['CLASSIFIED','RESOLVED'].includes(to)) this.validateIncidentFacts(data);
+      if (ticket.process === 'INCIDENT' && to === 'RESOLVED') {
+        this.requireEvidence(data,'solution','Solución aplicada');
+        if (data.interruptsOrDegrades &&
+          (!Number.isSafeInteger(Number(data.actualMinutes)) || Number(data.actualMinutes) < 1)) {
+          throw new BadRequestException('Registra la duración real de la interrupción o degradación antes de resolver.');
+        }
+      }
+      if (ticket.process === 'EVENT' && to === 'EVALUATED') {
+        if (!['E0','E1','E2','E3'].includes(String(data.eventCategory))) throw new BadRequestException('Categoría de evento E0-E3 requerida.');
+        this.requireEvidence(data,'assessment','Evaluación del evento');
+      }
+      if (ticket.process === 'EVENT' && to === 'RESPONDED') this.requireEvidence(data,'response','Respuesta aplicada');
       if (ticket.process === 'PROBLEM' && to === 'INVESTIGATING') {
         const incidents = await client.query(`SELECT 1 FROM ticket_links l JOIN tickets i
           ON i.id=CASE WHEN l.ticket_id=$1 THEN l.related_ticket_id ELSE l.ticket_id END
           WHERE (l.ticket_id=$1 OR l.related_ticket_id=$1) AND i.process='INCIDENT' LIMIT 1`, [id]);
         if (!incidents.rows[0]) throw new BadRequestException('Vincula al menos un incidente antes de investigar el problema.');
       }
-      if (ticket.process === 'PROBLEM' && to === 'DEFINITIVE_SOLUTION' && !data.rootCause) {
-        throw new BadRequestException('Documenta la causa raíz antes de la solución definitiva.');
+      if (ticket.process === 'PROBLEM' && to === 'WORKAROUND') this.requireEvidence(data,'workaround','Solución temporal');
+      if (ticket.process === 'PROBLEM' && to === 'KNOWN_ERROR') this.requireEvidence(data,'knownError','Error conocido');
+      if (ticket.process === 'PROBLEM' && to === 'DEFINITIVE_SOLUTION') {
+        this.requireEvidence(data,'rootCause','Causa raíz');
+        this.requireEvidence(data,'definitiveSolution','Solución definitiva');
+      }
+      if (ticket.process === 'PROBLEM' && to === 'RESOLVED') this.requireEvidence(data,'definitiveSolution','Solución definitiva');
+      if (ticket.process === 'ACCESS' && ['PROVISIONING','VALIDATING','RESOLVED'].includes(to) &&
+        !['GRANT','REVOKE'].includes(String(data.accessAction))) {
+        throw new BadRequestException('La solicitud debe indicar si concede o revoca el acceso.');
+      }
+      if (ticket.process === 'ACCESS' && to === 'VALIDATING') this.requireEvidence(data,'provisioningResult','Resultado de provisión o revocación');
+      if (ticket.process === 'ACCESS' && to === 'RESOLVED') this.requireEvidence(data,'validation','Resultado de validación');
+      if (ticket.process === 'TECH_SERVICE' && to === 'ASSIGNED') {
+        this.requireEvidence(data,'validation','Validación de la solicitud');
+        if (!ticket.assigned_user_id) throw new BadRequestException('Asigna un agente antes de pasar la solicitud a asignada.');
       }
       if (ticket.process === 'EVENT' && ticket.state === 'EVALUATED') {
         const critical = ['E2','E3'].includes(String(data.eventCategory));
@@ -520,6 +655,8 @@ export class DeskService {
       if (ticket.process === 'TECH_SERVICE' && to === 'FULFILLING' && !ticket.assigned_user_id) {
         throw new BadRequestException('Asigna un agente antes de cumplir la solicitud.');
       }
+      if (ticket.process === 'TECH_SERVICE' && to === 'CONFIRMING') this.requireEvidence(data,'delivery','Resultado del cumplimiento');
+      if (ticket.process === 'TECH_SERVICE' && to === 'RESOLVED') this.requireEvidence(data,'confirmation','Confirmación del solicitante');
       if (ticket.process === 'NEW_SERVICE' && to === 'APPROVED') {
         await this.approveNewService(client,ticket,user);
       }
@@ -547,17 +684,16 @@ export class DeskService {
     let serviceId: number;
     if (data.linkedServiceId) {
       serviceId = idOf(data.linkedServiceId,'Servicio a vincular');
-      const linked = await client.query('SELECT id FROM service_level_2 WHERE id=$1', [serviceId]);
-      if (!linked.rows[0]) throw new BadRequestException('El servicio a vincular no existe.');
+      const linked = await client.query(`SELECT id FROM service_level_2 WHERE id=$1 AND status='ACTIVE'`, [serviceId]);
+      if (!linked.rows[0]) throw new BadRequestException('El servicio a vincular no existe o está inactivo.');
     } else {
       const code = requiredText(data.proposedCode,'Código propuesto',50);
       const name = requiredText(data.proposedName,'Nombre propuesto');
-      const duplicate = await client.query('SELECT id FROM service_level_2 WHERE code=$1', [code]);
-      if (duplicate.rows[0]) throw new ConflictException('El servicio propuesto ya existe: vincúlalo por ID.');
       const parent = await client.query(`SELECT level_1_id FROM service_level_2 WHERE id=$1`, [ticket.service_id]);
       const inserted = await client.query(`INSERT INTO service_level_2(code,name,level_1_id,status,description)
-        VALUES($1,$2,$3,'REVIEW',$4) RETURNING id`,
+        VALUES($1,$2,$3,'REVIEW',$4) ON CONFLICT(code) DO NOTHING RETURNING id`,
         [code,name,parent.rows[0].level_1_id,`Propuesto por ticket ${ticket.number}; pendiente de completar clasificación.`]);
+      if (!inserted.rows[0]) throw new ConflictException('El servicio propuesto ya existe: vincúlalo por ID.');
       serviceId = inserted.rows[0].id;
     }
     const changed = { ...data, approvedServiceId: serviceId };
@@ -581,7 +717,10 @@ export class DeskService {
       RETURNING id`,
       [`Incidente por evento ${event.number}`,event.description,event.requester_id,actor.id,
         event.service_id,incidentQueue.rows[0].id,event.priority,event.impact,event.urgency,
-        JSON.stringify({ sourceEventId: event.id, securityEvent: event.process_data?.eventCategory === 'E3' }),
+        JSON.stringify({ sourceEventId: event.id, securityEvent: event.process_data?.eventCategory === 'E3',
+          incidentCategory: event.process_data?.eventCategory === 'E3' ? 'I6' : null,
+          interruptsOrDegrades: event.process_data?.eventCategory === 'E2' ? true : null,
+          estimatedMinutes: null }),
         event.no_ci_reason]);
     const incidentId = created.rows[0].id;
     await client.query(`UPDATE tickets SET number='T-'||LPAD(id::text,7,'0') WHERE id=$1`, [incidentId]);
@@ -699,12 +838,16 @@ export class DeskService {
     const linkType = String(body.linkType ?? 'RELATED');
     if (!['RELATED','CAUSED_BY','DUPLICATE_OF','IMPLEMENTS'].includes(linkType)) throw new BadRequestException('Tipo de vínculo no válido.');
     if (id === relatedId) throw new BadRequestException('No puedes vincular un ticket consigo mismo.');
-    const ticket = await this.db.query('SELECT queue_id FROM tickets WHERE id=$1', [id]);
+    const ticket = await this.db.query('SELECT queue_id,process FROM tickets WHERE id=$1', [id]);
     if (!ticket.rows[0]) throw new NotFoundException('Ticket no encontrado.');
     await this.assertAllowed(ticket.rows[0].queue_id,user,'can_handle');
     return this.db.transaction(async (client) => {
-      const related = await client.query('SELECT id FROM tickets WHERE id=$1', [relatedId]);
+      const related = await client.query('SELECT id,process FROM tickets WHERE id=$1', [relatedId]);
       if (!related.rows[0]) throw new BadRequestException('Ticket relacionado inexistente.');
+      if (linkType === 'IMPLEMENTS' && !(
+        (ticket.rows[0].process === 'PROBLEM' && related.rows[0].process === 'CHANGE') ||
+        (ticket.rows[0].process === 'CHANGE' && related.rows[0].process === 'PROBLEM')
+      )) throw new BadRequestException('El vínculo “Implementa” solo relaciona un problema con un cambio.');
       const inserted = await client.query(`INSERT INTO ticket_links(ticket_id,related_ticket_id,link_type)
         VALUES($1,$2,$3) ON CONFLICT DO NOTHING RETURNING *`, [id,relatedId,linkType]);
       if (inserted.rows[0]) await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,new_values)

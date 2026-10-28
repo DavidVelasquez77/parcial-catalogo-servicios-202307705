@@ -31,14 +31,14 @@ const transitions: Record<string,Record<string,string[]>> = {
   ACCESS: { SUBMITTED:['PENDING_APPROVAL'],PENDING_APPROVAL:['APPROVED','REJECTED'],APPROVED:['PROVISIONING'],PROVISIONING:['VALIDATING'],VALIDATING:['RESOLVED'],RESOLVED:['CLOSED'] },
   TECH_SERVICE: { SUBMITTED:['VALIDATING'],VALIDATING:['ASSIGNED'],ASSIGNED:['FULFILLING'],FULFILLING:['CONFIRMING'],CONFIRMING:['RESOLVED'],RESOLVED:['CLOSED'] },
 };
-const processFields: Record<string,Array<[string,string,'text'|'number'|'boolean'|'category']>> = {
-  NEW_SERVICE: [['need','Necesidad','text'],['feasibility','Viabilidad','text'],['proposedCode','Código propuesto','text'],['proposedName','Nombre propuesto','text'],['linkedServiceId','ID de servicio existente','number']],
-  CHANGE: [['riskAssessment','Impacto y riesgo','text'],['testPlan','Plan de pruebas','text'],['rollbackPlan','Plan de reversión','text'],['executionResult','Resultado de ejecución','text']],
+const processFields: Record<string,Array<[string,string,'text'|'number'|'boolean'|'category'|'accessAction']>> = {
+  NEW_SERVICE: [['need','Necesidad','text'],['feasibility','Viabilidad','text'],['proposedCode','Código propuesto','text'],['proposedName','Nombre propuesto','text'],['linkedServiceId','ID de servicio existente','number'],['implementationResult','Resultado de implementación','text']],
+  CHANGE: [['riskAssessment','Impacto y riesgo','text'],['testPlan','Plan de pruebas','text'],['rollbackPlan','Plan de reversión','text'],['executionResult','Resultado de ejecución','text'],['validationResult','Resultado de validación','text']],
   INCIDENT: [['incidentCategory','Categoría I0–I6','category'],['estimatedMinutes','Duración estimada (min)','number'],['actualMinutes','Duración real (min)','number'],['redundancyAvailable','Redundancia disponible','boolean'],['solution','Solución aplicada','text']],
-  EVENT: [['eventCategory','Categoría E0–E3','category'],['assessment','Evaluación','text'],['response','Respuesta','text']],
+  EVENT: [['eventCategory','Categoría E0–E3','category'],['assessment','Evaluación','text'],['response','Respuesta aplicada','text']],
   PROBLEM: [['rootCause','Causa raíz','text'],['workaround','Solución temporal','text'],['knownError','Error conocido','text'],['definitiveSolution','Solución definitiva','text']],
-  ACCESS: [['resource','Recurso','text'],['permission','Permiso','text'],['accessAction','Provisión o revocación','text'],['validation','Validación','text']],
-  TECH_SERVICE: [['request','Prestación solicitada','text'],['delivery','Cumplimiento','text'],['confirmation','Confirmación','text']],
+  ACCESS: [['resource','Recurso','text'],['permission','Permiso','text'],['accessAction','Provisión o revocación','accessAction'],['provisioningResult','Resultado de provisión o revocación','text'],['validation','Validación','text']],
+  TECH_SERVICE: [['request','Prestación solicitada','text'],['validation','Validación de la solicitud','text'],['delivery','Cumplimiento','text'],['confirmation','Confirmación del solicitante','text']],
 };
 const date = (value: string) => new Date(value).toLocaleString('es-GT');
 const message = (error: unknown) => error instanceof Error ? error.message : 'No fue posible completar la operación.';
@@ -57,6 +57,7 @@ function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: (
   const [beneficiaryId,setBeneficiaryId] = useState('');
   const [resource,setResource] = useState('');
   const [permission,setPermission] = useState('');
+  const [accessAction,setAccessAction] = useState('GRANT');
   const [priority,setPriority] = useState('3');
   const [extra,setExtra] = useState<Record<string,string>>({});
   const [ciSearch,setCiSearch] = useState('');
@@ -78,14 +79,15 @@ function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: (
     const processData: Record<string,unknown> = {};
     if (process === 'EVENT') processData.eventCategory = category;
     if (process === 'INCIDENT') processData.incidentCategory = category;
-    if (process === 'ACCESS') { processData.resource = resource; processData.permission = permission; }
+    if (process === 'ACCESS') { processData.resource = resource; processData.permission = permission; processData.accessAction = accessAction; }
     if (process === 'NEW_SERVICE') Object.assign(processData,{need:extra.need,feasibility:extra.feasibility,
       ...(extra.linkedServiceId ? {linkedServiceId:Number(extra.linkedServiceId)} : {proposedCode:extra.proposedCode,proposedName:extra.proposedName})});
     if (process === 'CHANGE') Object.assign(processData,{riskAssessment:extra.riskAssessment,testPlan:extra.testPlan,rollbackPlan:extra.rollbackPlan});
     if (process === 'PROBLEM') Object.assign(processData,{rootCause:extra.rootCause ?? '',workaround:extra.workaround ?? ''});
     if (process === 'TECH_SERVICE') processData.request = extra.request ?? description;
     if (process === 'INCIDENT') Object.assign(processData,{estimatedMinutes:extra.estimatedMinutes?Number(extra.estimatedMinutes):null,
-      redundancyAvailable:extra.redundancyAvailable==='yes',interruptsOrDegrades:extra.interruptsOrDegrades==='yes'});
+      redundancyAvailable:extra.redundancyAvailable==='yes'?true:extra.redundancyAvailable==='no'?false:null,
+      interruptsOrDegrades:extra.interruptsOrDegrades==='yes'?true:extra.interruptsOrDegrades==='no'?false:null});
     try {
       await post('/desk/tickets',{ queueId:Number(queueId),serviceId:Number(serviceId),title,description,
         priority:Number(priority),impact:3,urgency:3,ciIds,noCiReason:ciIds.length?undefined:noCiReason,processData,
@@ -100,12 +102,12 @@ function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: (
     <label>Descripción<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required /></label>
     <label>Prioridad<select value={priority} onChange={(e) => setPriority(e.target.value)}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} · {n===5?'Muy alta':n===1?'Muy baja':'Nivel '+n}</option>)}</select></label>
     {(process === 'EVENT' || process === 'INCIDENT') && <label>Categoría<select value={category} onChange={(e) => setCategory(e.target.value)} required><option value="">Selecciona</option>{(process === 'EVENT' ? ['E0','E1','E2','E3'] : ['I0','I1','I2','I3','I4','I5','I6']).map((x) => <option key={x}>{x}</option>)}</select></label>}
-    {process === 'INCIDENT' && <><label>Duración estimada (minutos)<input type="number" min="0" value={extra.estimatedMinutes ?? ''} onChange={(e) => change('estimatedMinutes',e.target.value)} /></label><label>¿Interrupción o degradación?<select value={extra.interruptsOrDegrades ?? ''} onChange={(e) => change('interruptsOrDegrades',e.target.value)}><option value="">Por evaluar</option><option value="yes">Sí</option><option value="no">No</option></select></label><label>¿Redundancia disponible?<select value={extra.redundancyAvailable ?? ''} onChange={(e) => change('redundancyAvailable',e.target.value)}><option value="">No informada</option><option value="yes">Sí</option><option value="no">No</option></select></label></>}
+    {process === 'INCIDENT' && <><label>Duración estimada (minutos)<input type="number" min={['I1','I2','I3','I4','I5'].includes(category)?1:0} required={['I1','I2','I3','I4','I5'].includes(category)} value={extra.estimatedMinutes ?? ''} onChange={(e) => change('estimatedMinutes',e.target.value)} /></label><label>¿Interrupción o degradación?<select value={extra.interruptsOrDegrades ?? ''} onChange={(e) => change('interruptsOrDegrades',e.target.value)} required><option value="">Selecciona</option><option value="yes">Sí</option><option value="no">No</option></select></label><label>¿Redundancia disponible?<select value={extra.redundancyAvailable ?? ''} onChange={(e) => change('redundancyAvailable',e.target.value)}><option value="">No informada</option><option value="yes">Sí</option><option value="no">No</option></select></label></>}
     {process === 'NEW_SERVICE' && <><label>Necesidad<input value={extra.need ?? ''} onChange={(e) => change('need',e.target.value)} required /></label><label>Viabilidad preliminar<input value={extra.feasibility ?? ''} onChange={(e) => change('feasibility',e.target.value)} required /></label><label>Vincular servicio existente<select value={extra.linkedServiceId ?? ''} onChange={(e) => change('linkedServiceId',e.target.value)}><option value="">Crear servicio nuevo tras aprobación</option>{services.map((s) => <option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</select></label>{!extra.linkedServiceId && <><label>Código propuesto<input value={extra.proposedCode ?? ''} onChange={(e) => change('proposedCode',e.target.value)} required /></label><label>Nombre propuesto<input value={extra.proposedName ?? ''} onChange={(e) => change('proposedName',e.target.value)} required /></label></>}</>}
     {process === 'CHANGE' && <><label>Impacto y riesgo<textarea value={extra.riskAssessment ?? ''} onChange={(e) => change('riskAssessment',e.target.value)} required /></label><label>Plan de pruebas<textarea value={extra.testPlan ?? ''} onChange={(e) => change('testPlan',e.target.value)} required /></label><label>Plan de reversión<textarea value={extra.rollbackPlan ?? ''} onChange={(e) => change('rollbackPlan',e.target.value)} required /></label></>}
     {process === 'PROBLEM' && <><label>Causa raíz preliminar<input value={extra.rootCause ?? ''} onChange={(e) => change('rootCause',e.target.value)} /></label><label>Solución temporal<input value={extra.workaround ?? ''} onChange={(e) => change('workaround',e.target.value)} /></label></>}
     {process === 'TECH_SERVICE' && <label>Prestación solicitada<input value={extra.request ?? ''} onChange={(e) => change('request',e.target.value)} required /></label>}
-    {process === 'ACCESS' && <><label>Beneficiario<select value={beneficiaryId} onChange={(e) => setBeneficiaryId(e.target.value)} required><option value="">Selecciona</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label><label>Recurso<input value={resource} onChange={(e) => setResource(e.target.value)} required /></label><label>Permiso solicitado<input value={permission} onChange={(e) => setPermission(e.target.value)} required /></label></>}
+    {process === 'ACCESS' && <><label>Beneficiario<select value={beneficiaryId} onChange={(e) => setBeneficiaryId(e.target.value)} required><option value="">Selecciona</option>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label><label>Recurso<input value={resource} onChange={(e) => setResource(e.target.value)} required /></label><label>Permiso solicitado<input value={permission} onChange={(e) => setPermission(e.target.value)} required /></label><label>Operación<select value={accessAction} onChange={(e) => setAccessAction(e.target.value)}><option value="GRANT">Conceder acceso</option><option value="REVOKE">Revocar acceso</option></select></label></>}
     <label>Buscar CI relacionado<input value={ciSearch} onChange={(e) => setCiSearch(e.target.value)} placeholder="Escribe al menos dos letras o parte del código" /></label>{ciOptions.length>0 && <div className="desk-search-options">{ciOptions.map((ci) => <button type="button" className="secondary" key={ci.id} onClick={() => {if(!ciIds.includes(Number(ci.id)))setCiIds([...ciIds,Number(ci.id)]);setCiSearch('');}}>{ci.code} · {ci.name}</button>)}</div>}
     {ciIds.length>0 && <p className="muted">{ciIds.length} CI seleccionado(s). <button type="button" className="text-button" onClick={() => setCiIds([])}>Quitar todos</button></p>}
     {ciIds.length===0 && <label>Motivo por el que no se asocia CI<input value={noCiReason} onChange={(e) => setNoCiReason(e.target.value)} required={process!=='CHANGE'} /></label>}

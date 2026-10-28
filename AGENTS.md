@@ -103,6 +103,23 @@ Las reglas y su alcance están en `docs/PROCESOS.md`; P06 y P07 en
 `apps/api/src/scripts/desk-acceptance.ts` las verifican, y
 `docs/PRUEBAS.md` conserva la salida real de cada ejecución.
 
+## Actualización de contexto 7: puertas de evidencia de los siete procesos (27 de octubre de 2026)
+
+La revisión del apartado 6 mostró que tener estados y recorridos de muestra no
+bastaba: la API debía impedir avanzar si faltaban datos propios del proceso.
+`DeskService.transition` ahora valida evidencias de entrada y salida para
+nuevos servicios, cambios, incidentes, eventos, problemas, accesos y servicios
+de tecnología; `createTicket` también valida referencias y datos iniciales.
+La aprobación de nuevo servicio puede vincular uno activo o crear uno en
+`REVIEW`, sin duplicar el código. Un cambio no se ejecuta sin aprobación
+registrada; eventos E2/E3 generan un incidente vinculado sin repetirlo; el
+acceso exige GRANT/REVOKE y bloquea la autoaprobación; y la solicitud de
+tecnología requiere agente, entrega y confirmación. `desk-acceptance.ts` amplía
+P09–P13 para probar éxitos y rechazos. La prueba de crear un servicio limpia
+solo su propio fixture en la base aislada, preservando los 46 importados para
+P18. Consultar `docs/PROCESOS.md` para las reglas y `docs/PRUEBAS.md` para el
+comando, resultados y límites observados.
+
 ## 4. Restricciones técnicas
 
 - No usar Prisma.

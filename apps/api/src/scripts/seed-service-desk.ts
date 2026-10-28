@@ -85,16 +85,28 @@ async function seedQueues(client: PoolClient, responsibleUserId: number) {
 }
 
 function dataFor(process: DeskProcess, index: number) {
-  if (process === 'EVENT') return { eventCategory: ['E0','E1','E2','E3','E1'][index - 1], assessment: 'Caso sintético de evaluación' };
+  if (process === 'EVENT') return { eventCategory: ['E0','E1','E2','E3','E1'][index - 1],
+    assessment: 'Caso sintético de evaluación',response:index > 2 ? 'Alerta atendida en la cola de evaluación.' : null };
   if (process === 'INCIDENT') return {
-    incidentCategory: `I${index - 1}`, estimatedMinutes: index * 60,
-    redundancyAvailable: index === 1, solution: index > 5 ? 'Recuperación sintética documentada' : null,
+    incidentCategory: `I${index - 1}`, estimatedMinutes: [null,120,360,1500,5000,45000,null][index - 1],
+    interruptsOrDegrades: index > 1 && index < 7, redundancyAvailable: index === 1,
+    actualMinutes:index === 6 ? 43200 : null,
+    solution: index > 5 ? 'Recuperación sintética documentada' : null,
   };
-  if (process === 'CHANGE') return { riskAssessment: 'Riesgo controlado de demostración', testPlan: 'Prueba de verificación', rollbackPlan: 'Restaurar configuración previa' };
-  if (process === 'ACCESS') return { resource: 'Portal de evaluación', permission: 'Lectura' };
-  if (process === 'NEW_SERVICE') return { linkedServiceId: null, proposedCode: `DEMO.NEW.${index}`, proposedName: `Servicio propuesto ${index}` };
-  if (process === 'PROBLEM') return { rootCause: 'Causa sintética bajo investigación', workaround: index > 2 ? 'Ruta temporal' : null };
-  return { request: 'Atención de servicio tecnológico de evaluación' };
+  if (process === 'CHANGE') return { riskAssessment: 'Riesgo controlado de demostración', testPlan: 'Prueba de verificación',
+    rollbackPlan: 'Restaurar configuración previa',executionResult:index > 3 ? 'Ejecución sintética completada.' : null,
+    validationResult:index > 3 ? 'Pruebas sintéticas aprobadas.' : null };
+  if (process === 'ACCESS') return { resource: 'Portal de evaluación', permission: 'Lectura',accessAction:'GRANT',
+    provisioningResult:index > 4 ? 'Concesión sintética registrada.' : null,
+    validation:index > 4 ? 'Validación sintética completada.' : null };
+  if (process === 'NEW_SERVICE') return { need:'Capacidad de demostración',feasibility:'Viabilidad sintética revisada.',
+    linkedServiceId: null, proposedCode: `DEMO.NEW.${index}`, proposedName: `Servicio propuesto ${index}` };
+  if (process === 'PROBLEM') return { rootCause: 'Causa sintética bajo investigación',
+    workaround: index > 2 ? 'Ruta temporal' : null,knownError:index > 3 ? 'Error conocido sintético.' : null,
+    definitiveSolution:index > 4 ? 'Corrección sintética aplicada.' : null };
+  return { request: 'Atención de servicio tecnológico de evaluación',validation:'Solicitud validada para demostración.',
+    delivery:index > 3 ? 'Prestación sintética realizada.' : null,
+    confirmation:index > 4 ? 'Confirmación sintética registrada.' : null };
 }
 
 async function main() {
@@ -117,6 +129,19 @@ async function main() {
         const number = `DEMO-${shortCodes[process]}-${String(index).padStart(2,'0')}`;
         const state = states[index - 1];
         const serviceId = services.rows[(index - 1) % services.rows.length].id;
+        const processData: Record<string,unknown> = dataFor(process,index);
+        if (process === 'NEW_SERVICE' && state === 'APPROVED') {
+          processData.linkedServiceId = serviceId;
+          processData.proposedCode = null;
+          processData.proposedName = null;
+          processData.approvedServiceId = serviceId;
+        }
+        if (process === 'NEW_SERVICE' && ['IMPLEMENTING','RESOLVED','CLOSED'].includes(state)) {
+          processData.approvedServiceId = serviceId;
+          processData.implementationResult = 'Implementación sintética documentada.';
+        }
+        const assignedUserId = ['ASSIGNED','FULFILLING','CONFIRMING'].includes(state) || index % 2 === 0
+          ? users.get('agente1.demo') : null;
         const result = await client.query<{ id: number }>(`INSERT INTO tickets
           (number,title,description,requester_id,creator_id,beneficiary_id,service_id,queue_id,
            type,process,state,priority,impact,urgency,channel,process_data,no_ci_reason,
@@ -130,9 +155,9 @@ async function main() {
             process === 'ACCESS' ? users.get('solicitante.demo') : null,
             serviceId,process === 'INCIDENT' && state === 'ESCALATED' ? incidentEscalationQueueId : queues.get(process),
             processType[process],process,state,
-            1 + ((index - 1) % 5),JSON.stringify(dataFor(process,index)),
+            1 + ((index - 1) % 5),JSON.stringify(processData),
             ci.rows.length ? null : 'Sin CI cargados al preparar la muestra',
-            index % 2 === 0 ? users.get('agente1.demo') : null,
+            assignedUserId,
             index > 1 ? new Date() : null,
             state === 'RESOLVED' || state === 'CLOSED' ? new Date() : null,
             state === 'CLOSED' ? new Date() : null,index * 3]);

@@ -95,21 +95,34 @@ async function main() {
 
     const services = await status('/services?status=ACTIVE&pageSize=100',200,'GET',undefined,admin);
     const serviceId = services.data[0].id as number;
+    const serviceCode = services.data[0].code as string;
     const queues = await status('/desk/queues',200,'GET',undefined,admin) as Array<Record<string,any>>;
     const queueCodes: Record<string,string> = {NEW_SERVICE:'Q-NEW',CHANGE:'Q-CHANGE',INCIDENT:'Q-INCIDENT',EVENT:'Q-EVENT',PROBLEM:'Q-PROBLEM',ACCESS:'Q-ACCESS',TECH_SERVICE:'Q-TECH'};
     const queueId = (process:string) => {const q=queues.find((row) => row.code===queueCodes[process]);truth(q,`cola ${process}`);return q!.id as number;};
     const firstCi = await pool.query('SELECT id FROM configuration_items WHERE is_device ORDER BY id LIMIT 2');
     const ci1 = Number(firstCi.rows[0].id); const ci2 = Number(firstCi.rows[1].id);
     async function create(process:string, data:Record<string,unknown>={}, options:Record<string,unknown>={}, session=admin) {
+      const incidentDurations: Record<string,number|null> = {I0:null,I1:120,I2:360,I3:1500,I4:5000,I5:45000,I6:null};
+      const processData = process==='INCIDENT'
+        ? {interruptsOrDegrades:data.incidentCategory==='I0'?false:true,
+          estimatedMinutes:incidentDurations[String(data.incidentCategory)] ?? null,...data}
+        : data;
       return status('/desk/tickets',201,'POST',{
         title:`Prueba ${process} ${stamp}`,description:'Caso automatizado aislado de evaluación.',
         serviceId,queueId:queueId(process),priority:3,impact:3,urgency:3,
-        noCiReason:'No aplica un CI específico al caso de prueba.',processData:data,...options,
+        noCiReason:'No aplica un CI específico al caso de prueba.',processData,...options,
       },session);
+    }
+    async function saveProcessData(ticketId:number,data:Record<string,unknown>) {
+      return status(`/desk/tickets/${ticketId}/process-data`,200,'PATCH',data,admin);
     }
     const incident = await create('INCIDENT',{incidentCategory:'I1'});
     await status(`/desk/tickets/${incident.id}`,200,'GET',undefined,admin);
     await status('/desk/tickets',400,'POST',{title:'Inválido',description:'Referencia',serviceId:999999,queueId:queueId('INCIDENT'),noCiReason:'No aplica',processData:{incidentCategory:'I1'}},admin);
+    await status('/desk/tickets',409,'POST',{
+      title:'Servicio duplicado',description:'Código existente',serviceId,queueId:queueId('NEW_SERVICE'),
+      noCiReason:'No aplica',processData:{need:'Capacidad',feasibility:'Viable',proposedCode:serviceCode,proposedName:'Duplicado'},
+    },admin);
     await status('/desk/tickets?from=2026-99-99',400,'GET',undefined,admin);
     await status('/desk/tickets?from=2026-10-27&to=2026-10-26',400,'GET',undefined,admin);
     const filtered = await status(`/desk/tickets?search=${stamp}&queueId=${queueId('INCIDENT')}&serviceId=${serviceId}&priority=3`,200,'GET',undefined,admin);
@@ -244,30 +257,122 @@ async function main() {
     const resolvedByProcess: Record<string,number> = {};
     const paths: Array<{process:string;data:Record<string,unknown>;extra?:Record<string,unknown>;route:string[]}> = [
       {process:'NEW_SERVICE',data:{need:'Nueva capacidad',feasibility:'Viable',linkedServiceId:serviceId},route:['ANALYSIS','PENDING_APPROVAL','APPROVED','IMPLEMENTING','RESOLVED','CLOSED']},
+      {process:'NEW_SERVICE',data:{need:'Capacidad adicional de evaluación',feasibility:'Viable con controles aprobados',proposedCode:`P09-${stamp}`,proposedName:'Servicio nuevo de aceptación'},route:['ANALYSIS','PENDING_APPROVAL','APPROVED','IMPLEMENTING','RESOLVED','CLOSED']},
       {process:'CHANGE',data:{riskAssessment:'Riesgo bajo',testPlan:'Prueba funcional',rollbackPlan:'Revertir configuración'},extra:{ciIds:[ci1]},route:['RISK_ASSESSMENT','PENDING_APPROVAL','APPROVED','PLANNED','EXECUTING','VALIDATING','RESOLVED','CLOSED']},
       {process:'INCIDENT',data:{incidentCategory:'I3'},route:['CLASSIFIED','DIAGNOSING','IN_PROGRESS','RESOLVED','CLOSED']},
       {process:'EVENT',data:{eventCategory:'E0'},route:['CLASSIFIED','EVALUATED','CLOSED']},
       {process:'PROBLEM',data:{rootCause:'Causa identificada'},route:['INVESTIGATING','DEFINITIVE_SOLUTION','RESOLVED','CLOSED']},
-      {process:'ACCESS',data:{resource:'Sistema de prueba',permission:'Lectura'},extra:{beneficiaryId:requester.id},route:['PENDING_APPROVAL','APPROVED','PROVISIONING','VALIDATING','RESOLVED','CLOSED']},
+      {process:'ACCESS',data:{resource:'Sistema de prueba',permission:'Lectura',accessAction:'GRANT'},extra:{beneficiaryId:requester.id},route:['PENDING_APPROVAL','APPROVED','PROVISIONING','VALIDATING','RESOLVED','CLOSED']},
       {process:'TECH_SERVICE',data:{request:'Atención programada'},route:['VALIDATING','ASSIGNED','FULFILLING','CONFIRMING','RESOLVED','CLOSED']},
     ];
+    await status('/desk/tickets',400,'POST',{
+      title:'Incidente sin indicador',description:'Prueba de validación del proceso',serviceId,
+      queueId:queueId('INCIDENT'),noCiReason:'No aplica',processData:{incidentCategory:'I1'},
+    },admin);
+    await status('/desk/tickets',400,'POST',{
+      title:'Incidente incoherente',description:'Duración incompatible con I1',serviceId,
+      queueId:queueId('INCIDENT'),noCiReason:'No aplica',
+      processData:{incidentCategory:'I1',interruptsOrDegrades:true,estimatedMinutes:600},
+    },admin);
+    await status('/desk/tickets',400,'POST',{
+      title:'Cambio sin riesgo',description:'Prueba de validación del proceso',serviceId,
+      queueId:queueId('CHANGE'),noCiReason:'No aplica',processData:{},ciIds:[ci1],
+    },admin);
+    await status('/desk/tickets',400,'POST',{
+      title:'Cambio sin CI',description:'Prueba de validación del proceso',serviceId,
+      queueId:queueId('CHANGE'),noCiReason:'El cambio no debe aceptar motivo de ausencia de CI.',
+      processData:{riskAssessment:'Riesgo',testPlan:'Prueba',rollbackPlan:'Reversión'},
+    },admin);
+    await status('/desk/tickets',400,'POST',{
+      title:'Acceso sin operación',description:'Prueba de validación del proceso',serviceId,
+      queueId:queueId('ACCESS'),noCiReason:'No aplica',beneficiaryId:requester.id,
+      processData:{resource:'Sistema',permission:'Lectura'},
+    },admin);
+    const problemWithoutIncident = await create('PROBLEM',{rootCause:'Causa sin incidente'});
+    await status(`/desk/tickets/${problemWithoutIncident.id}/transition`,400,'POST',{to:'INVESTIGATING'},admin);
+    await status(`/desk/tickets/${problemWithoutIncident.id}/links`,201,'POST',
+      {relatedTicketId:incident.id,linkType:'RELATED'},admin);
+    await status(`/desk/tickets/${problemWithoutIncident.id}/transition`,201,'POST',{to:'INVESTIGATING'},admin);
+    await status(`/desk/tickets/${problemWithoutIncident.id}/transition`,400,'POST',{to:'WORKAROUND'},admin);
+    await saveProcessData(problemWithoutIncident.id,{workaround:'Servicio temporal alterno.'});
+    await status(`/desk/tickets/${problemWithoutIncident.id}/transition`,201,'POST',{to:'WORKAROUND'},admin);
+    await status(`/desk/tickets/${problemWithoutIncident.id}/transition`,400,'POST',{to:'KNOWN_ERROR'},admin);
+    await saveProcessData(problemWithoutIncident.id,{knownError:'Defecto reproducible bajo condición documentada.'});
+    await status(`/desk/tickets/${problemWithoutIncident.id}/transition`,201,'POST',{to:'KNOWN_ERROR'},admin);
+    await status(`/desk/tickets/${problemWithoutIncident.id}/transition`,400,'POST',{to:'DEFINITIVE_SOLUTION'},admin);
+    await saveProcessData(problemWithoutIncident.id,{definitiveSolution:'Corrección permanente desplegada.'});
+    await status(`/desk/tickets/${problemWithoutIncident.id}/transition`,201,'POST',{to:'DEFINITIVE_SOLUTION'},admin);
     for (const item of paths) {
       const ticket = await create(item.process,item.data,item.extra ?? {});
       if (item.process==='PROBLEM') await status(`/desk/tickets/${ticket.id}/links`,201,'POST',{relatedTicketId:incident.id,linkType:'RELATED'},admin);
       if (item.process==='TECH_SERVICE') await status(`/desk/tickets/${ticket.id}/claim`,201,'POST',{},agent1);
       for (const to of item.route) {
+        if (item.process==='NEW_SERVICE' && to==='RESOLVED') {
+          await status(`/desk/tickets/${ticket.id}/transition`,400,'POST',{to,reason:'Implementación terminada'},admin);
+          await saveProcessData(ticket.id,{implementationResult:'Servicio configurado y documentado.'});
+        }
+        if (item.process==='CHANGE' && to==='VALIDATING') {
+          await status(`/desk/tickets/${ticket.id}/transition`,400,'POST',{to},admin);
+          await saveProcessData(ticket.id,{executionResult:'Cambio aplicado según el plan.'});
+        }
+        if (item.process==='CHANGE' && to==='RESOLVED') {
+          await status(`/desk/tickets/${ticket.id}/transition`,400,'POST',{to,reason:'Pruebas realizadas'},admin);
+          await saveProcessData(ticket.id,{validationResult:'Pruebas aprobadas; servicio verificado.'});
+        }
+        if (item.process==='INCIDENT' && to==='RESOLVED') {
+          await status(`/desk/tickets/${ticket.id}/transition`,400,'POST',{to,reason:'Recuperación comprobada'},admin);
+          await saveProcessData(ticket.id,{solution:'Servicio recuperado y causa mitigada.',actualMinutes:1350});
+        }
+        if (item.process==='EVENT' && to==='EVALUATED') await saveProcessData(ticket.id,{assessment:'Evento analizado; se determina impacto bajo.'});
+        if (item.process==='PROBLEM' && to==='DEFINITIVE_SOLUTION') await saveProcessData(ticket.id,{definitiveSolution:'Corrección permanente aplicada.'});
+        if (item.process==='ACCESS' && to==='VALIDATING') {
+          await status(`/desk/tickets/${ticket.id}/transition`,400,'POST',{to},admin);
+          await saveProcessData(ticket.id,{provisioningResult:'Permiso concedido al beneficiario.'});
+        }
+        if (item.process==='ACCESS' && to==='RESOLVED') {
+          await status(`/desk/tickets/${ticket.id}/transition`,400,'POST',{to,reason:'Acceso validado'},admin);
+          await saveProcessData(ticket.id,{validation:'Acceso probado con el beneficiario.'});
+        }
+        if (item.process==='TECH_SERVICE' && to==='ASSIGNED') {
+          await status(`/desk/tickets/${ticket.id}/transition`,400,'POST',{to},admin);
+          await saveProcessData(ticket.id,{validation:'Solicitud existente y datos completos.'});
+        }
+        if (item.process==='TECH_SERVICE' && to==='CONFIRMING') {
+          await status(`/desk/tickets/${ticket.id}/transition`,400,'POST',{to},admin);
+          await saveProcessData(ticket.id,{delivery:'Prestación entregada según lo solicitado.'});
+        }
+        if (item.process==='TECH_SERVICE' && to==='RESOLVED') await saveProcessData(ticket.id,{confirmation:'Solicitante confirma el servicio recibido.'});
         const session = to==='APPROVED' ? approver : admin;
         await status(`/desk/tickets/${ticket.id}/transition`,201,'POST',{to,reason:`Control ${to}`},session);
+        if (item.process==='NEW_SERVICE' && to==='APPROVED' && item.data.proposedCode) {
+          const createdService = await pool.query(`SELECT id,status FROM service_level_2 WHERE code=$1`,[item.data.proposedCode]);
+          eq(createdService.rows.length,1,'un servicio propuesto se crea una sola vez al aprobar');
+          eq(createdService.rows[0].status,'REVIEW','servicio propuesto queda pendiente de completar');
+          const linkedTicket = await pool.query(`SELECT process_data->>'approvedServiceId' AS service_id FROM tickets WHERE id=$1`,[ticket.id]);
+          eq(Number(linkedTicket.rows[0]?.service_id),Number(createdService.rows[0].id),'ticket conserva el servicio aprobado');
+          await status('/desk/tickets',409,'POST',{
+            title:'Propuesta duplicada',description:'No debe duplicar un código aprobado',serviceId,
+            queueId:queueId('NEW_SERVICE'),noCiReason:'No aplica',
+            processData:{need:'Otra solicitud',feasibility:'Viable',proposedCode:item.data.proposedCode,proposedName:'Duplicado'},
+          },admin);
+        }
       }
       const closed = await status(`/desk/tickets/${ticket.id}`,200,'GET',undefined,admin);
       eq(closed.state,'CLOSED',`ruta ${item.process}`);
+      if (item.process==='NEW_SERVICE' && item.data.proposedCode) {
+        // La suite usa una base aislada: quita solo el servicio sintético que acaba de crear
+        // para que P18 pueda seguir comprobando los 46 servicios originales importados.
+        await pool.query('DELETE FROM service_level_2 WHERE code=$1',[item.data.proposedCode]);
+      }
       resolvedByProcess[item.process]=ticket.id;
     }
     done('P09',Object.keys(resolvedByProcess));
 
     const rawChange = await create('CHANGE',{riskAssessment:'Riesgo',testPlan:'Prueba',rollbackPlan:'Reversión'},{ciIds:[ci1]});
     await status(`/desk/tickets/${rawChange.id}/transition`,400,'POST',{to:'EXECUTING'},admin);
-    const selfAccess = await create('ACCESS',{resource:'Sistema',permission:'Lectura'},{beneficiaryId:requester.id});
+    await pool.query("UPDATE tickets SET state='PLANNED' WHERE id=$1",[rawChange.id]);
+    await status(`/desk/tickets/${rawChange.id}/transition`,409,'POST',{to:'EXECUTING'},admin);
+    const selfAccess = await create('ACCESS',{resource:'Sistema',permission:'Lectura',accessAction:'GRANT'},{beneficiaryId:requester.id});
     await status(`/desk/tickets/${selfAccess.id}/transition`,201,'POST',{to:'PENDING_APPROVAL'},admin);
     await status(`/desk/tickets/${selfAccess.id}/transition`,403,'POST',{to:'APPROVED'},admin);
     done('P10');
@@ -275,6 +380,8 @@ async function main() {
     for (const category of ['E0','E1','E2','E3']) {
       const event = await create('EVENT',{eventCategory:category});
       await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'CLASSIFIED'},agent1);
+      await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'EVALUATED'},agent1);
+      await saveProcessData(event.id,{assessment:'Evaluación del evento'});
       await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'EVALUATED'},agent1);
       const links = await pool.query(`SELECT COUNT(*)::int AS total FROM ticket_links
         WHERE ticket_id=$1 AND link_type='GENERATED_INCIDENT'`,[event.id]);
@@ -282,6 +389,8 @@ async function main() {
       await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'EVALUATED'},agent1);
       if (['E2','E3'].includes(category)) {
         await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'CLOSED'},agent1);
+        await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'RESPONDED'},agent1);
+        await saveProcessData(event.id,{response:'Equipo técnico atendió la alerta y documentó las acciones.'});
         await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'RESPONDED'},agent1);
         const notifications = await status('/desk/notifications',200,'GET',undefined,admin) as Array<Record<string,any>>;
         truth(notifications.some((n) => n.ticketId===event.id),`notificación ${category}`);
@@ -299,6 +408,7 @@ async function main() {
 
     const problem = await create('PROBLEM',{rootCause:'Causa de prueba'});
     await status(`/desk/tickets/${problem.id}/links`,201,'POST',{relatedTicketId:incident.id,linkType:'RELATED'},admin);
+    await status(`/desk/tickets/${problem.id}/links`,400,'POST',{relatedTicketId:incident.id,linkType:'IMPLEMENTS'},admin);
     await status(`/desk/tickets/${problem.id}/links`,201,'POST',{relatedTicketId:rawChange.id,linkType:'IMPLEMENTS'},admin);
     const related = await status(`/desk/tickets/${problem.id}`,200,'GET',undefined,admin);
     eq(related.links.length,2,'relaciones problema-incidente-cambio');
@@ -338,6 +448,10 @@ async function main() {
     await status(`/desk/tickets/${unfinished.id}/pause`,201,'POST',{reason:'Espera controlada'},admin);
     await status(`/desk/tickets/${unfinished.id}/resume`,201,'POST',{reason:'Atención reanudada'},admin);
     for (const to of ['CLASSIFIED','DIAGNOSING','IN_PROGRESS','RESOLVED','CLOSED']) {
+      if (to==='RESOLVED') {
+        await status(`/desk/tickets/${unfinished.id}/transition`,400,'POST',{to,reason:'Solución de prueba'},admin);
+        await saveProcessData(unfinished.id,{solution:'Servicio restablecido.',actualMinutes:4800});
+      }
       await status(`/desk/tickets/${unfinished.id}/transition`,201,'POST',{to,reason:'Solución de prueba'},admin);
     }
     await status(`/desk/tickets/${unfinished.id}/transition`,201,'POST',{to:'SUBMITTED',reason:'Se repitió el problema'},admin);
