@@ -50,29 +50,37 @@ async function createUsers(client: PoolClient, positionId: number) {
   return users;
 }
 
-async function seedQueues(client: PoolClient) {
+async function seedQueues(client: PoolClient, responsibleUserId: number) {
   const queues = new Map<DeskProcess,number>();
   for (const [code,name,process] of queueDefinitions) {
     const result = await client.query<{ id: number }>(`INSERT INTO support_queues
-      (code,name,process,support_level,first_response_minutes,resolution_minutes)
-      VALUES($1,$2,$3,1,60,480)
+      (code,name,process,responsible_user_id,support_level,first_response_minutes,resolution_minutes)
+      VALUES($1,$2,$3,$4,1,60,480)
       ON CONFLICT(code) DO UPDATE SET name=EXCLUDED.name,process=EXCLUDED.process,
-        active=TRUE,updated_at=NOW() RETURNING id`, [code,name,process]);
+        active=TRUE,updated_at=NOW() RETURNING id`, [code,name,process,responsibleUserId]);
     const queueId = result.rows[0].id;
     queues.set(process,queueId);
     await client.query(`INSERT INTO queue_grants(queue_id,role,can_view,can_handle,can_transfer)
       VALUES($1,'AGENTE',TRUE,TRUE,TRUE) ON CONFLICT DO NOTHING`, [queueId]);
     await client.query(`INSERT INTO queue_grants(queue_id,role,can_view,can_approve)
       VALUES($1,'APROBADOR',TRUE,TRUE) ON CONFLICT DO NOTHING`, [queueId]);
+    await client.query(`INSERT INTO queue_grants(queue_id,user_id,can_view,can_handle)
+      VALUES($1,$2,TRUE,TRUE)
+      ON CONFLICT (queue_id,user_id) WHERE role IS NULL
+      DO UPDATE SET can_view=TRUE,can_handle=TRUE`, [queueId,responsibleUserId]);
   }
   const escalationQueue = await client.query<{ id: number }>(`INSERT INTO support_queues
-    (code,name,process,support_level,first_response_minutes,resolution_minutes)
-    VALUES('Q-INCIDENT-L2','Soporte técnico de incidentes','INCIDENT',2,60,480)
+    (code,name,process,responsible_user_id,support_level,first_response_minutes,resolution_minutes)
+    VALUES('Q-INCIDENT-L2','Soporte técnico de incidentes','INCIDENT',$1,2,60,480)
     ON CONFLICT(code) DO UPDATE SET name=EXCLUDED.name,process=EXCLUDED.process,
-      support_level=2,active=TRUE,updated_at=NOW() RETURNING id`);
+      support_level=2,active=TRUE,updated_at=NOW() RETURNING id`, [responsibleUserId]);
   const incidentEscalationQueueId = escalationQueue.rows[0].id;
   await client.query(`INSERT INTO queue_grants(queue_id,role,can_view,can_handle,can_transfer)
     VALUES($1,'AGENTE',TRUE,TRUE,TRUE) ON CONFLICT DO NOTHING`, [incidentEscalationQueueId]);
+  await client.query(`INSERT INTO queue_grants(queue_id,user_id,can_view,can_handle)
+    VALUES($1,$2,TRUE,TRUE)
+    ON CONFLICT (queue_id,user_id) WHERE role IS NULL
+    DO UPDATE SET can_view=TRUE,can_handle=TRUE`, [incidentEscalationQueueId,responsibleUserId]);
   return { queues, incidentEscalationQueueId };
 }
 
@@ -98,7 +106,9 @@ async function main() {
     const services = await client.query<{ id: number }>(`SELECT id FROM service_level_2 WHERE status='ACTIVE' ORDER BY id`);
     if (!position.rows[0] || !services.rows[0]) throw new Error('Ejecuta seed-demo e import-catalog antes de seed-service-desk.');
     const users = await createUsers(client,position.rows[0].id);
-    const { queues, incidentEscalationQueueId } = await seedQueues(client);
+    const responsibleUserId = users.get('agente1.demo');
+    if (!responsibleUserId) throw new Error('No se creó el agente responsable de las colas.');
+    const { queues, incidentEscalationQueueId } = await seedQueues(client,responsibleUserId);
     const ci = await client.query<{ id: number }>(`SELECT id FROM configuration_items WHERE is_device ORDER BY id LIMIT 20`);
     let created = 0;
     for (const [,,process] of queueDefinitions) {

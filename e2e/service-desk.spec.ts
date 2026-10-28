@@ -79,13 +79,18 @@ test('mantenimiento visual de categoría, ubicación y cola', async ({ page }) =
   const queuePanel = page.locator('section.panel').filter({ has: page.getByRole('heading', { name: 'Crear cola' }) });
   await queuePanel.getByLabel('Código').fill(code);
   await queuePanel.getByLabel('Nombre').fill('Cola de interfaz');
+  await queuePanel.getByLabel('Responsable').selectOption({index:1});
+  await queuePanel.getByLabel('Regla de orden').selectOption('AGE_PRIORITY');
   await queuePanel.getByRole('button', { name: 'Crear cola' }).click();
   const queueRow = page.locator('table tbody tr').filter({ hasText: code });
   await expect(queueRow).toBeVisible();
+  await expect(queueRow).toContainText('Antigüedad y prioridad');
   await queueRow.getByRole('button', { name: 'Editar' }).click();
   const queueDialog = page.getByRole('dialog', { name: `Editar cola ${code}` });
   await queueDialog.getByLabel('Nombre').fill('Cola revisada');
+  await queueDialog.getByLabel('Regla de orden').selectOption('PRIORITY_AGE');
   await queueDialog.getByLabel('Primera respuesta (min)').fill('45');
   await queueDialog.getByRole('button', { name: 'Guardar cambios' }).click();
   await expect(queueRow).toContainText('Cola revisada');
+  await expect(queueRow).toContainText('Prioridad y antigüedad');
 });

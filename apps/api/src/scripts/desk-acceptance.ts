@@ -130,14 +130,60 @@ async function main() {
     eq(invalidUpload.status,400,'firma de PDF inválida');
     done('P05');
 
-    const privateQueue = await status('/desk/queues',201,'POST',{code:`PRV-${stamp}`,name:'Cola privada de prueba',process:'INCIDENT'},admin);
-    await status(`/desk/queues/${privateQueue.id}/grants`,201,'POST',{userId:agent1.id,canView:true,canHandle:true,canTransfer:true},admin);
+    await status('/desk/queues',400,'POST',{code:`NO-OWNER-${stamp}`,name:'Sin responsable',process:'INCIDENT'},admin);
+    await status('/desk/queues',400,'POST',
+      {code:`CONSULTA-${stamp}`,name:'Responsable consulta',process:'INCIDENT',responsibleUserId:consulta.id},admin);
+    const privateQueue = await status('/desk/queues',201,'POST',
+      {code:`PRV-${stamp}`,name:'Cola privada de prueba',process:'INCIDENT',responsibleUserId:agent1.id,
+        sortRule:'AGE_PRIORITY',firstResponseMinutes:45,resolutionMinutes:240},admin);
+    eq(privateQueue.responsible_user_id,agent1.id,'responsable de cola');
+    eq(privateQueue.sort_rule,'AGE_PRIORITY','regla de orden configurada');
+    const initialGrants = await status(`/desk/queues/${privateQueue.id}/grants`,200,'GET',undefined,admin);
+    const ownerGrant = initialGrants.find((grant:Record<string,unknown>) => grant.userId===agent1.id);
+    truth(ownerGrant?.canView===true && ownerGrant?.canHandle===true,'responsable con acceso de atención');
+    await status(`/desk/queues/${privateQueue.id}/grants/${ownerGrant.id}`,409,'DELETE',undefined,admin);
+    await status('/desk/queues',409,'POST',
+      {code:`PRV-${stamp}`,name:'Código repetido',process:'INCIDENT',responsibleUserId:agent1.id},admin);
+    await status(`/desk/queues/${privateQueue.id}/grants`,201,'POST',
+      {userId:agent1.id,canView:true,canHandle:true,canTransfer:true,canAdmin:true},admin);
+    await status(`/desk/queues/${privateQueue.id}`,200,'PATCH',{description:'Administrada por agente autorizado'},agent1);
+    const delegated = await status(`/desk/queues/${privateQueue.id}/grants`,200,'GET',undefined,agent1);
+    truth(delegated.some((grant:Record<string,unknown>) => grant.userId===agent1.id && grant.canAdmin===true),
+      'administración de cola delegada por permiso');
+    await status(`/desk/queues/${privateQueue.id}/grants`,201,'POST',{userId:approver.id,canAdmin:true},admin);
+    await status(`/desk/queues/${privateQueue.id}`,200,'PATCH',{description:'Administrada también por aprobador'},approver);
+    await status(`/desk/queues/${privateQueue.id}`,403,'PATCH',{name:'Sin permiso'},agent2);
+    await status(`/desk/queues/${privateQueue.id}/grants`,400,'POST',
+      {userId:consulta.id,canView:true,canHandle:true},admin);
+    await status(`/desk/queues/${privateQueue.id}/grants`,400,'POST',
+      {role:'CONSULTA',canAdmin:true},admin);
     const privateTicket = await create('INCIDENT',{incidentCategory:'I1'},{queueId:privateQueue.id});
     await status(`/desk/tickets/${privateTicket.id}`,200,'GET',undefined,agent1);
     await status(`/desk/tickets/${privateTicket.id}`,403,'GET',undefined,agent2);
     await status(`/desk/tickets/${privateTicket.id}/claim`,403,'POST',{},agent2);
+    await status(`/desk/tickets/${privateTicket.id}/claim`,403,'POST',{},approver);
+    const delegatedGrant = await status(`/desk/queues/${privateQueue.id}/grants`,201,'POST',
+      {userId:agent2.id,canView:true},agent1);
+    await status(`/desk/tickets/${privateTicket.id}`,200,'GET',undefined,agent2);
+    await status(`/desk/tickets/${privateTicket.id}/claim`,403,'POST',{},agent2);
+    await status(`/desk/queues/${privateQueue.id}/grants/${delegatedGrant.id}`,200,'DELETE',undefined,agent1);
+    await status(`/desk/tickets/${privateTicket.id}`,403,'GET',undefined,agent2);
+    await status(`/desk/queues/${privateQueue.id}`,409,'PATCH',{active:false},admin);
+    await status(`/users/${agent1.id}`,409,'PATCH',{active:false},admin);
+    await status(`/desk/tickets/${privateTicket.id}/claim`,201,'POST',{},agent1);
+    await status(`/desk/queues/${privateQueue.id}/grants`,409,'POST',
+      {userId:agent1.id,canView:true,canAdmin:true},admin);
     done('P06');
 
+    const older = await create('INCIDENT',{incidentCategory:'I1'},
+      {queueId:privateQueue.id,title:`ORDER-${stamp}-older`,priority:1});
+    const newer = await create('INCIDENT',{incidentCategory:'I1'},
+      {queueId:privateQueue.id,title:`ORDER-${stamp}-newer`,priority:5});
+    await pool.query("UPDATE tickets SET created_at=NOW()-INTERVAL '1 hour' WHERE id=$1",[older.id]);
+    const ageOrdered = await status(`/desk/tickets?queueId=${privateQueue.id}&search=ORDER-${stamp}`,200,'GET',undefined,admin);
+    eq(ageOrdered.data[0].id,older.id,'orden por antigüedad de cola');
+    const defaultOrdered = await status(`/desk/tickets?search=ORDER-${stamp}`,200,'GET',undefined,admin);
+    eq(defaultOrdered.data[0].id,newer.id,'orden global por prioridad');
     const race = await create('INCIDENT',{incidentCategory:'I2'});
     const [claim1,claim2] = await Promise.all([
       request(`/desk/tickets/${race.id}/claim`,'POST',{},agent1.cookie),
@@ -148,6 +194,21 @@ async function main() {
     for (let index=1;index<ordered.data.length;index++) {
       truth(ordered.data[index-1].priority>=ordered.data[index].priority,'orden por prioridad');
     }
+    const candidates = await status(`/desk/queues/${queueId('INCIDENT')}/assignees`,200,'GET',undefined,admin);
+    truth(candidates.some((candidate:Record<string,unknown>) => candidate.id===agent1.id) &&
+      !candidates.some((candidate:Record<string,unknown>) => candidate.id===requester.id),
+      'solo agentes autorizados aparecen para asignación');
+    const claimed = await status(`/desk/tickets/${race.id}`,200,'GET',undefined,admin);
+    const targetAgentId = claimed.assigned_user_id===agent1.id ? agent2.id : agent1.id;
+    await status(`/desk/tickets/${race.id}/assign`,403,'POST',{userId:agent1.id},agent2);
+    await status(`/desk/tickets/${race.id}/assign`,400,'POST',{userId:requester.id},admin);
+    await status(`/desk/tickets/${race.id}/assign`,201,'POST',{userId:targetAgentId,reason:'Asignación supervisada'},admin);
+    const assigned = await status(`/desk/tickets/${race.id}`,200,'GET',undefined,admin);
+    eq(assigned.assigned_user_id,targetAgentId,'agente reasignado');
+    truth(assigned.history.some((item:Record<string,any>) => item.action==='ASSIGN' &&
+      item.actor_id===admin.id && item.old_values.assignedUserId===claimed.assigned_user_id &&
+      item.new_values.assignedUserId===targetAgentId),
+      'asignación dirigida con actor y cambio registrado');
     done('P07',{claimStatuses:[claim1.status,claim2.status]});
 
     await status(`/desk/tickets/${race.id}/transfer`,201,'POST',{queueId:privateQueue.id,reason:'Escalamiento de prueba'},admin);
@@ -160,7 +221,8 @@ async function main() {
     await status(`/desk/tickets/${race.id}/transition`,400,'POST',{to:'ESCALATED',reason:'Sin destino'},admin);
     await status(`/desk/tickets/${race.id}/escalate`,400,'POST',{queueId:queueId('INCIDENT'),reason:'Mismo nivel'},admin);
     const upperQueue = await status('/desk/queues',201,'POST',
-      {code:`ESC-${stamp}`,name:'Soporte nivel 2 de prueba',process:'INCIDENT',supportLevel:2},admin);
+      {code:`ESC-${stamp}`,name:'Soporte nivel 2 de prueba',process:'INCIDENT',supportLevel:2,
+        responsibleUserId:agent1.id},admin);
     await status(`/desk/tickets/${race.id}/escalate`,403,'POST',
       {queueId:upperQueue.id,reason:'Sin permiso'},agent2);
     await status(`/desk/tickets/${race.id}/escalate`,400,'POST',{queueId:upperQueue.id},admin);

@@ -36,6 +36,8 @@ En **Linux/macOS**, sustituya únicamente la copia del archivo por `cp .env.exam
 
 El script de preparación crea ocho colas (una por cada uno de los siete procesos y una cola adicional de nivel 2 para escalar incidentes) y 37 tickets de muestra. La importación de `data/fuentes/CMDB.xlsx` procesa dos CI originales y registra las referencias ambiguas sin inventar destinos; la generación agrega **5,000 dispositivos distintos**. Los tres comandos de carga son repetibles y no borran datos existentes. Ambos Excel originales se conservan sin cambios.
 
+En **Colas**, `ADMIN` crea una cola con responsable activo, proceso, nivel, objetivos y regla de orden (`prioridad → antigüedad` o `antigüedad → prioridad`). `ADMIN` puede delegar la administración de una cola con el permiso `can_admin`; ese permiso permite editarla, gestionar sus accesos y asignar tickets a usuarios autorizados. En **Tickets**, un agente con permiso puede tomar un caso libre; el administrador global o de la cola puede asignarlo o reasignarlo. La API conserva actor, motivo y valores anteriores/nuevos. La [política de autorización y asignación](docs/PROCESOS.md#colas-autorización-y-asignación) explica los bloqueos al desactivar usuarios o colas.
+
 En **CMDB**, el administrador puede mantener categorías, ubicaciones
 controladas y CI. Un CI importado conserva la ubicación textual del Excel si
 no existe una ubicación identificada. La composición `Padre técnico de`

@@ -87,6 +87,22 @@ la secuencia histórica real. La migración 005 protege esa exclusividad en la
 base. `DEPENDS_ON` y `HOSTED_ON` se validan juntos para evitar ciclos mixtos;
 `CONNECTED_TO` admite ciclos. Repetir P04 y P14 cuando se cambien estas reglas.
 
+## Actualización de contexto 6: colas con dueño y administración delegada (27 de octubre de 2026)
+
+Al revisar el apartado 5 de la tarea se halló que la cola tenía un orden fijo,
+`can_admin` se almacenaba sin aplicarse a sus rutas y faltaba un responsable
+designado y una asignación dirigida. La migración 006 conserva las colas
+existentes, asigna un responsable activo a las anteriores y exige ese campo en
+las nuevas. El responsable tiene acceso individual de consulta y atención;
+para cambiarlo se edita la cola antes de retirar su concesión. La API acepta
+dos reglas de orden, comprueba `can_admin` en edición, permisos y asignación,
+y guarda actor y valores anteriores/nuevos de la asignación. CONSULTA nunca
+adquiere escritura por pertenecer a una cola. El catálogo de usuarios y la
+desactivación de colas impiden dejar tickets abiertos sin responsable válido.
+Las reglas y su alcance están en `docs/PROCESOS.md`; P06 y P07 en
+`apps/api/src/scripts/desk-acceptance.ts` las verifican, y
+`docs/PRUEBAS.md` conserva la salida real de cada ejecución.
+
 ## 4. Restricciones técnicas
 
 - No usar Prisma.

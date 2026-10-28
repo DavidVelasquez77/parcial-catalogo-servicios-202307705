@@ -58,6 +58,8 @@ erDiagram
   service_level_2 ||--o{ ci_services : sirve
   configuration_items ||--o{ ticket_ci : afectado
   tickets ||--o{ ticket_ci : asocia
+  users ||--o{ support_queues : responsable
+  support_queues ||--o{ queue_grants : autoriza
   support_queues ||--o{ tickets : atiende
   users ||--o{ tickets : solicita
   tickets ||--o{ ticket_history : audita
@@ -146,7 +148,7 @@ Las dos filas contienen `Base de Datos1` en Relaciones, pero ese CI no existe en
 | `ci_history` | `ci_id`, acción, fecha | Historial de cambios del sistema; no equivale a la fecha histórica del Excel |
 | `cmdb_import_runs` | `id`, archivo, SHA-256, hoja | Totales creados, actualizados, omitidos y observados |
 | `cmdb_import_observations` | `run_id`, fila, campo | Registra ambigüedades sin inventar relaciones |
-| `support_queues` | `id`, `code` único, `process` | Un proceso por cola; objetivos de primera respuesta y resolución en minutos calendario |
+| `support_queues` | `id`, `code` único, `process`, `responsible_user_id` obligatorio | Un proceso por cola; responsable activo `ADMIN`/`AGENTE`; nivel 0–4, regla `PRIORITY_AGE` o `AGE_PRIORITY`, objetivos de primera respuesta y resolución en minutos calendario; baja lógica |
 | `queue_grants` | `queue_id` más usuario o rol | Permisos separados de consulta, atención, transferencia, aprobación y administración |
 | `tickets` | `id`, `number` único, FKs de servicio, cola y personas | Servicio nivel 1 derivado; estado, prioridad, impacto, urgencia, canal, fechas y datos propios del proceso |
 | `ticket_ci`, `ticket_links` | pares de IDs | CI afectados y vínculos entre tickets; motivo obligatorio si no hay CI |

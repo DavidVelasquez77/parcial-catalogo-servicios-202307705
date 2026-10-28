@@ -67,18 +67,50 @@ export class DeskService {
     if (!(await this.allowed(queueId,user,permission,client))) throw new ForbiddenException('No tienes permiso para esta acción en la cola.');
   }
 
+  private sortRule(value: unknown) {
+    const rule = String(value);
+    if (!['PRIORITY_AGE','AGE_PRIORITY'].includes(rule)) {
+      throw new BadRequestException('La regla de orden debe ser prioridad y antigüedad, o antigüedad y prioridad.');
+    }
+    return rule;
+  }
+
+  private async assertResponsibleUser(id: number, client: PoolClient) {
+    const result = await client.query(`SELECT 1 FROM users u WHERE u.id=$1 AND u.active
+      AND EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role IN ('ADMIN','AGENTE'))
+      AND NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role='CONSULTA')
+      FOR UPDATE OF u`, [id]);
+    if (!result.rows[0]) throw new BadRequestException('El responsable de la cola debe ser un administrador o agente activo.');
+  }
+
+  private async ensureResponsibleAccess(queueId: number, responsibleId: number, client: PoolClient) {
+    const existing = await client.query(`SELECT id FROM queue_grants
+      WHERE queue_id=$1 AND user_id=$2 AND role IS NULL FOR UPDATE`, [queueId,responsibleId]);
+    if (existing.rows[0]) {
+      await client.query('UPDATE queue_grants SET can_view=TRUE,can_handle=TRUE WHERE id=$1', [existing.rows[0].id]);
+    } else {
+      await client.query(`INSERT INTO queue_grants(queue_id,user_id,can_view,can_handle)
+        VALUES($1,$2,TRUE,TRUE)`, [queueId,responsibleId]);
+    }
+  }
+
   async activeUsers() {
-    const result = await this.db.query('SELECT id,name FROM users WHERE active ORDER BY name');
+    const result = await this.db.query(`SELECT u.id,u.name,u.role,
+      ARRAY(SELECT ur.role FROM user_roles ur WHERE ur.user_id=u.id ORDER BY ur.role) AS roles
+      FROM users u WHERE u.active ORDER BY u.name`);
     return result.rows;
   }
 
   async queues(user: AuthenticatedUser) {
-    const result = await this.db.query(`SELECT q.*,
+    const result = await this.db.query(`SELECT q.*,owner.name AS "responsibleName",
       EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_handle
         AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canHandle",
       EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_transfer
-        AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canTransfer"
-      FROM support_queues q ORDER BY q.process,q.name`, [user.id,user.roles]);
+        AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canTransfer",
+      EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_admin
+        AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canAdmin"
+      FROM support_queues q JOIN users owner ON owner.id=q.responsible_user_id
+      ORDER BY q.process,q.name`, [user.id,user.roles]);
     return result.rows;
   }
 
@@ -88,21 +120,27 @@ export class DeskService {
     if (!processes.includes(process as DeskProcess)) throw new BadRequestException('Proceso no válido.');
     const code = requiredText(body.code,'Código',50);
     const name = requiredText(body.name,'Nombre',160);
+    const responsibleId = idOf(body.responsibleUserId,'Responsable de cola');
+    const sortRule = this.sortRule(body.sortRule ?? 'PRIORITY_AGE');
     const supportLevel = body.supportLevel === undefined ? 1 : Number(body.supportLevel);
     if (!Number.isInteger(supportLevel) || supportLevel < 0 || supportLevel > 4) throw new BadRequestException('Nivel de soporte no válido.');
-    const duplicate = await this.db.query('SELECT id FROM support_queues WHERE code=$1', [code]);
-    if (duplicate.rows[0]) throw new ConflictException('El código de cola ya existe.');
-    const result = await this.db.query(`INSERT INTO support_queues
-      (code,name,description,process,support_level,first_response_minutes,resolution_minutes)
-      VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [code,name,body.description ?? null,process,supportLevel,
-        optionalPositiveMinutes(body.firstResponseMinutes,'Objetivo de primera respuesta'),
-        optionalPositiveMinutes(body.resolutionMinutes,'Objetivo de resolución')]);
-    return result.rows[0];
+    return this.db.transaction(async (client) => {
+      await this.assertResponsibleUser(responsibleId,client);
+      const duplicate = await client.query('SELECT id FROM support_queues WHERE code=$1', [code]);
+      if (duplicate.rows[0]) throw new ConflictException('El código de cola ya existe.');
+      const result = await client.query(`INSERT INTO support_queues
+        (code,name,description,process,responsible_user_id,support_level,sort_rule,first_response_minutes,resolution_minutes)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [code,name,body.description ?? null,process,responsibleId,supportLevel,sortRule,
+          optionalPositiveMinutes(body.firstResponseMinutes,'Objetivo de primera respuesta'),
+          optionalPositiveMinutes(body.resolutionMinutes,'Objetivo de resolución')]);
+      await this.ensureResponsibleAccess(result.rows[0].id,responsibleId,client);
+      return result.rows[0];
+    });
   }
 
   async updateQueue(id: number, body: Record<string, unknown>, user: AuthenticatedUser) {
-    this.assertAdmin(user);
+    await this.assertAllowed(id,user,'can_admin');
     return this.db.transaction(async (client) => {
       const current = await client.query('SELECT * FROM support_queues WHERE id=$1 FOR UPDATE', [id]);
       if (!current.rows[0]) throw new NotFoundException('Cola no encontrada.');
@@ -117,21 +155,26 @@ export class DeskService {
       if (!active && dependencies.rows[0].open) throw new ConflictException('Transfiere o cierra los tickets abiertos antes de desactivar la cola.');
       const levelValue = body.supportLevel === undefined ? old.support_level : Number(body.supportLevel);
       if (!Number.isInteger(levelValue) || levelValue < 0 || levelValue > 4) throw new BadRequestException('Nivel de soporte no válido.');
+      const responsibleId = body.responsibleUserId === undefined ? old.responsible_user_id : idOf(body.responsibleUserId,'Responsable de cola');
+      const sortRule = body.sortRule === undefined ? old.sort_rule : this.sortRule(body.sortRule);
+      await this.assertResponsibleUser(responsibleId,client);
       const updated = await client.query(`UPDATE support_queues SET name=$1,description=$2,process=$3,
-        support_level=$4,first_response_minutes=$5,resolution_minutes=$6,active=$7,updated_at=NOW()
-        WHERE id=$8 RETURNING *`,
+        responsible_user_id=$4,support_level=$5,sort_rule=$6,first_response_minutes=$7,
+        resolution_minutes=$8,active=$9,updated_at=NOW()
+        WHERE id=$10 RETURNING *`,
         [body.name === undefined ? old.name : requiredText(body.name,'Nombre',160),
-          body.description ?? old.description,process,levelValue,
+          body.description ?? old.description,process,responsibleId,levelValue,sortRule,
           body.firstResponseMinutes === undefined ? old.first_response_minutes : optionalPositiveMinutes(body.firstResponseMinutes,'Objetivo de primera respuesta'),
           body.resolutionMinutes === undefined ? old.resolution_minutes : optionalPositiveMinutes(body.resolutionMinutes,'Objetivo de resolución'),active,id]);
+      if (active) await this.ensureResponsibleAccess(id,responsibleId,client);
       return updated.rows[0];
     });
   }
 
   async grant(queueId: number, body: Record<string, unknown>, user: AuthenticatedUser) {
-    this.assertAdmin(user);
     const queue = await this.db.query('SELECT id FROM support_queues WHERE id=$1', [queueId]);
     if (!queue.rows[0]) throw new NotFoundException('Cola no encontrada.');
+    await this.assertAllowed(queueId,user,'can_admin');
     const userId = body.userId == null ? null : idOf(body.userId,'Usuario');
     const role = body.role == null ? null : String(body.role);
     if ((userId === null) === (role === null)) throw new BadRequestException('Indica un usuario o un rol, no ambos.');
@@ -146,6 +189,21 @@ export class DeskService {
     const flags = ['canView','canHandle','canTransfer','canApprove','canAdmin'];
     if (!flags.some((key) => body[key] === true)) throw new BadRequestException('Activa al menos un permiso.');
     return this.db.transaction(async (client) => {
+      const previous = await client.query(`SELECT * FROM queue_grants
+        WHERE queue_id=$1 AND user_id IS NOT DISTINCT FROM $2
+          AND role IS NOT DISTINCT FROM $3 FOR UPDATE`, [queueId,userId,role]);
+      if (userId && previous.rows[0] && body.canHandle !== true) {
+        const owner = await client.query('SELECT 1 FROM support_queues WHERE id=$1 AND responsible_user_id=$2 AND active', [queueId,userId]);
+        if (owner.rows[0]) throw new ConflictException('Designa otro responsable antes de retirar su permiso de atención.');
+      }
+      if (previous.rows[0]?.can_handle && body.canHandle !== true) {
+        const assigned = await client.query(`SELECT t.id FROM tickets t WHERE t.queue_id=$1
+          AND t.state NOT IN ('CLOSED','REJECTED') AND t.assigned_user_id IS NOT NULL
+          AND (t.assigned_user_id=$2 OR ($3::text IS NOT NULL AND EXISTS(
+            SELECT 1 FROM user_roles ur WHERE ur.user_id=t.assigned_user_id AND ur.role=$3))) LIMIT 1`,
+          [queueId,userId,role]);
+        if (assigned.rows[0]) throw new ConflictException('Reasigna los tickets abiertos antes de retirar el permiso de atención.');
+      }
       await client.query('DELETE FROM queue_grants WHERE queue_id=$1 AND user_id IS NOT DISTINCT FROM $2 AND role IS NOT DISTINCT FROM $3', [queueId,userId,role]);
       const result = await client.query(`INSERT INTO queue_grants
         (queue_id,user_id,role,can_view,can_handle,can_transfer,can_approve,can_admin)
@@ -156,9 +214,9 @@ export class DeskService {
   }
 
   async grants(queueId: number, user: AuthenticatedUser) {
-    this.assertAdmin(user);
     const queue = await this.db.query('SELECT id FROM support_queues WHERE id=$1', [queueId]);
     if (!queue.rows[0]) throw new NotFoundException('Cola no encontrada.');
+    await this.assertAllowed(queueId,user,'can_admin');
     const result = await this.db.query(`SELECT g.id,g.role,g.user_id AS "userId",u.name AS "userName",
       g.can_view AS "canView",g.can_handle AS "canHandle",g.can_transfer AS "canTransfer",
       g.can_approve AS "canApprove",g.can_admin AS "canAdmin"
@@ -167,12 +225,35 @@ export class DeskService {
     return result.rows;
   }
 
+  private async eligibleAssignees(queueId: number, client?: PoolClient) {
+    const statement = `SELECT u.id,u.name FROM users u WHERE u.active
+      AND NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role='CONSULTA')
+      AND (EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role='ADMIN')
+        OR EXISTS (SELECT 1 FROM queue_grants g WHERE g.queue_id=$1 AND g.can_handle
+          AND (g.user_id=u.id OR EXISTS (SELECT 1 FROM user_roles ur
+            WHERE ur.user_id=u.id AND ur.role=g.role))))
+      ORDER BY u.name,u.id`;
+    const result = client ? await client.query(statement,[queueId]) : await this.db.query(statement,[queueId]);
+    return result.rows as Array<{ id: number; name: string }>;
+  }
+
+  async assignees(queueId: number, user: AuthenticatedUser) {
+    const queue = await this.db.query('SELECT id FROM support_queues WHERE id=$1', [queueId]);
+    if (!queue.rows[0]) throw new NotFoundException('Cola no encontrada.');
+    await this.assertAllowed(queueId,user,'can_admin');
+    return this.eligibleAssignees(queueId);
+  }
+
   async revoke(queueId: number, grantId: number, user: AuthenticatedUser) {
-    this.assertAdmin(user);
+    await this.assertAllowed(queueId,user,'can_admin');
     return this.db.transaction(async (client) => {
       const grant = await client.query('SELECT * FROM queue_grants WHERE id=$1 AND queue_id=$2 FOR UPDATE', [grantId,queueId]);
       if (!grant.rows[0]) throw new NotFoundException('Permiso de cola no encontrado.');
       const row = grant.rows[0];
+      if (row.user_id) {
+        const owner = await client.query('SELECT 1 FROM support_queues WHERE id=$1 AND responsible_user_id=$2 AND active', [queueId,row.user_id]);
+        if (owner.rows[0]) throw new ConflictException('Designa otro responsable antes de retirar su acceso a la cola.');
+      }
       const open = await client.query(`SELECT t.id FROM tickets t WHERE t.queue_id=$1
         AND t.state NOT IN ('CLOSED','REJECTED') AND t.assigned_user_id IS NOT NULL
         AND (t.assigned_user_id=$2 OR ($3::text IS NOT NULL AND EXISTS(
@@ -217,7 +298,9 @@ export class DeskService {
         t.requester_id AS "requesterId",t.assigned_user_id AS "assignedUserId",
         t.created_at AS "createdAt",t.updated_at AS "updatedAt"
         FROM tickets t JOIN support_queues q ON q.id=t.queue_id ${where}
-        ORDER BY t.priority DESC,t.created_at ASC,t.id ASC LIMIT $13 OFFSET $14`,
+        ORDER BY CASE WHEN $4::int IS NOT NULL AND q.sort_rule='AGE_PRIORITY'
+          THEN t.created_at END ASC NULLS LAST,
+          t.priority DESC,t.created_at ASC,t.id ASC LIMIT $13 OFFSET $14`,
         [...params,pageSize,(page-1)*pageSize]),
     ]);
     return { data: rows.rows,total: count.rows[0].total,page,pageSize };
@@ -322,6 +405,32 @@ export class DeskService {
         VALUES($1,$2,'CLAIM',$3::jsonb,$4::jsonb)`,
         [id,user.id,JSON.stringify({ assignedUserId: null, firstAttendedAt: ticket.rows[0].first_attended_at }),
           JSON.stringify({ assignedUserId: user.id, firstAttendedAt: updated.rows[0].first_attended_at })]);
+      return updated.rows[0];
+    });
+  }
+
+  async assign(id: number, body: Record<string, unknown>, user: AuthenticatedUser) {
+    this.assertWriter(user);
+    const assigneeId = idOf(body.userId,'Agente');
+    return this.db.transaction(async (client) => {
+      const result = await client.query('SELECT * FROM tickets WHERE id=$1 FOR UPDATE', [id]);
+      const ticket = result.rows[0];
+      if (!ticket) throw new NotFoundException('Ticket no encontrado.');
+      await this.assertAllowed(ticket.queue_id,user,'can_admin',client);
+      if (['CLOSED','REJECTED'].includes(ticket.state)) throw new ConflictException('No se asigna un ticket finalizado.');
+      const candidates = await this.eligibleAssignees(ticket.queue_id,client);
+      if (!candidates.some((candidate) => candidate.id === assigneeId)) {
+        throw new BadRequestException('El agente debe estar activo y autorizado para atender esta cola.');
+      }
+      if (ticket.assigned_user_id === assigneeId) return ticket;
+      const updated = await client.query(`UPDATE tickets SET assigned_user_id=$1,
+        first_attended_at=COALESCE(first_attended_at,NOW()),updated_at=NOW()
+        WHERE id=$2 RETURNING *`, [assigneeId,id]);
+      await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values,reason)
+        VALUES($1,$2,'ASSIGN',$3::jsonb,$4::jsonb,$5)`, [id,user.id,
+          JSON.stringify({ assignedUserId: ticket.assigned_user_id, firstAttendedAt: ticket.first_attended_at }),
+          JSON.stringify({ assignedUserId: assigneeId, firstAttendedAt: updated.rows[0].first_attended_at }),
+          body.reason == null ? null : requiredText(body.reason,'Motivo',1000)]);
       return updated.rows[0];
     });
   }

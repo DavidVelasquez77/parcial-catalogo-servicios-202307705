@@ -3,7 +3,7 @@ import { api, patch, post } from './api';
 
 type Account = { id: number; role: string; roles?: string[] };
 type Page<T> = { data: T[]; total: number; page: number; pageSize: number };
-type Queue = { id: number; code: string; name: string; description: string | null; process: string; active: boolean; canHandle: boolean; canTransfer: boolean; support_level: number; first_response_minutes: number | null; resolution_minutes: number | null };
+type Queue = { id: number; code: string; name: string; description: string | null; process: string; active: boolean; canHandle: boolean; canTransfer: boolean; canAdmin: boolean; responsible_user_id: number; responsibleName: string; sort_rule: string; support_level: number; first_response_minutes: number | null; resolution_minutes: number | null };
 type Ticket = { id: number; number: string; title: string; state: string; process: string; priority: number; queueId: number; queueName: string; createdAt: string; assignedUserId: number | null };
 type TicketDetail = Record<string, unknown> & {
   id: number; number: string; title: string; description: string; state: string; process: string;
@@ -19,7 +19,8 @@ type Ci = { id: number; code: string; name: string; categoryName: string; status
 type Category = { id: number; code: string; name: string; parentId: number | null; sourceKind: string; active: boolean };
 type CiLocation = { id: number; code: string; name: string; active: boolean };
 type Service = { id: number; code: string; name: string; status: string };
-const names: Record<string,string> = { NEW_SERVICE:'Nuevos servicios', CHANGE:'Cambios', INCIDENT:'Incidentes', EVENT:'Eventos', PROBLEM:'Problemas', ACCESS:'Accesos', TECH_SERVICE:'Servicios de tecnología', SUBMITTED:'Registrado', ANALYSIS:'Análisis', PENDING_APPROVAL:'Pendiente de aprobación', APPROVED:'Aprobado', REJECTED:'Rechazado', RESOLVED:'Resuelto', CLOSED:'Cerrado', CLASSIFIED:'Clasificado', EVALUATED:'Evaluado', RESPONDED:'Respuesta', DIAGNOSING:'Diagnóstico', IN_PROGRESS:'En atención', ESCALATED:'Escalado', ESCALATE:'Escalamiento', TRANSFER:'Transferencia', PAUSE:'Pausa', RESUME:'Reanudación', CLAIM:'Asignación', TRANSITION:'Cambio de estado', INVESTIGATING:'Investigación', VALIDATING:'Validación', EXECUTING:'Ejecución', PLANNED:'Planificado', FULFILLING:'Cumplimiento', CONFIRMING:'Confirmación' };
+const names: Record<string,string> = { NEW_SERVICE:'Nuevos servicios', CHANGE:'Cambios', INCIDENT:'Incidentes', EVENT:'Eventos', PROBLEM:'Problemas', ACCESS:'Accesos', TECH_SERVICE:'Servicios de tecnología', SUBMITTED:'Registrado', ANALYSIS:'Análisis', PENDING_APPROVAL:'Pendiente de aprobación', APPROVED:'Aprobado', REJECTED:'Rechazado', RESOLVED:'Resuelto', CLOSED:'Cerrado', CLASSIFIED:'Clasificado', EVALUATED:'Evaluado', RESPONDED:'Respuesta', DIAGNOSING:'Diagnóstico', IN_PROGRESS:'En atención', ESCALATED:'Escalado', ESCALATE:'Escalamiento', TRANSFER:'Transferencia', PAUSE:'Pausa', RESUME:'Reanudación', CLAIM:'Asignación', ASSIGN:'Asignación dirigida', TRANSITION:'Cambio de estado', INVESTIGATING:'Investigación', VALIDATING:'Validación', EXECUTING:'Ejecución', PLANNED:'Planificado', FULFILLING:'Cumplimiento', CONFIRMING:'Confirmación' };
+const sortRuleLabel = (rule: string) => rule === 'AGE_PRIORITY' ? 'Antigüedad y prioridad' : 'Prioridad y antigüedad';
 const label = (value: string) => names[value] ?? value.replaceAll('_',' ').toLowerCase();
 const transitions: Record<string,Record<string,string[]>> = {
   NEW_SERVICE: { SUBMITTED:['ANALYSIS'],ANALYSIS:['PENDING_APPROVAL'],PENDING_APPROVAL:['APPROVED','REJECTED'],APPROVED:['IMPLEMENTING'],IMPLEMENTING:['RESOLVED'],RESOLVED:['CLOSED'] },
@@ -113,7 +114,7 @@ function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: (
   </form></section></div>;
 }
 
-function TicketView({ id, user, queues, onClose, onChanged }: { id: number; user: Account; queues: Queue[]; onClose: () => void; onChanged: () => void }) {
+function TicketView({ id, user, queues, users, onClose, onChanged }: { id: number; user: Account; queues: Queue[]; users: Array<{id:number;name:string}>; onClose: () => void; onChanged: () => void }) {
   const [ticket,setTicket] = useState<TicketDetail | null>(null);
   const [error,setError] = useState('');
   const [busy,setBusy] = useState(false);
@@ -123,6 +124,8 @@ function TicketView({ id, user, queues, onClose, onChanged }: { id: number; user
   const [processValues,setProcessValues] = useState<Record<string,unknown>>({});
   const [destination,setDestination] = useState('');
   const [escalationQueueId,setEscalationQueueId] = useState('');
+  const [assigneeId,setAssigneeId] = useState('');
+  const [assignees,setAssignees] = useState<Array<{id:number;name:string}>>([]);
   const [file,setFile] = useState<File | null>(null);
   const [ciSearch,setCiSearch] = useState('');
   const [ciOptions,setCiOptions] = useState<Ci[]>([]);
@@ -130,6 +133,11 @@ function TicketView({ id, user, queues, onClose, onChanged }: { id: number; user
   const [linkType,setLinkType] = useState('RELATED');
   async function load() { try { const row = await api<TicketDetail>(`/desk/tickets/${id}`); setTicket(row); setProcessValues(row.process_data); } catch (e) { setError(message(e)); } }
   useEffect(() => { void load(); }, [id]);
+  useEffect(() => {
+    if (!ticket || (!isAdmin(user) && !queues.find((q) => q.id === ticket.queue_id)?.canAdmin)) { setAssignees([]); return; }
+    api<Array<{id:number;name:string}>>(`/desk/queues/${ticket.queue_id}/assignees`)
+      .then(setAssignees).catch((e) => setError(message(e)));
+  },[ticket?.queue_id,queues,user.role]);
   useEffect(() => {if (ciSearch.trim().length<2) {setCiOptions([]);return;}
     api<Page<Ci>>(`/cmdb/items?search=${encodeURIComponent(ciSearch)}&pageSize=20`).then((page) => setCiOptions(page.data)).catch(() => setCiOptions([]));
   },[ciSearch]);
@@ -144,11 +152,13 @@ function TicketView({ id, user, queues, onClose, onChanged }: { id: number; user
   const staff = ticket && (isAdmin(user) || queues.find((q) => q.id === ticket.queue_id)?.canHandle);
   const sourceQueue = queues.find((q) => q.id === ticket?.queue_id);
   const mayTransfer = ticket && canWrite(user) && (isAdmin(user) || sourceQueue?.canTransfer);
+  const mayAssign = ticket && canWrite(user) && (isAdmin(user) || sourceQueue?.canAdmin);
   const escalationTargets = ticket && sourceQueue ? queues.filter((q) => q.active && q.process === ticket.process && q.support_level > sourceQueue.support_level) : [];
   return <div className="modal-backdrop" onClick={onClose}><section className="modal-card desk-detail" role="dialog" aria-modal="true" aria-label="Ficha de ticket" onClick={(e) => e.stopPropagation()}><div className="drawer-head"><div><p className="eyebrow">FICHA DE TICKET</p><h2>{ticket?.number ?? 'Cargando...'}</h2></div><button className="icon-button" onClick={onClose} aria-label="Cerrar">×</button></div>
     {error && <div className="alert error">{error}</div>}
-    {ticket && <><h3>{ticket.title}</h3><p className="muted">{ticket.description}</p><div className="desk-facts"><span><strong>Proceso</strong>{label(ticket.process)}</span><span><strong>Estado</strong>{label(ticket.state)}</span><span><strong>Servicio</strong>{ticket.service_name}</span><span><strong>Nivel 1</strong>{ticket.level_1_name}</span><span><strong>Prioridad</strong>{String(ticket.priority)}</span><span><strong>Cola</strong>{String(ticket.queue_name)}</span><span><strong>Asignado</strong>{ticket.assigned_user_id ?? 'Sin asignar'}</span><span><strong>CI</strong>{ticket.ci.length ? ticket.ci.map((ci) => ci.code).join(', ') : ticket.no_ci_reason ?? 'Sin CI'}</span></div>
+    {ticket && <><h3>{ticket.title}</h3><p className="muted">{ticket.description}</p><div className="desk-facts"><span><strong>Proceso</strong>{label(ticket.process)}</span><span><strong>Estado</strong>{label(ticket.state)}</span><span><strong>Servicio</strong>{ticket.service_name}</span><span><strong>Nivel 1</strong>{ticket.level_1_name}</span><span><strong>Prioridad</strong>{String(ticket.priority)}</span><span><strong>Cola</strong>{String(ticket.queue_name)}</span><span><strong>Asignado</strong>{ticket.assigned_user_id === null ? 'Sin asignar' : users.find((person) => person.id===ticket.assigned_user_id)?.name ?? `Usuario #${ticket.assigned_user_id}`}</span><span><strong>CI</strong>{ticket.ci.length ? ticket.ci.map((ci) => ci.code).join(', ') : ticket.no_ci_reason ?? 'Sin CI'}</span></div>
       <section className="desk-section"><h3>Acciones</h3><label>Motivo o solución<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Obligatorio al resolver, rechazar o reabrir" /></label><div className="button-row desk-actions">{staff && !ticket.assigned_user_id && canWrite(user) && <button className="secondary" disabled={busy} onClick={() => void action('claim',{})}>Tomar ticket</button>}{options.filter((to) => to !== 'APPROVED' && to !== 'REJECTED' || isAdmin(user) || (user.roles ?? [user.role]).includes('APROBADOR')).map((to) => <button key={to} className={to==='CLOSED'?'primary':'secondary'} disabled={busy || !canWrite(user)} onClick={() => void action('transition',{to,reason})}>{label(to)}</button>)}{staff && !ticket.paused_at && <button className="secondary" disabled={busy} onClick={() => void action('pause',{reason})}>Pausar</button>}{staff && !!ticket.paused_at && <button className="secondary" disabled={busy} onClick={() => void action('resume',{reason})}>Reanudar</button>}</div></section>
+      {mayAssign && !['CLOSED','REJECTED'].includes(ticket.state) && <section className="desk-section"><h3>Asignar agente</h3><p className="muted">Solo aparecen agentes activos con permiso para atender esta cola.</p><div className="button-row"><select aria-label="Agente autorizado" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}><option value="">Selecciona agente</option>{assignees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select><button className="secondary" disabled={busy || !assigneeId} onClick={() => void action('assign',{userId:Number(assigneeId),reason:reason.trim() || undefined})}>Asignar</button></div></section>}
       {staff && <section className="desk-section"><h3>Datos de {label(ticket.process)}</h3><p className="muted">Completa las evidencias necesarias antes de avanzar el proceso.</p><div className="form-grid">{(processFields[ticket.process] ?? []).map(([key,title,kind]) => <label key={key}>{title}{kind==='boolean'?<select value={processValues[key]===true?'true':processValues[key]===false?'false':''} onChange={(e) => setProcessValues({...processValues,[key]:e.target.value===''?null:e.target.value==='true'})}><option value="">No informado</option><option value="true">Sí</option><option value="false">No</option></select>:kind==='category'?<select value={String(processValues[key] ?? '')} onChange={(e) => setProcessValues({...processValues,[key]:e.target.value})}>{(ticket.process==='EVENT'?['E0','E1','E2','E3']:['I0','I1','I2','I3','I4','I5','I6']).map((item) => <option key={item} value={item}>{item}</option>)}</select>:<input type={kind==='number'?'number':'text'} value={String(processValues[key] ?? '')} onChange={(e) => setProcessValues({...processValues,[key]:kind==='number'?(e.target.value===''?null:Number(e.target.value)):e.target.value})} />}</label>)}</div><div className="button-row desk-actions"><button className="secondary" disabled={busy} onClick={async () => {try {setBusy(true);await patch(`/desk/tickets/${id}/process-data`,processValues);await load();}catch(e){setError(message(e));}finally{setBusy(false);}}}>Guardar datos</button></div></section>}
       {mayTransfer && <section className="desk-section"><h3>Transferir</h3><div className="button-row"><select value={destination} onChange={(e) => setDestination(e.target.value)}><option value="">Cola destino</option>{queues.filter((q) => q.process===ticket.process && q.id!==ticket.queue_id && q.active).map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}</select><button className="secondary" disabled={busy || !destination} onClick={() => void action('transfer',{queueId:Number(destination),reason})}>Transferir</button></div></section>}
       {mayTransfer && ticket.process==='INCIDENT' && ['DIAGNOSING','IN_PROGRESS','ESCALATED'].includes(ticket.state) && <section className="desk-section"><h3>Escalar incidente</h3><p className="muted">Elige una cola del mismo proceso con nivel de soporte superior y escribe el motivo arriba.</p><div className="button-row"><select aria-label="Cola de escalamiento" value={escalationQueueId} onChange={(e) => setEscalationQueueId(e.target.value)}><option value="">Cola de nivel superior</option>{escalationTargets.map((q) => <option key={q.id} value={q.id}>{q.name} · nivel {q.support_level}</option>)}</select><button className="secondary" disabled={busy || !escalationQueueId || !reason.trim()} onClick={() => void action('escalate',{queueId:Number(escalationQueueId),reason})}>Escalar</button></div>{escalationTargets.length===0 && <p className="muted">No hay una cola activa de nivel superior para este proceso.</p>}</section>}
@@ -188,7 +198,7 @@ export function TicketsPage({ user }: { user: Account }) {
     <div className="filters desk-extra-filters"><select aria-label="Filtrar cola" value={queueId} onChange={(e)=>{setQueueId(e.target.value);setPage(1);}}><option value="">Todas las colas</option>{queues.map((q)=><option key={q.id} value={q.id}>{q.name}</option>)}</select><select aria-label="Filtrar servicio" value={serviceId} onChange={(e)=>{setServiceId(e.target.value);setPage(1);}}><option value="">Todos los servicios</option>{services.map((s)=><option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</select><select aria-label="Filtrar prioridad" value={priority} onChange={(e)=>{setPriority(e.target.value);setPage(1);}}><option value="">Todas las prioridades</option>{[1,2,3,4,5].map((n)=><option key={n} value={n}>Prioridad {n}</option>)}</select><select aria-label="Filtrar responsable" value={assigneeId} onChange={(e)=>{setAssigneeId(e.target.value);setPage(1);}}><option value="">Todos los responsables</option>{users.map((u)=><option key={u.id} value={u.id}>{u.name}</option>)}</select><label>Desde<input type="date" value={fromDate} onChange={(e)=>{setFromDate(e.target.value);setPage(1);}} /></label><label>Antes de<input type="date" value={toDate} onChange={(e)=>{setToDate(e.target.value);setPage(1);}} /></label></div>
     {error && <div className="alert error">{error}</div>}<section className="panel"><div className="table-wrap"><table><thead><tr><th>Número</th><th>Título</th><th>Proceso</th><th>Cola</th><th>Estado</th><th>Prioridad</th><th>Creado</th></tr></thead><tbody>{rows?.data.map((row) => <tr className="clickable" key={row.id} onClick={() => setSelected(row.id)}><td><strong>{row.number}</strong></td><td>{row.title}</td><td>{label(row.process)}</td><td>{row.queueName}</td><td><span className="badge">{label(row.state)}</span></td><td>{row.priority}</td><td>{date(row.createdAt)}</td></tr>)}</tbody></table>{rows?.data.length===0 && <p className="empty">No hay tickets con esos filtros.</p>}</div><div className="pagination"><button className="secondary" disabled={page<=1} onClick={() => setPage(page-1)}>Anterior</button><span>Página {page} · {rows?.total ?? 0} tickets</span><button className="secondary" disabled={!rows || page*20>=rows.total} onClick={() => setPage(page+1)}>Siguiente</button></div></section>
     {creating && <TicketCreate queues={queues} onCancel={() => setCreating(false)} onDone={() => {setCreating(false);void load();}} />}
-    {selected !== null && <TicketView id={selected} user={user} queues={queues} onClose={() => setSelected(null)} onChanged={() => void load()} />}
+    {selected !== null && <TicketView id={selected} user={user} queues={queues} users={users} onClose={() => setSelected(null)} onChanged={() => void load()} />}
   </div>;
 }
 
@@ -357,43 +367,103 @@ export function KnowledgePage({ user }: { user: Account }) {
 function QueueGrants({ queue }: { queue: Queue }) {
   type Grant = { id: number; role: string | null; userId: number | null; userName: string | null; canView: boolean; canHandle: boolean; canTransfer: boolean; canApprove: boolean; canAdmin: boolean };
   const [grants,setGrants] = useState<Grant[]>([]);
-  const [users,setUsers] = useState<Array<{id:number;name:string;role:string;active:boolean}>>([]);
+  const [users,setUsers] = useState<Array<{id:number;name:string;role:string;roles:string[]}>>([]);
   const [target,setTarget] = useState('AGENTE');
   const [flags,setFlags] = useState<Record<string,boolean>>({canView:true,canHandle:false,canTransfer:false,canApprove:false,canAdmin:false});
   const [error,setError] = useState('');
   async function load() {try {setGrants(await api<Grant[]>(`/desk/queues/${queue.id}/grants`));}catch(e){setError(message(e));}}
-  useEffect(() => {void load();api<typeof users>('/users').then((rows) => setUsers(rows.filter((u) => u.active && u.role!=='CONSULTA'))).catch((e) => setError(message(e)));},[queue.id]);
+  useEffect(() => {void load();api<typeof users>('/desk/users').then((rows) => setUsers(rows.filter((u) => !u.roles.includes('CONSULTA')))).catch((e) => setError(message(e)));},[queue.id]);
   async function add(event:FormEvent) {event.preventDefault();setError('');try {await post(`/desk/queues/${queue.id}/grants`,{
     ...(target.startsWith('U:') ? {userId:Number(target.slice(2))} : {role:target}),...flags,
   });await load();}catch(e){setError(message(e));}}
-  return <section className="panel desk-section"><h2>Permisos de {queue.name}</h2><p className="muted">Consultar, atender, transferir, aprobar y administrar son permisos separados.</p>{error && <div className="alert error">{error}</div>}<div className="table-wrap"><table><thead><tr><th>Rol o usuario</th><th>Consultar</th><th>Atender</th><th>Transferir</th><th>Aprobar</th><th>Administrar</th><th>Acción</th></tr></thead><tbody>{grants.map((g) => <tr key={g.id}><td>{g.role ?? g.userName}</td>{(['canView','canHandle','canTransfer','canApprove','canAdmin'] as const).map((key) => <td key={key}>{g[key]?'Sí':'—'}</td>)}<td><button className="text-button danger-text" onClick={async() => {try {await api(`/desk/queues/${queue.id}/grants/${g.id}`,{method:'DELETE'});await load();}catch(e){setError(message(e));}}}>Retirar</button></td></tr>)}</tbody></table></div><form className="desk-category-form" onSubmit={add}><label>Rol o usuario<select value={target} onChange={(e) => setTarget(e.target.value)}><option value="AGENTE">Rol agente</option><option value="APROBADOR">Rol aprobador</option>{users.map((u) => <option key={u.id} value={`U:${u.id}`}>{u.name} · usuario</option>)}</select></label><div className="desk-checks">{([['canView','Consultar'],['canHandle','Atender'],['canTransfer','Transferir'],['canApprove','Aprobar'],['canAdmin','Administrar']] as const).map(([key,text]) => <label key={key}><input type="checkbox" checked={flags[key]} onChange={(e) => setFlags({...flags,[key]:e.target.checked})} />{text}</label>)}</div><button className="secondary">Guardar permisos</button></form></section>;
+  return <section className="panel desk-section"><h2>Permisos de {queue.name}</h2><p className="muted">Consultar, atender, transferir, aprobar y administrar son permisos separados.</p>{error && <div className="alert error">{error}</div>}<div className="table-wrap"><table><thead><tr><th>Rol o usuario</th><th>Consultar</th><th>Atender</th><th>Transferir</th><th>Aprobar</th><th>Administrar</th><th>Acción</th></tr></thead><tbody>{grants.map((g) => <tr key={g.id}><td>{g.role ?? g.userName}</td>{(['canView','canHandle','canTransfer','canApprove','canAdmin'] as const).map((key) => <td key={key}>{g[key]?'Sí':'—'}</td>)}<td>{g.userId === queue.responsible_user_id && queue.active ? <span className="muted">Responsable</span> : <button className="text-button danger-text" onClick={async() => {try {await api(`/desk/queues/${queue.id}/grants/${g.id}`,{method:'DELETE'});await load();}catch(e){setError(message(e));}}}>Retirar</button>}</td></tr>)}</tbody></table></div><form className="desk-category-form" onSubmit={add}><label>Rol o usuario<select value={target} onChange={(e) => setTarget(e.target.value)}><option value="AGENTE">Rol agente</option><option value="APROBADOR">Rol aprobador</option>{users.map((u) => <option key={u.id} value={`U:${u.id}`}>{u.name} · usuario</option>)}</select></label><div className="desk-checks">{([['canView','Consultar'],['canHandle','Atender'],['canTransfer','Transferir'],['canApprove','Aprobar'],['canAdmin','Administrar']] as const).map(([key,text]) => <label key={key}><input type="checkbox" checked={flags[key]} onChange={(e) => setFlags({...flags,[key]:e.target.checked})} />{text}</label>)}</div><button className="secondary">Guardar permisos</button></form></section>;
 }
 
 function QueueEditor({ queue, onCancel, onSaved }: { queue: Queue; onCancel: () => void; onSaved: () => void }) {
   const [name,setName] = useState(queue.name);
   const [description,setDescription] = useState(queue.description ?? '');
+  const [process,setProcess] = useState(queue.process);
+  const [responsibleUserId,setResponsibleUserId] = useState(String(queue.responsible_user_id));
+  const [sortRule,setSortRule] = useState(queue.sort_rule);
+  const [users,setUsers] = useState<Array<{id:number;name:string;roles:string[]}>>([]);
   const [supportLevel,setSupportLevel] = useState(String(queue.support_level));
   const [firstMinutes,setFirstMinutes] = useState(String(queue.first_response_minutes ?? ''));
   const [resolutionMinutes,setResolutionMinutes] = useState(String(queue.resolution_minutes ?? ''));
   const [error,setError] = useState('');
   const [saving,setSaving] = useState(false);
+  useEffect(() => {api<typeof users>('/desk/users').then((rows) => setUsers(rows.filter((u) => !u.roles.includes('CONSULTA') && (u.roles.includes('AGENTE') || u.roles.includes('ADMIN'))))).catch((e) => setError(message(e)));},[]);
   async function save(event:FormEvent) {
     event.preventDefault();setError('');setSaving(true);
-    try {await patch(`/desk/queues/${queue.id}`,{name,description,supportLevel:Number(supportLevel),
+    try {await patch(`/desk/queues/${queue.id}`,{name,description,process,responsibleUserId:Number(responsibleUserId),sortRule,supportLevel:Number(supportLevel),
       firstResponseMinutes:firstMinutes?Number(firstMinutes):null,
       resolutionMinutes:resolutionMinutes?Number(resolutionMinutes):null});onSaved();}
     catch(e){setError(message(e));}finally{setSaving(false);}
   }
-  return <div className="modal-backdrop" onClick={onCancel}><section className="modal-card desk-detail" role="dialog" aria-modal="true" aria-label={`Editar cola ${queue.code}`} onClick={(e)=>e.stopPropagation()}><div className="drawer-head"><h2>Editar cola {queue.code}</h2><button className="icon-button" onClick={onCancel} aria-label="Cerrar">×</button></div><form className="form-grid" onSubmit={save}><label>Nombre<input value={name} onChange={(e)=>setName(e.target.value)} required /></label><label>Nivel de soporte<input type="number" min="0" max="4" value={supportLevel} onChange={(e)=>setSupportLevel(e.target.value)} required /></label><label>Primera respuesta (min)<input type="number" min="1" value={firstMinutes} onChange={(e)=>setFirstMinutes(e.target.value)} /></label><label>Resolución (min)<input type="number" min="1" value={resolutionMinutes} onChange={(e)=>setResolutionMinutes(e.target.value)} /></label><label className="wide">Descripción<textarea value={description} onChange={(e)=>setDescription(e.target.value)} rows={3} /></label>{error && <div className="alert error wide">{error}</div>}<div className="wide modal-actions"><button type="button" className="secondary" onClick={onCancel}>Cancelar</button><button className="primary" disabled={saving}>Guardar cambios</button></div></form></section></div>;
+  return <div className="modal-backdrop" onClick={onCancel}><section className="modal-card desk-detail" role="dialog" aria-modal="true" aria-label={`Editar cola ${queue.code}`} onClick={(e)=>e.stopPropagation()}>
+    <div className="drawer-head"><h2>Editar cola {queue.code}</h2><button className="icon-button" onClick={onCancel} aria-label="Cerrar">×</button></div>
+    <form className="form-grid" onSubmit={save}>
+      <label>Nombre<input value={name} onChange={(e)=>setName(e.target.value)} required /></label>
+      <label>Proceso<select value={process} onChange={(e)=>setProcess(e.target.value)}>{Object.keys(transitions).map((key) => <option key={key} value={key}>{label(key)}</option>)}</select></label>
+      <label>Responsable<select value={responsibleUserId} onChange={(e)=>setResponsibleUserId(e.target.value)} required><option value="">Selecciona</option>{users.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
+      <label>Regla de orden<select value={sortRule} onChange={(e)=>setSortRule(e.target.value)}><option value="PRIORITY_AGE">Prioridad y antigüedad</option><option value="AGE_PRIORITY">Antigüedad y prioridad</option></select></label>
+      <label>Nivel de soporte<input type="number" min="0" max="4" value={supportLevel} onChange={(e)=>setSupportLevel(e.target.value)} required /></label>
+      <label>Primera respuesta (min)<input type="number" min="1" value={firstMinutes} onChange={(e)=>setFirstMinutes(e.target.value)} /></label>
+      <label>Resolución (min)<input type="number" min="1" value={resolutionMinutes} onChange={(e)=>setResolutionMinutes(e.target.value)} /></label>
+      <label className="wide">Descripción<textarea value={description} onChange={(e)=>setDescription(e.target.value)} rows={3} /></label>
+      <p className="muted wide">Si la cola ya tiene tickets, su proceso no puede cambiarse.</p>
+      {error && <div className="alert error wide">{error}</div>}
+      <div className="wide modal-actions"><button type="button" className="secondary" onClick={onCancel}>Cancelar</button><button className="primary" disabled={saving}>Guardar cambios</button></div>
+    </form>
+  </section></div>;
 }
 
 export function QueuesPage({ user }: { user: Account }) {
-  const [rows,setRows] = useState<Queue[]>([]); const [error,setError] = useState('');
-  const [code,setCode] = useState(''); const [name,setName] = useState(''); const [process,setProcess] = useState('INCIDENT');
-  const [supportLevel,setSupportLevel] = useState('1'); const [firstMinutes,setFirstMinutes] = useState('60'); const [resolutionMinutes,setResolutionMinutes] = useState('480');
+  const [rows,setRows] = useState<Queue[]>([]);
+  const [users,setUsers] = useState<Array<{id:number;name:string;roles:string[]}>>([]);
+  const [error,setError] = useState('');
+  const [code,setCode] = useState('');
+  const [name,setName] = useState('');
+  const [description,setDescription] = useState('');
+  const [process,setProcess] = useState('INCIDENT');
+  const [responsibleUserId,setResponsibleUserId] = useState('');
+  const [sortRule,setSortRule] = useState('PRIORITY_AGE');
+  const [supportLevel,setSupportLevel] = useState('1');
+  const [firstMinutes,setFirstMinutes] = useState('60');
+  const [resolutionMinutes,setResolutionMinutes] = useState('480');
   const [selected,setSelected] = useState<Queue | null>(null);
   const [editing,setEditing] = useState<Queue | null>(null);
   async function load() {try {setRows(await api<Queue[]>('/desk/queues'));}catch(e){setError(message(e));}}
   useEffect(() => {void load();},[]);
-  return <div className="page"><div className="page-heading"><div><p className="eyebrow">DISTRIBUCIÓN</p><h1>Colas de atención</h1><p className="muted">Una cola pertenece a un proceso y aplica permisos por acción.</p></div></div>{error && <div className="alert error">{error}</div>}<section className="panel"><div className="table-wrap"><table><thead><tr><th>Código</th><th>Cola</th><th>Proceso</th><th>Nivel</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><td>{row.code}</td><td>{row.name}</td><td>{label(row.process)}</td><td>{row.support_level}</td><td>{row.active?'Activa':'Inactiva'}</td><td>{isAdmin(user) && <div className="button-row"><button className="text-button" onClick={() => setEditing(row)}>Editar</button><button className="text-button" onClick={() => setSelected(row)}>Permisos</button><button className="text-button" onClick={async() => {try {await patch(`/desk/queues/${row.id}`,{active:!row.active});await load();}catch(e){setError(message(e));}}}>{row.active?'Desactivar':'Activar'}</button></div>}</td></tr>)}</tbody></table></div></section>{isAdmin(user) && selected && <QueueGrants queue={selected} />}{isAdmin(user) && editing && <QueueEditor queue={editing} onCancel={() => setEditing(null)} onSaved={() => {setEditing(null);void load();}} />}{isAdmin(user) && <section className="panel desk-section"><h2>Crear cola</h2><form className="desk-category-form" onSubmit={async(e) => {e.preventDefault();try {await post('/desk/queues',{code,name,process,supportLevel:Number(supportLevel),firstResponseMinutes:Number(firstMinutes),resolutionMinutes:Number(resolutionMinutes)});setCode('');setName('');await load();}catch(err){setError(message(err));}}}><label>Código<input value={code} onChange={(e) => setCode(e.target.value)} required /></label><label>Nombre<input value={name} onChange={(e) => setName(e.target.value)} required /></label><label>Proceso<select value={process} onChange={(e) => setProcess(e.target.value)}>{Object.keys(transitions).map((key) => <option key={key} value={key}>{label(key)}</option>)}</select></label><label>Nivel de soporte<input type="number" min="0" max="4" value={supportLevel} onChange={(e) => setSupportLevel(e.target.value)} required /></label><label>Primera respuesta (min)<input type="number" min="1" value={firstMinutes} onChange={(e) => setFirstMinutes(e.target.value)} required /></label><label>Resolución (min)<input type="number" min="1" value={resolutionMinutes} onChange={(e) => setResolutionMinutes(e.target.value)} required /></label><button className="primary">Crear cola</button></form></section>}</div>;
+  useEffect(() => {if (isAdmin(user)) api<typeof users>('/desk/users').then((rows) => setUsers(rows.filter((person) => !person.roles.includes('CONSULTA') && (person.roles.includes('AGENTE') || person.roles.includes('ADMIN'))))).catch((e) => setError(message(e)));},[user.role]);
+  const canManage = (queue: Queue) => canWrite(user) && (isAdmin(user) || queue.canAdmin);
+  async function create(event: FormEvent) {
+    event.preventDefault();setError('');
+    try {
+      await post('/desk/queues',{code,name,description,process,responsibleUserId:Number(responsibleUserId),sortRule,
+        supportLevel:Number(supportLevel),firstResponseMinutes:Number(firstMinutes),resolutionMinutes:Number(resolutionMinutes)});
+      setCode('');setName('');setDescription('');await load();
+    } catch (e) {setError(message(e));}
+  }
+  return <div className="page">
+    <div className="page-heading"><div><p className="eyebrow">DISTRIBUCIÓN</p><h1>Colas de atención</h1><p className="muted">Cada cola pertenece a un proceso y tiene responsable, orden y permisos propios.</p></div></div>
+    {error && <div className="alert error">{error}</div>}
+    <section className="panel"><div className="table-wrap"><table><thead><tr><th>Código</th><th>Cola</th><th>Proceso</th><th>Responsable</th><th>Orden</th><th>Nivel</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}>
+      <td>{row.code}</td><td><strong>{row.name}</strong>{row.description && <small className="muted">{row.description}</small>}</td><td>{label(row.process)}</td><td>{row.responsibleName}</td><td>{sortRuleLabel(row.sort_rule)}</td><td>{row.support_level}</td><td>{row.active?'Activa':'Inactiva'}</td>
+      <td>{canManage(row) && <div className="button-row"><button className="text-button" onClick={() => setEditing(row)}>Editar</button><button className="text-button" onClick={() => setSelected(row)}>Permisos</button><button className="text-button" onClick={async() => {try {await patch(`/desk/queues/${row.id}`,{active:!row.active});await load();}catch(e){setError(message(e));}}}>{row.active?'Desactivar':'Activar'}</button></div>}</td>
+    </tr>)}</tbody></table></div></section>
+    {selected && canManage(selected) && <QueueGrants queue={selected} />}
+    {editing && canManage(editing) && <QueueEditor queue={editing} onCancel={() => setEditing(null)} onSaved={() => {setEditing(null);void load();}} />}
+    {isAdmin(user) && <section className="panel desk-section"><h2>Crear cola</h2><form className="desk-category-form" onSubmit={create}>
+      <label>Código<input value={code} onChange={(e) => setCode(e.target.value)} required /></label>
+      <label>Nombre<input value={name} onChange={(e) => setName(e.target.value)} required /></label>
+      <label>Descripción<input value={description} onChange={(e) => setDescription(e.target.value)} /></label>
+      <label>Proceso<select value={process} onChange={(e) => setProcess(e.target.value)}>{Object.keys(transitions).map((key) => <option key={key} value={key}>{label(key)}</option>)}</select></label>
+      <label>Responsable<select value={responsibleUserId} onChange={(e) => setResponsibleUserId(e.target.value)} required><option value="">Selecciona</option>{users.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select></label>
+      <label>Regla de orden<select value={sortRule} onChange={(e) => setSortRule(e.target.value)}><option value="PRIORITY_AGE">Prioridad y antigüedad</option><option value="AGE_PRIORITY">Antigüedad y prioridad</option></select></label>
+      <label>Nivel de soporte<input type="number" min="0" max="4" value={supportLevel} onChange={(e) => setSupportLevel(e.target.value)} required /></label>
+      <label>Primera respuesta (min)<input type="number" min="1" value={firstMinutes} onChange={(e) => setFirstMinutes(e.target.value)} required /></label>
+      <label>Resolución (min)<input type="number" min="1" value={resolutionMinutes} onChange={(e) => setResolutionMinutes(e.target.value)} required /></label>
+      <button className="primary">Crear cola</button>
+    </form></section>}
+  </div>;
 }

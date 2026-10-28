@@ -78,14 +78,17 @@ export class UsersService {
     const duplicate = await this.db.query(`SELECT id FROM users WHERE email = NULLIF($1, '') AND id <> $2`, [email, id]);
     if (duplicate.rows[0]) throw new ConflictException('El correo ya está registrado.');
     await this.assertActivePositionHierarchy(positionId);
-    if (!active || (current.rows[0].role === 'AGENTE' && role !== 'AGENTE')) {
-      const open = await this.db.query(`SELECT id FROM tickets
-        WHERE assigned_user_id=$1 AND state NOT IN ('CLOSED','REJECTED') LIMIT 1`, [id]);
-      if (open.rows[0]) throw new ConflictException('Reasigna los tickets abiertos antes de desactivar o retirar al agente.');
-    }
     let passwordHash = current.rows[0].password_hash;
     if (body.password) passwordHash = await bcrypt.hash(String(body.password), 12);
     return this.db.transaction(async (client) => {
+      await client.query('SELECT id FROM users WHERE id=$1 FOR UPDATE', [id]);
+      if (!active || !['ADMIN','AGENTE'].includes(role)) {
+        const open = await client.query(`SELECT id FROM tickets
+          WHERE assigned_user_id=$1 AND state NOT IN ('CLOSED','REJECTED') LIMIT 1`, [id]);
+        if (open.rows[0]) throw new ConflictException('Reasigna los tickets abiertos antes de desactivar o retirar al agente.');
+        const owned = await client.query('SELECT id FROM support_queues WHERE responsible_user_id=$1 AND active LIMIT 1', [id]);
+        if (owned.rows[0]) throw new ConflictException('Designa otro responsable para las colas activas antes de desactivar o cambiar este usuario.');
+      }
       const result = await client.query(`UPDATE users SET name = $1, email = NULLIF($2, ''), role = $3, position_id = $4, active = $5, password_hash = $6, updated_at = NOW()
         WHERE id = $7 RETURNING id, name, username, email, role, active, position_id AS "positionId"`,
         [name, email, role, positionId, active, passwordHash, id]);
@@ -111,6 +114,8 @@ export class UsersService {
         const open = await client.query(`SELECT id FROM tickets
           WHERE assigned_user_id=$1 AND state NOT IN ('CLOSED','REJECTED') LIMIT 1`, [id]);
         if (open.rows[0]) throw new ConflictException('Reasigna los tickets abiertos antes de retirar el permiso de agente.');
+        const owned = await client.query('SELECT id FROM support_queues WHERE responsible_user_id=$1 AND active LIMIT 1', [id]);
+        if (owned.rows[0]) throw new ConflictException('Designa otro responsable para las colas activas antes de retirar este rol.');
       }
       await client.query('DELETE FROM user_roles WHERE user_id=$1', [id]);
       for (const role of roles) await client.query('INSERT INTO user_roles(user_id,role) VALUES($1,$2)', [id,role]);

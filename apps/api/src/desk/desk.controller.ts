@@ -25,12 +25,14 @@ export class DeskController {
   @Patch('queues/:id') updateQueue(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.updateQueue(id, body, req.user); }
   @Post('queues/:id/grants') grant(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.grant(id, body, req.user); }
   @Get('queues/:id/grants') grants(@Param('id', ParseIntPipe) id: number, @Req() req: AuthedRequest) { return this.service.grants(id, req.user); }
+  @Get('queues/:id/assignees') assignees(@Param('id', ParseIntPipe) id: number, @Req() req: AuthedRequest) { return this.service.assignees(id, req.user); }
   @Delete('queues/:id/grants/:grantId') revoke(@Param('id', ParseIntPipe) id: number,
     @Param('grantId', ParseIntPipe) grantId: number, @Req() req: AuthedRequest) { return this.service.revoke(id, grantId, req.user); }
   @Get('tickets') tickets(@Query() query: Record<string, string | undefined>, @Req() req: AuthedRequest) { return this.service.tickets(query, req.user); }
   @Post('tickets') createTicket(@Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.createTicket(body, req.user); }
   @Get('tickets/:id') ticket(@Param('id', ParseIntPipe) id: number, @Req() req: AuthedRequest) { return this.service.ticket(id, req.user); }
   @Post('tickets/:id/claim') claim(@Param('id', ParseIntPipe) id: number, @Req() req: AuthedRequest) { return this.service.claim(id, req.user); }
+  @Post('tickets/:id/assign') assign(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.assign(id, body, req.user); }
   @Patch('tickets/:id/process-data') processData(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.updateProcessData(id, body, req.user); }
   @Post('tickets/:id/transition') transition(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.transition(id, body, req.user); }
   @Post('tickets/:id/transfer') transfer(@Param('id', ParseIntPipe) id: number, @Body() body: Record<string, unknown>, @Req() req: AuthedRequest) { return this.service.transfer(id, body, req.user); }
