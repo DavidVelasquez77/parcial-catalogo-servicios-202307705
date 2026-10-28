@@ -248,6 +248,24 @@ El [diagrama y diccionario de origen](CMDB_JERARQUIA.md) identifican las
 celdas del Excel y las diapositivas o minutos de clase usados para estas
 reglas. La base impone además un índice único parcial para `PARENT_OF`.
 
+## Service Desk: notificaciones, conocimientos e indicadores
+
+Todas estas rutas se sirven bajo `/api` y requieren sesión, salvo donde se
+indica que además se necesita permiso administrativo o de cola.
+
+| Método y ruta | Acceso | Uso y control |
+|---|---|---|
+| `GET /api/desk/notifications` | Sesión | Devuelve únicamente notificaciones del usuario autenticado; P11 comprueba la notificación creada por eventos E2/E3. |
+| `GET /api/desk/knowledge` | Sesión | Lee artículos activos de la base de conocimientos de nivel 0. |
+| `POST /api/desk/knowledge` | ADMIN | Publica una FAQ o guía. |
+| `GET /api/desk/metrics` | Sesión | Calcula agrupaciones y tiempos solo con tickets visibles para esa cuenta. |
+| `POST /api/desk/tickets/:id/transition` | Permiso de atención o aprobación según la acción | Aplica transiciones y evidencia específica del proceso; E0 solo permite cierre tras registro. |
+| `PATCH /api/desk/tickets/:id/process-data` | Permiso de atención en la cola | Guarda evidencia con bitácora; las categorías E0–E3 no pueden cambiarse tras registrar el evento. |
+
+La notificación de E2/E3 se conserva en la tabla `ticket_notifications` y se
+consulta por el endpoint autenticado del destinatario; no se envía correo ni
+se depende de un proveedor externo.
+
 ## Matriz de autorización
 
 | Operación | Público | CONSULTA | ADMIN |

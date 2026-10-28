@@ -4,33 +4,38 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 cd "$ROOT_DIR"
 SUITE=${1:-all}
+project=service-desk-pyramid-202307705
+compose() { WEB_PORT=18081 docker compose -p "$project" "$@"; }
 
 run() {
   name=$1
   shift
   printf '\n[TEST-PYRAMID] %s\n' "$name"
-  "$@"
+  compose "$@"
 }
 
 prepare_backend() {
-  run 'preparar PostgreSQL, API y frontend' docker compose up --build -d db api web
-  run 'crear datos demo' docker compose exec -T api node apps/api/dist/scripts/seed-demo.js
-  run 'validar Excel original' docker compose exec -T api node apps/api/dist/scripts/validate-import.js
-  run 'cargar Excel original' docker compose exec -T api node apps/api/dist/scripts/import-catalog.js
+  run 'preparar PostgreSQL, API y frontend aislados' up --build -d db api web
+  run 'crear datos demo' exec -T api node apps/api/dist/scripts/seed-demo.js
+  run 'validar Excel original' exec -T api node apps/api/dist/scripts/validate-import.js
+  run 'cargar Excel original' exec -T api node apps/api/dist/scripts/import-catalog.js
+  run 'importar los CI originales de CMDB.xlsx' exec -T api node apps/api/dist/scripts/import-cmdb.js
+  run 'preparar 5,000 dispositivos sintéticos para interfaz' exec -T -e CMDB_SEED=EVAL2026 -e CMDB_COUNT=5000 api node apps/api/dist/scripts/generate-cmdb.js
+  run 'preparar colas demo y preguntas frecuentes de autoservicio' exec -T api node apps/api/dist/scripts/seed-service-desk.js
 }
 
 run_unit() {
-  run 'unitarias Jest (7 pruebas, 70%)' docker compose run --build --rm -T api node_modules/.bin/jest --config apps/api/test/jest.unit.config.js --runInBand
+  run 'unitarias Jest (70%)' run --build --rm -T api node_modules/.bin/jest --config apps/api/test/jest.unit.config.js --runInBand
 }
 
 run_integration() {
   prepare_backend
-  run 'integración Jest (2 pruebas, 20%)' docker compose run --rm -T api node_modules/.bin/jest --config apps/api/test/jest.integration.config.js --runInBand
+  run 'integración Jest (20%)' run --rm -T api node_modules/.bin/jest --config apps/api/test/jest.integration.config.js --runInBand
 }
 
 run_e2e() {
   prepare_backend
-  run 'E2E Playwright (1 prueba, 10%)' docker compose --profile tests run --build --rm -T e2e
+  run 'E2E Playwright (10%)' --profile tests run --build --rm -T e2e
 }
 
 case "$SUITE" in
@@ -48,4 +53,5 @@ case "$SUITE" in
     ;;
 esac
 
+run 'detener contenedores de prueba (el volumen aislado se conserva)' down
 printf '{"ok":true,"suite":"%s","pyramid":"70/20/10"}\n' "$SUITE"

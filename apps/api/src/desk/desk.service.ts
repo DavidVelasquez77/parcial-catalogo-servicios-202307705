@@ -535,6 +535,18 @@ export class DeskService {
       if (process === 'NEW_SERVICE' && Object.prototype.hasOwnProperty.call(body,'approvedServiceId')) {
         throw new BadRequestException('El servicio aprobado se asigna automáticamente y no se puede editar.');
       }
+      if (process === 'EVENT') {
+        const currentCategory = ticket.process_data?.eventCategory;
+        if (Object.prototype.hasOwnProperty.call(body,'eventCategory') && body.eventCategory !== currentCategory) {
+          throw new ConflictException('La categoría E0-E3 queda fijada al registrar el evento; crea otro ticket si la clasificación inicial fue incorrecta.');
+        }
+        if (currentCategory === 'E0' && ['assessment','response'].some((key) => Object.prototype.hasOwnProperty.call(body,key))) {
+          throw new BadRequestException('E0 solo requiere el registro; no admite evaluación ni respuesta operativa.');
+        }
+        if (currentCategory === 'E1' && Object.prototype.hasOwnProperty.call(body,'response')) {
+          throw new BadRequestException('E1 conserva su evaluación, pero no requiere respuesta operativa.');
+        }
+      }
       const approvalBasis: Partial<Record<DeskProcess,{states:string[];fields:string[]}>> = {
         NEW_SERVICE:{states:['APPROVED','IMPLEMENTING','RESOLVED'],fields:['need','feasibility','linkedServiceId','proposedCode','proposedName']},
         CHANGE:{states:['APPROVED','PLANNED','EXECUTING','VALIDATING','RESOLVED'],fields:['riskAssessment','testPlan','rollbackPlan']},
@@ -637,7 +649,7 @@ export class DeskService {
       }
       if (ticket.process === 'EVENT' && to === 'EVALUATED') {
         if (!['E0','E1','E2','E3'].includes(String(data.eventCategory))) throw new BadRequestException('Categoría de evento E0-E3 requerida.');
-        this.requireEvidence(data,'assessment','Evaluación del evento');
+        if (data.eventCategory !== 'E0') this.requireEvidence(data,'assessment','Evaluación del evento');
       }
       if (ticket.process === 'EVENT' && to === 'RESPONDED') this.requireEvidence(data,'response','Respuesta aplicada');
       if (ticket.process === 'PROBLEM' && to === 'INVESTIGATING') {
@@ -667,6 +679,12 @@ export class DeskService {
         const critical = ['E2','E3'].includes(String(data.eventCategory));
         if (critical && to === 'CLOSED') throw new BadRequestException('E2/E3 requiere respuesta e incidente antes del cierre.');
         if (!critical && to === 'RESPONDED') throw new BadRequestException('E0/E1 solo requieren registro y evaluación.');
+      }
+      if (ticket.process === 'EVENT' && ticket.state === 'SUBMITTED' && to === 'CLOSED' && data.eventCategory !== 'E0') {
+        throw new BadRequestException('Solo E0 puede cerrarse directamente después del registro; E1-E3 requieren evaluación.');
+      }
+      if (ticket.process === 'EVENT' && ticket.state === 'SUBMITTED' && data.eventCategory === 'E0' && to !== 'CLOSED') {
+        throw new BadRequestException('E0 solo requiere registro; ciérralo directamente sin clasificación, evaluación ni respuesta operativa.');
       }
       if (ticket.process === 'TECH_SERVICE' && to === 'FULFILLING' && !ticket.assigned_user_id) {
         throw new BadRequestException('Asigna un agente antes de cumplir la solicitud.');
@@ -939,7 +957,7 @@ export class DeskService {
       averageResolutionMinutes: average(resolutionSum,resolutionCount),
       firstResponseObjective: { met: firstResponseMet,evaluated: firstResponseEvaluated },
       resolutionObjective: { met: resolutionMet,evaluated: resolutionEvaluated },
-      basis: 'Minutos calendario; los objetivos se evalúan al atender o resolver. El tiempo pausado se descuenta de la resolución; tickets abiertos sin atención o resolución quedan fuera de esos promedios.',
+      basis: 'Minutos calendario. Antigüedad abierta incluye pausas; primera atención usa el primer hito y no descuenta pausas; resolución vigente se mide desde la creación y resta las pausas acumuladas. Los objetivos solo cuentan tickets con el hito alcanzado y un objetivo configurado. Al reabrir se conserva la primera atención y se reinicia el hito de resolución.',
     };
   }
 

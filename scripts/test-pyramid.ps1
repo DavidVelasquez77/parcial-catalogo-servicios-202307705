@@ -6,39 +6,44 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 Set-Location -LiteralPath $repoRoot
+$composeProject = 'service-desk-pyramid-202307705'
+$env:WEB_PORT = '18081'
 
-function Invoke-DockerStep {
+function Invoke-ComposeStep {
   param(
     [Parameter(Mandatory = $true)][string]$Name,
     [Parameter(Mandatory = $true)][string[]]$Arguments
   )
 
   Write-Host "`n[TEST-PYRAMID] $Name"
-  & docker @Arguments
+  & docker compose -p $composeProject @Arguments
   if ($LASTEXITCODE -ne 0) {
     throw "Falló '$Name' con código $LASTEXITCODE."
   }
 }
 
 function Prepare-Backend {
-  Invoke-DockerStep 'preparar PostgreSQL, API y frontend' @('compose', 'up', '--build', '-d', 'db', 'api', 'web')
-  Invoke-DockerStep 'crear datos demo' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/seed-demo.js')
-  Invoke-DockerStep 'validar Excel original' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/validate-import.js')
-  Invoke-DockerStep 'cargar Excel original' @('compose', 'exec', '-T', 'api', 'node', 'apps/api/dist/scripts/import-catalog.js')
+  Invoke-ComposeStep 'preparar PostgreSQL, API y frontend aislados' @('up', '--build', '-d', 'db', 'api', 'web')
+  Invoke-ComposeStep 'crear datos demo' @('exec', '-T', 'api', 'node', 'apps/api/dist/scripts/seed-demo.js')
+  Invoke-ComposeStep 'validar Excel original' @('exec', '-T', 'api', 'node', 'apps/api/dist/scripts/validate-import.js')
+  Invoke-ComposeStep 'cargar Excel original' @('exec', '-T', 'api', 'node', 'apps/api/dist/scripts/import-catalog.js')
+  Invoke-ComposeStep 'importar los CI originales de CMDB.xlsx' @('exec', '-T', 'api', 'node', 'apps/api/dist/scripts/import-cmdb.js')
+  Invoke-ComposeStep 'preparar 5,000 dispositivos sintéticos para interfaz' @('exec', '-T', '-e', 'CMDB_SEED=EVAL2026', '-e', 'CMDB_COUNT=5000', 'api', 'node', 'apps/api/dist/scripts/generate-cmdb.js')
+  Invoke-ComposeStep 'preparar colas demo y preguntas frecuentes de autoservicio' @('exec', '-T', 'api', 'node', 'apps/api/dist/scripts/seed-service-desk.js')
 }
 
 function Run-Unit {
-  Invoke-DockerStep 'unitarias Jest (7 pruebas, 70%)' @('compose', 'run', '--build', '--rm', '-T', 'api', 'node_modules/.bin/jest', '--config', 'apps/api/test/jest.unit.config.js', '--runInBand')
+  Invoke-ComposeStep 'unitarias Jest (70%)' @('run', '--build', '--rm', '-T', 'api', 'node_modules/.bin/jest', '--config', 'apps/api/test/jest.unit.config.js', '--runInBand')
 }
 
 function Run-Integration {
   Prepare-Backend
-  Invoke-DockerStep 'integración Jest (2 pruebas, 20%)' @('compose', 'run', '--rm', '-T', 'api', 'node_modules/.bin/jest', '--config', 'apps/api/test/jest.integration.config.js', '--runInBand')
+  Invoke-ComposeStep 'integración Jest (20%)' @('run', '--rm', '-T', 'api', 'node_modules/.bin/jest', '--config', 'apps/api/test/jest.integration.config.js', '--runInBand')
 }
 
 function Run-E2E {
   Prepare-Backend
-  Invoke-DockerStep 'E2E Playwright (1 prueba, 10%)' @('compose', '--profile', 'tests', 'run', '--build', '--rm', '-T', 'e2e')
+  Invoke-ComposeStep 'E2E Playwright (10%)' @('--profile', 'tests', 'run', '--build', '--rm', '-T', 'e2e')
 }
 
 switch ($Suite) {
@@ -52,4 +57,5 @@ switch ($Suite) {
   }
 }
 
+Invoke-ComposeStep 'detener contenedores de prueba (el volumen aislado se conserva)' @('down')
 Write-Host "`n{`"ok`":true,`"suite`":`"$Suite`",`"pyramid`":`"70/20/10`"}"

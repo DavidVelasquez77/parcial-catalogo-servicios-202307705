@@ -12,6 +12,13 @@ const queueDefinitions: Array<[string,string,DeskProcess]> = [
   ['Q-ACCESS','Accesos','ACCESS'],
   ['Q-TECH','Servicios de tecnología','TECH_SERVICE'],
 ];
+const knowledgeEntries: Array<[string,string]> = [
+  ['FAQ-L0-01 · Registrar una solicitud','Abre Tickets, selecciona Nuevo ticket, elige la cola del proceso y un servicio activo. Describe el resultado que necesitas. Si no corresponde asociar un CI, explica el motivo; conserva el número del ticket para darle seguimiento.'],
+  ['FAQ-L0-02 · Incidente o solicitud de servicio','Registra un incidente cuando algo existente se interrumpió o degradó. Usa Servicios de tecnología para pedir una prestación de un servicio existente. Usa Nuevos servicios cuando necesites proponer un servicio que aún no está en el catálogo.'],
+  ['FAQ-L0-03 · Elegir categoría de evento','E0 es programado y solo requiere registro. E1 es no programado sin impacto y conserva evaluación. E2 impacta el servicio y E3 afecta seguridad; ambos generan un incidente relacionado que debe recibir respuesta.'],
+  ['FAQ-L0-04 · Dar seguimiento a un ticket','En Tickets busca por número o título. El detalle muestra estado, cola, responsable, historial y comentarios. Los comentarios públicos son visibles al solicitante; las notas internas quedan para el equipo autorizado.'],
+  ['FAQ-L0-05 · Aportar información útil','Incluye cuándo empezó el problema, servicio afectado, síntomas observados y pasos para reproducirlo. Relaciona un CI solo cuando lo conoces; no inventes equipos. Evita incluir contraseñas o secretos en la descripción o en adjuntos.'],
+];
 const demoUsers = [
   { username: 'solicitante.demo', name: 'Solicitante de evaluación', role: 'SOLICITANTE', env: 'DEMO_REQUESTER_PASSWORD', fallback: 'Solicita123!' },
   { username: 'agente1.demo', name: 'Agente de evaluación 1', role: 'AGENTE', env: 'DEMO_AGENT1_PASSWORD', fallback: 'Agente123!' },
@@ -84,9 +91,40 @@ async function seedQueues(client: PoolClient, responsibleUserId: number) {
   return { queues, incidentEscalationQueueId };
 }
 
+async function seedKnowledge(client: PoolClient, createdBy: number) {
+  for (const [title,body] of knowledgeEntries) {
+    await client.query(`INSERT INTO knowledge_articles(title,body,created_by)
+      SELECT $1::varchar,$2::text,$3::bigint WHERE NOT EXISTS (
+        SELECT 1 FROM knowledge_articles WHERE title=$1::varchar
+      )`, [title,body,createdBy]);
+  }
+}
+
+async function normalizeSeededE0(client: PoolClient) {
+  const fixture = await client.query<{ id: number; process_data: Record<string,unknown> }>(`SELECT id,process_data
+    FROM tickets WHERE number='DEMO-EVT-01' AND process='EVENT' AND process_data->>'eventCategory'='E0'
+      AND process_data->>'assessment'='Caso sintético de evaluación'
+      AND process_data->>'response' IS NULL FOR UPDATE`);
+  if (!fixture.rows[0]) return 0;
+  const previous = fixture.rows[0].process_data;
+  const revised = { ...previous };
+  delete revised.assessment;
+  delete revised.response;
+  await client.query('UPDATE tickets SET process_data=$1::jsonb,updated_at=NOW() WHERE id=$2',
+    [JSON.stringify(revised),fixture.rows[0].id]);
+  await client.query(`INSERT INTO ticket_history(ticket_id,actor_id,action,old_values,new_values,reason)
+    VALUES($1,NULL,'DEMO_SEED_REPAIR',$2::jsonb,$3::jsonb,$4)`,
+    [fixture.rows[0].id,JSON.stringify(previous),JSON.stringify(revised),
+      'Se elimina evidencia operativa sintética del E0 de muestra; este evento solo requiere registro.']);
+  return 1;
+}
+
 function dataFor(process: DeskProcess, index: number) {
-  if (process === 'EVENT') return { eventCategory: ['E0','E1','E2','E3','E1'][index - 1],
-    assessment: 'Caso sintético de evaluación',response:index > 2 ? 'Alerta atendida en la cola de evaluación.' : null };
+  if (process === 'EVENT') {
+    const eventCategory = ['E0','E1','E2','E3','E1'][index - 1];
+    return { eventCategory,assessment:eventCategory === 'E0' ? null : 'Caso sintético de evaluación',
+      response:index > 2 ? 'Alerta atendida en la cola de evaluación.' : null };
+  }
   if (process === 'INCIDENT') return {
     incidentCategory: `I${index - 1}`, estimatedMinutes: [null,120,360,1500,5000,45000,null][index - 1],
     interruptsOrDegrades: index > 1 && index < 7, redundancyAvailable: index === 1,
@@ -118,9 +156,14 @@ async function main() {
     const services = await client.query<{ id: number }>(`SELECT id FROM service_level_2 WHERE status='ACTIVE' ORDER BY id`);
     if (!position.rows[0] || !services.rows[0]) throw new Error('Ejecuta seed-demo e import-catalog antes de seed-service-desk.');
     const users = await createUsers(client,position.rows[0].id);
+    const administrator = await client.query<{ id: number }>(
+      `SELECT id FROM users WHERE active AND role='ADMIN' ORDER BY id LIMIT 1`);
+    if (!administrator.rows[0]) throw new Error('Ejecuta seed-demo para preparar el administrador de la base de conocimientos.');
+    await seedKnowledge(client,administrator.rows[0].id);
     const responsibleUserId = users.get('agente1.demo');
     if (!responsibleUserId) throw new Error('No se creó el agente responsable de las colas.');
     const { queues, incidentEscalationQueueId } = await seedQueues(client,responsibleUserId);
+    const repairedE0 = await normalizeSeededE0(client);
     const ci = await client.query<{ id: number }>(`SELECT id FROM configuration_items WHERE is_device ORDER BY id LIMIT 20`);
     let created = 0;
     for (const [,,process] of queueDefinitions) {
@@ -183,9 +226,11 @@ async function main() {
     }
     const totals = await client.query(`SELECT process,COUNT(*)::int AS count FROM tickets
       WHERE number LIKE 'DEMO-%' GROUP BY process ORDER BY process`);
+    const articles = await client.query(`SELECT COUNT(*)::int AS total FROM knowledge_articles
+      WHERE active AND title LIKE 'FAQ-L0-%'`);
     await client.query('COMMIT');
-    console.log(JSON.stringify({ ok: true,created,total: totals.rows.reduce((sum,row) => sum + row.count,0),
-      byProcess: totals.rows,queues: queues.size + 1,accounts: [...users.keys()] }));
+    console.log(JSON.stringify({ ok: true,created,repairedE0,total: totals.rows.reduce((sum,row) => sum + row.count,0),
+      byProcess: totals.rows,queues: queues.size + 1,knowledgeArticles: articles.rows[0].total,accounts: [...users.keys()] }));
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

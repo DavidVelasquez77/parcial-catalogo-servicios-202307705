@@ -60,7 +60,7 @@ En Linux/macOS:
 sh scripts/service-desk-test.sh
 ```
 
-Esa rutina hace preparación, importaciones repetidas, 5,000 dispositivos, escenarios **P01–P18** y reinicio persistente. Para las pruebas unitarias con Jest y las de navegador con Playwright, sin instalar Node en el host, consulte los comandos exactos en [PRUEBAS.md](docs/PRUEBAS.md). Una ejecución termina con código 0 si pasa y distinto de 0 al fallar.
+Esa rutina hace preparación, importaciones repetidas, 5,000 dispositivos, escenarios **P01–P18** y reinicio persistente en un proyecto Compose aislado. Para las pruebas unitarias con Jest y las de navegador con Playwright, sin instalar Node en el host, ejecute `scripts/test-pyramid.ps1 all` en Windows o `sh scripts/test-pyramid.sh all` en Linux/macOS. Esa pirámide usa el proyecto aislado `service-desk-pyramid-202307705`, puerto auxiliar 18081 y conserva su volumen al detener contenedores; no usa ni reinicia la base de evaluación normal. Una ejecución termina con código 0 si pasa y distinto de 0 al fallar.
 
 ### Operación diaria
 
@@ -114,6 +114,8 @@ La aplicación permite:
 - operar, en la entrega original del catálogo, con ADMIN y CONSULTA; la ampliación añade Solicitante, Agente y Aprobador, además de roles múltiples.
 
 La primera entrega no incluía tickets. La ampliación Service Desk sí los implementa; facturación y consumo continúan fuera de alcance.
+
+La ampliación incluye un portal de solicitantes con base de conocimientos inicial para autoservicio nivel 0, una consola de atención por colas y un tablero con antigüedad abierta, primera atención, resolución y cumplimiento de objetivos. Las definiciones de tipos, niveles, categorías E0–E3 e I0–I6, reglas complementarias y fórmulas de indicadores están en [docs/PROCESOS.md](docs/PROCESOS.md).
 
 ## 3. Tecnologías y justificación
 

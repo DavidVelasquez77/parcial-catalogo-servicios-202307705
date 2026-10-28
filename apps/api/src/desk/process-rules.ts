@@ -30,7 +30,7 @@ export const transitions: Record<DeskProcess, Record<string, string[]>> = {
     ESCALATED: ['IN_PROGRESS','RESOLVED'], RESOLVED: ['CLOSED'],
   },
   EVENT: {
-    SUBMITTED: ['CLASSIFIED'], CLASSIFIED: ['EVALUATED'],
+    SUBMITTED: ['CLASSIFIED','CLOSED'], CLASSIFIED: ['EVALUATED'],
     EVALUATED: ['RESPONDED','CLOSED'], RESPONDED: ['CLOSED'],
   },
   PROBLEM: {

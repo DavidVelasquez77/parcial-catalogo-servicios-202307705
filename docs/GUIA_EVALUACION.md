@@ -4,7 +4,7 @@
 
 Desde un clon limpio de `main`, copiar `.env.example` a `.env` (PowerShell: `Copy-Item .env.example .env`; Linux/macOS: `cp .env.example .env`), ejecutar `docker compose up --build -d` y luego los cinco comandos de preparación del [README](../README.md): seed de cuentas, importación del catálogo, importación de CMDB, generación de 5,000 dispositivos y seed de tickets. Entrar en `http://localhost:8080/` como `admin.demo` con la contraseña local de demostración configurada en `.env`.
 
-En cinco minutos, mostrar: (1) **Tickets**, filtros, un detalle con bitácora, CI y campos específicos de proceso; (2) **Colas**, siete procesos, nivel y permisos por rol o usuario; (3) **CMDB**, dos CI con procedencia `CMDB.xlsx` y 5,000 dispositivos, clasificación y recorrido de impacto; (4) **Indicadores**, tiempos calendario y cumplimiento de objetivos; (5) **Conocimientos**, autoservicio nivel 0. Enseñar `docs/PROCESOS.md` para explicar E0–E3, I0–I6 y aprobaciones; `docs/MODELO.md` para diferenciar jerarquía de categorías y relaciones técnicas.
+En cinco minutos, mostrar: (1) **Tickets**, filtros, un detalle con bitácora, CI y campos específicos de proceso; (2) **Colas**, siete procesos, nivel y permisos por rol o usuario; (3) **CMDB**, dos CI con procedencia `CMDB.xlsx` y 5,000 dispositivos, clasificación y recorrido de impacto; (4) **Indicadores**, antigüedad, primera atención, resolución y cumplimiento en minutos calendario; (5) **Conocimientos**, autoservicio nivel 0 con las FAQ iniciales. Para eventos, explicar que E0 solo se registra y se cierra; E1 se evalúa sin respuesta operativa; E2/E3 generan incidente y notificación, y reciben respuesta antes del cierre. Mostrar `GET /api/desk/notifications` como verificación de la notificación, sin correo real. Enseñar `docs/PROCESOS.md` para explicar el mapeo de tipos, E0–E3, I0–I6, niveles y fórmulas; `docs/MODELO.md` para diferenciar jerarquía de categorías y relaciones técnicas.
 
 Si se solicita harness, ejecutar `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` en Windows o `sh scripts/service-desk-test.sh` en Linux/macOS. La salida muestra P01–P18 y P18 tras reiniciar PostgreSQL. Para la evidencia de IA, abrir `docs/IA.md` y `docs/prompts/service-desk.md`; explicar un prompt revisado y una actualización de `AGENTS.md`. El proyecto de pruebas usa otro nombre Compose y no modifica la instalación normal. El recorrido antiguo del catálogo continúa debajo.
 
@@ -24,8 +24,9 @@ Para una demostración breve, describir un control distintivo por flujo:
    se puede ejecutar sin aprobación registrada y planificar.
 3. **Incidente:** mostrar categoría I0–I6, afectación y solución; la categoría
    se valida con la duración y la resolución deja el tiempo real cuando aplica.
-4. **Evento:** mostrar E0–E3; E2/E3 generan el incidente enlazado y deben tener
-   respuesta antes del cierre.
+4. **Evento:** mostrar E0 directo de registro a cierre; E1 con evaluación sin
+   respuesta; E2/E3 con evaluación, incidente enlazado, notificación y respuesta
+   antes del cierre. La notificación puede comprobarse en `GET /api/desk/notifications`.
 5. **Problema:** mostrar el incidente relacionado y la cadena de causa raíz,
    solución temporal/error conocido y solución definitiva; el cambio correctivo
    queda vinculado con `IMPLEMENTS`.

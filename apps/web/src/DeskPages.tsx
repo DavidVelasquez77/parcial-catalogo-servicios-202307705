@@ -40,6 +40,17 @@ const processFields: Record<string,Array<[string,string,'text'|'number'|'boolean
   ACCESS: [['resource','Recurso','text'],['permission','Permiso','text'],['accessAction','Provisión o revocación','accessAction'],['provisioningResult','Resultado de provisión o revocación','text'],['validation','Validación','text']],
   TECH_SERVICE: [['request','Prestación solicitada','text'],['validation','Validación de la solicitud','text'],['delivery','Cumplimiento','text'],['confirmation','Confirmación del solicitante','text']],
 };
+const eventLabels: Record<string,string> = {
+  E0:'Programado; requiere registro',
+  E1:'No programado, sin impacto; requiere evaluación registrada',
+  E2:'No programado, impacta el servicio; requiere incidente',
+  E3:'No programado, impacto en seguridad con posible impacto al servicio; requiere incidente',
+};
+const incidentLabels: Record<string,string> = {
+  I0:'No causa interrupción',I1:'3 horas o menos, incluidas degradaciones',
+  I2:'8 horas o menos, incluidas degradaciones',I3:'2 días o menos',
+  I4:'1 semana o menos',I5:'1 mes o más',I6:'Afecta la seguridad de los recursos y la información',
+};
 const date = (value: string) => new Date(value).toLocaleString('es-GT');
 const message = (error: unknown) => error instanceof Error ? error.message : 'No fue posible completar la operación.';
 const canWrite = (user: Account) => !(user.roles ?? [user.role]).includes('CONSULTA');
@@ -101,7 +112,9 @@ function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: (
     <label>Título<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={240} required /></label>
     <label>Descripción<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required /></label>
     <label>Prioridad<select value={priority} onChange={(e) => setPriority(e.target.value)}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} · {n===5?'Muy alta':n===1?'Muy baja':'Nivel '+n}</option>)}</select></label>
-    {(process === 'EVENT' || process === 'INCIDENT') && <label>Categoría<select value={category} onChange={(e) => setCategory(e.target.value)} required><option value="">Selecciona</option>{(process === 'EVENT' ? ['E0','E1','E2','E3'] : ['I0','I1','I2','I3','I4','I5','I6']).map((x) => <option key={x}>{x}</option>)}</select></label>}
+    {(process === 'EVENT' || process === 'INCIDENT') && <label>Categoría<select value={category} onChange={(e) => setCategory(e.target.value)} required><option value="">Selecciona</option>{(process === 'EVENT' ? ['E0','E1','E2','E3'] : ['I0','I1','I2','I3','I4','I5','I6']).map((x) => <option key={x} value={x}>{x} · {(process === 'EVENT' ? eventLabels : incidentLabels)[x]}</option>)}</select></label>}
+    {process === 'EVENT' && category === 'E0' && <p className="muted">E0 queda registrado al crear el ticket y puede cerrarse sin clasificación, evaluación ni respuesta operativa.</p>}
+    {process === 'EVENT' && category === 'E1' && <p className="muted">E1 requiere guardar una evaluación; no requiere respuesta operativa.</p>}
     {process === 'INCIDENT' && <><label>Duración estimada (minutos)<input type="number" min={['I1','I2','I3','I4','I5'].includes(category)?1:0} required={['I1','I2','I3','I4','I5'].includes(category)} value={extra.estimatedMinutes ?? ''} onChange={(e) => change('estimatedMinutes',e.target.value)} /></label><label>¿Interrupción o degradación?<select value={extra.interruptsOrDegrades ?? ''} onChange={(e) => change('interruptsOrDegrades',e.target.value)} required><option value="">Selecciona</option><option value="yes">Sí</option><option value="no">No</option></select></label><label>¿Redundancia disponible?<select value={extra.redundancyAvailable ?? ''} onChange={(e) => change('redundancyAvailable',e.target.value)}><option value="">No informada</option><option value="yes">Sí</option><option value="no">No</option></select></label></>}
     {process === 'NEW_SERVICE' && <><label>Necesidad<input value={extra.need ?? ''} onChange={(e) => change('need',e.target.value)} required /></label><label>Viabilidad preliminar<input value={extra.feasibility ?? ''} onChange={(e) => change('feasibility',e.target.value)} required /></label><label>Vincular servicio existente<select value={extra.linkedServiceId ?? ''} onChange={(e) => change('linkedServiceId',e.target.value)}><option value="">Crear servicio nuevo tras aprobación</option>{services.map((s) => <option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</select></label>{!extra.linkedServiceId && <><label>Código propuesto<input value={extra.proposedCode ?? ''} onChange={(e) => change('proposedCode',e.target.value)} required /></label><label>Nombre propuesto<input value={extra.proposedName ?? ''} onChange={(e) => change('proposedName',e.target.value)} required /></label></>}</>}
     {process === 'CHANGE' && <><label>Impacto y riesgo<textarea value={extra.riskAssessment ?? ''} onChange={(e) => change('riskAssessment',e.target.value)} required /></label><label>Plan de pruebas<textarea value={extra.testPlan ?? ''} onChange={(e) => change('testPlan',e.target.value)} required /></label><label>Plan de reversión<textarea value={extra.rollbackPlan ?? ''} onChange={(e) => change('rollbackPlan',e.target.value)} required /></label></>}
@@ -150,18 +163,29 @@ function TicketView({ id, user, queues, users, onClose, onChanged }: { id: numbe
     const data = new FormData(); data.append('file',file);
     try { const response = await fetch(`/api/desk/tickets/${id}/attachments`,{method:'POST',body:data,credentials:'include'});const payload = await response.json();if (!response.ok) throw new Error(payload.message);setFile(null);await load(); } catch(e) {setError(message(e));} finally {setBusy(false);}
   }
-  const options = ticket ? [...(transitions[ticket.process]?.[ticket.state] ?? []).filter((to) => to !== 'ESCALATED'),...(ticket.state === 'CLOSED' ? ['SUBMITTED'] : [])] : [];
+  const options = ticket ? (() => {
+    const allowed = [...(transitions[ticket.process]?.[ticket.state] ?? []).filter((to) => to !== 'ESCALATED'),...(ticket.state === 'CLOSED' ? ['SUBMITTED'] : [])];
+    if (ticket.process === 'EVENT' && ticket.process_data?.eventCategory === 'E0' && ticket.state === 'SUBMITTED') return ['CLOSED'];
+    return allowed;
+  })() : [];
   const staff = ticket && (isAdmin(user) || queues.find((q) => q.id === ticket.queue_id)?.canHandle);
   const sourceQueue = queues.find((q) => q.id === ticket?.queue_id);
   const mayTransfer = ticket && canWrite(user) && (isAdmin(user) || sourceQueue?.canTransfer);
   const mayAssign = ticket && canWrite(user) && (isAdmin(user) || sourceQueue?.canAdmin);
   const escalationTargets = ticket && sourceQueue ? queues.filter((q) => q.active && q.process === ticket.process && q.support_level > sourceQueue.support_level) : [];
+  const visibleProcessFields = ticket ? (processFields[ticket.process] ?? []).filter(([key]) => {
+    if (ticket.process !== 'EVENT') return true;
+    if (ticket.process_data?.eventCategory === 'E0') return false;
+    if (key === 'eventCategory') return false;
+    if (ticket.process_data?.eventCategory === 'E1') return key !== 'response';
+    return true;
+  }) : [];
   return <div className="modal-backdrop" onClick={onClose}><section className="modal-card desk-detail" role="dialog" aria-modal="true" aria-label="Ficha de ticket" onClick={(e) => e.stopPropagation()}><div className="drawer-head"><div><p className="eyebrow">FICHA DE TICKET</p><h2>{ticket?.number ?? 'Cargando...'}</h2></div><button className="icon-button" onClick={onClose} aria-label="Cerrar">×</button></div>
     {error && <div className="alert error">{error}</div>}
     {ticket && <><h3>{ticket.title}</h3><p className="muted">{ticket.description}</p><div className="desk-facts"><span><strong>Proceso</strong>{label(ticket.process)}</span><span><strong>Estado</strong>{label(ticket.state)}</span><span><strong>Servicio</strong>{ticket.service_name}</span><span><strong>Nivel 1</strong>{ticket.level_1_name}</span><span><strong>Prioridad</strong>{String(ticket.priority)}</span><span><strong>Cola</strong>{String(ticket.queue_name)}</span><span><strong>Asignado</strong>{ticket.assigned_user_id === null ? 'Sin asignar' : users.find((person) => person.id===ticket.assigned_user_id)?.name ?? `Usuario #${ticket.assigned_user_id}`}</span><span><strong>CI</strong>{ticket.ci.length ? ticket.ci.map((ci) => ci.code).join(', ') : ticket.no_ci_reason ?? 'Sin CI'}</span></div>
       <section className="desk-section"><h3>Acciones</h3><label>Motivo o solución<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Obligatorio al resolver, rechazar o reabrir" /></label><div className="button-row desk-actions">{staff && !ticket.assigned_user_id && canWrite(user) && <button className="secondary" disabled={busy} onClick={() => void action('claim',{})}>Tomar ticket</button>}{options.filter((to) => to !== 'APPROVED' && to !== 'REJECTED' || isAdmin(user) || (user.roles ?? [user.role]).includes('APROBADOR')).map((to) => <button key={to} className={to==='CLOSED'?'primary':'secondary'} disabled={busy || !canWrite(user)} onClick={() => void action('transition',{to,reason})}>{label(to)}</button>)}{staff && !ticket.paused_at && <button className="secondary" disabled={busy} onClick={() => void action('pause',{reason})}>Pausar</button>}{staff && !!ticket.paused_at && <button className="secondary" disabled={busy} onClick={() => void action('resume',{reason})}>Reanudar</button>}</div></section>
       {mayAssign && !['CLOSED','REJECTED'].includes(ticket.state) && <section className="desk-section"><h3>Asignar agente</h3><p className="muted">Solo aparecen agentes activos con permiso para atender esta cola.</p><div className="button-row"><select aria-label="Agente autorizado" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}><option value="">Selecciona agente</option>{assignees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select><button className="secondary" disabled={busy || !assigneeId} onClick={() => void action('assign',{userId:Number(assigneeId),reason:reason.trim() || undefined})}>Asignar</button></div></section>}
-      {staff && <section className="desk-section"><h3>Datos de {label(ticket.process)}</h3><p className="muted">Completa las evidencias necesarias antes de avanzar el proceso.</p><div className="form-grid">{(processFields[ticket.process] ?? []).map(([key,title,kind]) => <label key={key}>{title}{kind==='boolean'?<select value={processValues[key]===true?'true':processValues[key]===false?'false':''} onChange={(e) => setProcessValues({...processValues,[key]:e.target.value===''?null:e.target.value==='true'})}><option value="">No informado</option><option value="true">Sí</option><option value="false">No</option></select>:kind==='category'?<select value={String(processValues[key] ?? '')} onChange={(e) => setProcessValues({...processValues,[key]:e.target.value})}>{(ticket.process==='EVENT'?['E0','E1','E2','E3']:['I0','I1','I2','I3','I4','I5','I6']).map((item) => <option key={item} value={item}>{item}</option>)}</select>:<input type={kind==='number'?'number':'text'} value={String(processValues[key] ?? '')} onChange={(e) => setProcessValues({...processValues,[key]:kind==='number'?(e.target.value===''?null:Number(e.target.value)):e.target.value})} />}</label>)}</div><div className="button-row desk-actions"><button className="secondary" disabled={busy} onClick={async () => {try {setBusy(true);await patch(`/desk/tickets/${id}/process-data`,processValues);await load();}catch(e){setError(message(e));}finally{setBusy(false);}}}>Guardar datos</button></div></section>}
+      {staff && <section className="desk-section"><h3>Datos de {label(ticket.process)}</h3><p className="muted">Completa las evidencias necesarias antes de avanzar el proceso.</p>{ticket.process==='EVENT' && <p className="muted"><strong>{String(ticket.process_data?.eventCategory)}:</strong> {eventLabels[String(ticket.process_data?.eventCategory)] ?? 'Categoría no disponible'}.</p>}<div className="form-grid">{visibleProcessFields.map(([key,title,kind]) => <label key={key}>{title}{kind==='boolean'?<select value={processValues[key]===true?'true':processValues[key]===false?'false':''} onChange={(e) => setProcessValues({...processValues,[key]:e.target.value===''?null:e.target.value==='true'})}><option value="">No informado</option><option value="true">Sí</option><option value="false">No</option></select>:kind==='category'?<select value={String(processValues[key] ?? '')} onChange={(e) => setProcessValues({...processValues,[key]:e.target.value})}>{(ticket.process==='EVENT'?['E0','E1','E2','E3']:['I0','I1','I2','I3','I4','I5','I6']).map((item) => <option key={item} value={item}>{item} · {(ticket.process==='EVENT'?eventLabels:incidentLabels)[item]}</option>)}</select>:<input type={kind==='number'?'number':'text'} value={String(processValues[key] ?? '')} onChange={(e) => setProcessValues({...processValues,[key]:kind==='number'?(e.target.value===''?null:Number(e.target.value)):e.target.value})} />}</label>)}</div>{ticket.process !== 'EVENT' || ticket.process_data?.eventCategory !== 'E0' ? <div className="button-row desk-actions"><button className="secondary" disabled={busy} onClick={async () => {try {setBusy(true);await patch(`/desk/tickets/${id}/process-data`,processValues);await load();}catch(e){setError(message(e));}finally{setBusy(false);}}}>Guardar datos</button></div> : null}</section>}
       {mayTransfer && <section className="desk-section"><h3>Transferir</h3><div className="button-row"><select value={destination} onChange={(e) => setDestination(e.target.value)}><option value="">Cola destino</option>{queues.filter((q) => q.process===ticket.process && q.id!==ticket.queue_id && q.active).map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}</select><button className="secondary" disabled={busy || !destination} onClick={() => void action('transfer',{queueId:Number(destination),reason})}>Transferir</button></div></section>}
       {mayTransfer && ticket.process==='INCIDENT' && ['DIAGNOSING','IN_PROGRESS','ESCALATED'].includes(ticket.state) && <section className="desk-section"><h3>Escalar incidente</h3><p className="muted">Elige una cola del mismo proceso con nivel de soporte superior y escribe el motivo arriba.</p><div className="button-row"><select aria-label="Cola de escalamiento" value={escalationQueueId} onChange={(e) => setEscalationQueueId(e.target.value)}><option value="">Cola de nivel superior</option>{escalationTargets.map((q) => <option key={q.id} value={q.id}>{q.name} · nivel {q.support_level}</option>)}</select><button className="secondary" disabled={busy || !escalationQueueId || !reason.trim()} onClick={() => void action('escalate',{queueId:Number(escalationQueueId),reason})}>Escalar</button></div>{escalationTargets.length===0 && <p className="muted">No hay una cola activa de nivel superior para este proceso.</p>}</section>}
       <section className="desk-section"><h3>Conversación</h3>{ticket.comments.map((item) => <article className="desk-note" key={item.id}><small>{item.visibility==='INTERNAL'?'Nota interna':'Comentario público'} · {date(item.created_at)}</small><p>{item.body}</p></article>)}{canWrite(user) && <div className="stack-form"><label>Nuevo comentario<textarea value={comment} onChange={(e) => setComment(e.target.value)} rows={2} /></label>{staff && <label>Visibilidad<select value={visibility} onChange={(e) => setVisibility(e.target.value)}><option value="PUBLIC">Visible al solicitante</option><option value="INTERNAL">Nota interna</option></select></label>}<button className="secondary" disabled={busy || !comment.trim()} onClick={() => void action('comments',{body:comment,visibility})}>Enviar comentario</button></div>}</section>
@@ -348,6 +372,15 @@ export function CmdbPage({ user }: { user: Account }) {
   </div>;
 }
 
+function objectiveSummary(value: unknown) {
+  const row = value && typeof value === 'object' ? value as { met?: unknown; evaluated?: unknown } : {};
+  const met = Number(row.met ?? 0);
+  const evaluated = Number(row.evaluated ?? 0);
+  if (!Number.isFinite(met) || !Number.isFinite(evaluated) || evaluated <= 0) return 'Sin casos evaluables';
+  const percentage = Math.round(met / evaluated * 1000) / 10;
+  return `${met} de ${evaluated} dentro del objetivo (${percentage}%)`;
+}
+
 export function DeskMetricsPage() {
   const [data,setData] = useState<Record<string,unknown> | null>(null);
   const [error,setError] = useState('');
@@ -355,7 +388,26 @@ export function DeskMetricsPage() {
   if (error) return <div className="alert error">{error}</div>;
   if (!data) return <div className="loading">Cargando indicadores...</div>;
   const groups = [['Por cola',data.byQueue],['Por proceso',data.byProcess],['Por prioridad',data.byPriority],['Por estado',data.byState]] as const;
-  return <div className="page"><div className="page-heading"><div><p className="eyebrow">INDICADORES</p><h1>Tablero de atención</h1><p className="muted">Cálculos sobre tickets visibles para tu cuenta.</p></div></div><div className="metric-grid">{[['Total',data.total],['Abiertos',data.open],['Primera atención (min)',data.averageFirstResponseMinutes],['Resolución (min)',data.averageResolutionMinutes]].map(([title,value]) => <div className="metric-card" key={String(title)}><div><span>{String(title)}</span><strong>{value==null?'—':String(value)}</strong></div></div>)}</div><div className="desk-metric-grid">{groups.map(([title,values]) => <section className="panel" key={title}><h2>{title}</h2>{Object.entries(values as Record<string,number>).map(([key,value]) => <div className="desk-stat" key={key}><span>{label(key)}</span><strong>{value}</strong></div>)}</section>)}</div><section className="panel desk-section"><h2>Objetivos de atención</h2><p>Primera respuesta: {JSON.stringify(data.firstResponseObjective)} · Resolución: {JSON.stringify(data.resolutionObjective)}</p><p className="muted">{String(data.basis)}</p></section></div>;
+  return <div className="page">
+    <div className="page-heading"><div><p className="eyebrow">INDICADORES</p><h1>Tablero de atención</h1><p className="muted">Cálculos sobre tickets visibles para tu cuenta.</p></div></div>
+    <div className="desk-kpi-grid">
+      {[
+        ['Tickets',data.total],['No cerrados o rechazados',data.open],
+        ['Antigüedad abierta (min)',data.averageOpenAgeMinutes],
+        ['Primera atención promedio (min)',data.averageFirstResponseMinutes],
+        ['Resolución promedio (min)',data.averageResolutionMinutes],
+      ].map(([title,value]) => <div className="metric-card" key={String(title)}><div><span>{String(title)}</span><strong>{value==null?'—':String(value)}</strong></div></div>)}
+    </div>
+    <div className="desk-metric-grid">{groups.map(([title,values]) => <section className="panel" key={title}><h2>{title}</h2>{Object.entries(values as Record<string,number>).map(([key,value]) => <div className="desk-stat" key={key}><span>{label(key)}</span><strong>{value}</strong></div>)}</section>)}</div>
+    <section className="panel desk-section">
+      <h2>Objetivos de atención</h2>
+      <div className="desk-objectives">
+        <div><strong>Primera respuesta</strong><span>{objectiveSummary(data.firstResponseObjective)}</span></div>
+        <div><strong>Resolución</strong><span>{objectiveSummary(data.resolutionObjective)}</span></div>
+      </div>
+      <p className="muted">{String(data.basis)}</p>
+    </section>
+  </div>;
 }
 
 export function KnowledgePage({ user }: { user: Account }) {

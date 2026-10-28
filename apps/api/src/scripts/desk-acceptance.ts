@@ -141,7 +141,15 @@ async function main() {
     invalidFile.append('file',new Blob(['contenido inválido'],{type:'application/pdf'}),'falso.pdf');
     const invalidUpload = await fetch(base+filePath,{method:'POST',headers:{Cookie:admin.cookie},body:invalidFile});
     eq(invalidUpload.status,400,'firma de PDF inválida');
-    done('P05');
+    const knowledge = await status('/desk/knowledge',200,'GET',undefined,admin) as Array<Record<string,any>>;
+    const l0Articles = knowledge.filter((article) => String(article.title).startsWith('FAQ-L0-'));
+    eq(l0Articles.length,5,'cinco artículos de autoservicio nivel 0 sembrados');
+    truth(l0Articles.some((article) => article.title==='FAQ-L0-01 · Registrar una solicitud'),'FAQ de registro publicada');
+    const seededE0 = await pool.query<{ process_data: Record<string,unknown> }>(`SELECT process_data FROM tickets
+      WHERE number='DEMO-EVT-01' AND process='EVENT'`);
+    truth(seededE0.rows[0]?.process_data.eventCategory==='E0' && !('assessment' in seededE0.rows[0].process_data) &&
+      !('response' in seededE0.rows[0].process_data),'E0 de muestra solo conserva su registro');
+    done('P05',{knowledgeArticles:l0Articles.length});
 
     await status('/desk/queues',400,'POST',{code:`NO-OWNER-${stamp}`,name:'Sin responsable',process:'INCIDENT'},admin);
     await status('/desk/queues',400,'POST',
@@ -260,7 +268,7 @@ async function main() {
       {process:'NEW_SERVICE',data:{need:'Capacidad adicional de evaluación',feasibility:'Viable con controles aprobados',proposedCode:`P09-${stamp}`,proposedName:'Servicio nuevo de aceptación'},route:['ANALYSIS','PENDING_APPROVAL','APPROVED','IMPLEMENTING','RESOLVED','CLOSED']},
       {process:'CHANGE',data:{riskAssessment:'Riesgo bajo',testPlan:'Prueba funcional',rollbackPlan:'Revertir configuración'},extra:{ciIds:[ci1]},route:['RISK_ASSESSMENT','PENDING_APPROVAL','APPROVED','PLANNED','EXECUTING','VALIDATING','RESOLVED','CLOSED']},
       {process:'INCIDENT',data:{incidentCategory:'I3'},route:['CLASSIFIED','DIAGNOSING','IN_PROGRESS','RESOLVED','CLOSED']},
-      {process:'EVENT',data:{eventCategory:'E0'},route:['CLASSIFIED','EVALUATED','CLOSED']},
+      {process:'EVENT',data:{eventCategory:'E0'},route:['CLOSED']},
       {process:'PROBLEM',data:{rootCause:'Causa identificada'},route:['INVESTIGATING','DEFINITIVE_SOLUTION','RESOLVED','CLOSED']},
       {process:'ACCESS',data:{resource:'Sistema de prueba',permission:'Lectura',accessAction:'GRANT'},extra:{beneficiaryId:requester.id},route:['PENDING_APPROVAL','APPROVED','PROVISIONING','VALIDATING','RESOLVED','CLOSED']},
       {process:'TECH_SERVICE',data:{request:'Atención programada'},route:['VALIDATING','ASSIGNED','FULFILLING','CONFIRMING','RESOLVED','CLOSED']},
@@ -393,23 +401,38 @@ async function main() {
 
     for (const category of ['E0','E1','E2','E3']) {
       const event = await create('EVENT',{eventCategory:category});
-      await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'CLASSIFIED'},agent1);
-      await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'EVALUATED'},agent1);
-      await saveProcessData(event.id,{assessment:'Evaluación del evento'});
-      await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'EVALUATED'},agent1);
+      if (category==='E0') {
+        await status(`/desk/tickets/${event.id}/process-data`,400,'PATCH',{assessment:'No corresponde'},agent1);
+        await status(`/desk/tickets/${event.id}/process-data`,409,'PATCH',{eventCategory:'E1'},agent1);
+        await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'CLASSIFIED'},agent1);
+        await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'CLOSED'},agent1);
+        const recorded = await status(`/desk/tickets/${event.id}`,200,'GET',undefined,admin);
+        eq(recorded.state,'CLOSED','E0 se registra y cierra sin evaluación operativa');
+      } else {
+        await status(`/desk/tickets/${event.id}/process-data`,409,'PATCH',{eventCategory:'E0'},agent1);
+        await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'CLASSIFIED'},agent1);
+        await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'EVALUATED'},agent1);
+        await saveProcessData(event.id,{assessment:'Evaluación del evento'});
+        await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'EVALUATED'},agent1);
+      }
       const links = await pool.query(`SELECT COUNT(*)::int AS total FROM ticket_links
         WHERE ticket_id=$1 AND link_type='GENERATED_INCIDENT'`,[event.id]);
       eq(links.rows[0].total,['E2','E3'].includes(category)?1:0,`evento ${category}`);
-      await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'EVALUATED'},agent1);
+      if (category!=='E0') await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'EVALUATED'},agent1);
+      if (category==='E1') {
+        await status(`/desk/tickets/${event.id}/process-data`,400,'PATCH',{response:'No corresponde'},agent1);
+        await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'RESPONDED'},agent1);
+        await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'CLOSED'},agent1);
+      }
       if (['E2','E3'].includes(category)) {
         await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'CLOSED'},agent1);
         await status(`/desk/tickets/${event.id}/transition`,400,'POST',{to:'RESPONDED'},agent1);
         await saveProcessData(event.id,{response:'Equipo técnico atendió la alerta y documentó las acciones.'});
         await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'RESPONDED'},agent1);
         const notifications = await status('/desk/notifications',200,'GET',undefined,admin) as Array<Record<string,any>>;
-        truth(notifications.some((n) => n.ticketId===event.id),`notificación ${category}`);
+        truth(notifications.some((n) => n.ticketId===event.id && String(n.message).includes(event.number)),`notificación verificable ${category}`);
       }
-      await status(`/desk/tickets/${event.id}/transition`,201,'POST',{to:'CLOSED'},agent1);
+      if (category==='E0') continue;
     }
     done('P11');
 
@@ -417,7 +440,18 @@ async function main() {
       WHERE number LIKE 'DEMO-INC-%' ORDER BY number`);
     eq(new Set(categoriesIncident.rows.map((row) => row.category)).size,7,'I0-I6 en muestra');
     const gap = await status('/desk/incident-classification',201,'POST',{securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:10081},admin);
+    eq(gap.category,'I4','decisión complementaria para el hueco temporal');
     eq(gap.rule,'PROJECT_GAP_RULE_7_TO_30_DAYS','regla del vacío temporal');
+    for (const [minutes,expected] of [[180,'I1'],[181,'I2'],[480,'I2'],[481,'I3'],[2880,'I3'],[2881,'I4'],[10080,'I4']] as Array<[number,string]>) {
+      const suggestion = await status('/desk/incident-classification',201,'POST',
+        {securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:minutes},admin);
+      eq(suggestion.category,expected,`intervalo de proyecto ${minutes} min`);
+      eq(suggestion.rule,'PROJECT_SHORTEST_MATCH',`regla explícita de solapamiento ${minutes} min`);
+    }
+    const zeroDuration = await status('/desk/incident-classification',201,'POST',
+      {securityImpact:false,interruptsOrDegrades:true,estimatedMinutes:0},admin);
+    eq(zeroDuration.category,null,'duración cero requiere revisión manual');
+    eq(zeroDuration.rule,'MANUAL_REVIEW','duración cero no se atribuye a la lección');
     done('P12');
 
     const problem = await create('PROBLEM',{rootCause:'Causa de prueba'});
@@ -495,10 +529,17 @@ async function main() {
     const metrics = await status(`/desk/metrics?ticketId=${metricTicket.id}`,200,'GET',undefined,admin);
     eq(metrics.total,1,'métrica controlada');
     truth(Math.abs(metrics.averageFirstResponseMinutes-30)<0.2,'primera atención de 30 min');
-    truth(Math.abs(metrics.averageResolutionMinutes-80)<0.2,'resolución de 80 min sin pausa');
+    truth(Math.abs(metrics.averageResolutionMinutes-80)<0.2,'resolución de 90 min calendario menos 10 min pausados');
+    truth(Math.abs(metrics.averageOpenAgeMinutes-120)<0.2,'antigüedad abierta incluye 120 min calendario aunque esté resuelto sin cerrar');
+    eq(metrics.firstResponseObjective.met,1,'primera respuesta dentro del objetivo');
+    eq(metrics.firstResponseObjective.evaluated,1,'primera respuesta evaluable');
+    eq(metrics.resolutionObjective.met,1,'resolución dentro del objetivo');
+    eq(metrics.resolutionObjective.evaluated,1,'resolución evaluable');
     const openMetrics = await status(`/desk/metrics?ticketId=${rawChange.id}`,200,'GET',undefined,admin);
     eq(openMetrics.averageResolutionMinutes,null,'abierto sin resolución no promedia');
-    done('P17',{firstResponseMinutes:metrics.averageFirstResponseMinutes,resolutionMinutes:metrics.averageResolutionMinutes});
+    done('P17',{firstResponseMinutes:metrics.averageFirstResponseMinutes,resolutionMinutes:metrics.averageResolutionMinutes,
+      openAgeMinutes:metrics.averageOpenAgeMinutes,firstResponseObjective:metrics.firstResponseObjective,
+      resolutionObjective:metrics.resolutionObjective});
 
     console.log(JSON.stringify({ok:true,checks:results.length,stamp}));
   } finally {await pool.end();}

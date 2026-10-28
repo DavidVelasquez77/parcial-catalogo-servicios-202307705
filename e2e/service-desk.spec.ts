@@ -39,8 +39,11 @@ test('portal Service Desk: ticket, CMDB, indicadores y conocimientos', async ({ 
 
   await page.getByRole('button', { name: 'Indicadores' }).click();
   await expect(page.getByRole('heading', { name: 'Tablero de atención' })).toBeVisible();
+  await expect(page.getByText('Antigüedad abierta (min)')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Objetivos de atención' })).toBeVisible();
   await page.getByRole('button', { name: 'Conocimientos' }).click();
   await expect(page.getByRole('heading', { name: 'Base de conocimientos' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'FAQ-L0-01 · Registrar una solicitud' })).toBeVisible();
 });
 
 test('mantenimiento visual de categoría, ubicación y cola', async ({ page }) => {

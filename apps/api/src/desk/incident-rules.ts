@@ -16,13 +16,13 @@ export function suggestIncidentCategory(input: {
   if (input.securityImpact) return { category: 'I6', rule: 'LECCION_25_SECURITY' };
   if (!input.interruptsOrDegrades) return { category: 'I0', rule: 'LECCION_25_NO_INTERRUPTION' };
   const minutes = input.estimatedMinutes;
-  if (minutes === null || !Number.isFinite(minutes) || minutes < 0) {
+  if (minutes === null || !Number.isSafeInteger(minutes) || minutes <= 0) {
     return { category: null, rule: 'MANUAL_REVIEW' };
   }
-  if (minutes <= 180) return { category: 'I1', rule: 'LECCION_25_SHORTEST_MATCH' };
-  if (minutes <= 480) return { category: 'I2', rule: 'LECCION_25_SHORTEST_MATCH' };
-  if (minutes <= 2880) return { category: 'I3', rule: 'LECCION_25_SHORTEST_MATCH' };
-  if (minutes <= 10080) return { category: 'I4', rule: 'LECCION_25_SHORTEST_MATCH' };
+  if (minutes <= 180) return { category: 'I1', rule: 'PROJECT_SHORTEST_MATCH' };
+  if (minutes <= 480) return { category: 'I2', rule: 'PROJECT_SHORTEST_MATCH' };
+  if (minutes <= 2880) return { category: 'I3', rule: 'PROJECT_SHORTEST_MATCH' };
+  if (minutes <= 10080) return { category: 'I4', rule: 'PROJECT_SHORTEST_MATCH' };
   if (minutes < 43200) return { category: 'I4', rule: 'PROJECT_GAP_RULE_7_TO_30_DAYS' };
-  return { category: 'I5', rule: 'LECCION_25_MONTH_OR_MORE' };
+  return { category: 'I5', rule: 'PROJECT_30_DAY_MONTH_THRESHOLD' };
 }

@@ -122,6 +122,22 @@ fixture en la base aislada, preservando los 46 importados para P18. Consultar
 `docs/PROCESOS.md` para las reglas y `docs/PRUEBAS.md` para el comando,
 resultados y límites observados.
 
+## Actualización de contexto 8: parámetros de Service Desk de la lección 25 (27 de octubre de 2026)
+
+La revisión del apartado 7 encontró que el flujo de eventos trataba E0 como si
+requiriera evaluación y que el tablero no presentaba la antigüedad abierta ni
+el cumplimiento de objetivos de forma legible. Se fijó el ciclo de E0 a solo
+registro y cierre; E1 conserva evaluación sin respuesta; E2/E3 mantienen
+incidente, notificación verificable y respuesta. Las categorías se fijan al
+registrar para no eludir esas reglas editando después E0–E3. Las decisiones
+complementarias de intervalos I0–I6 quedan identificadas como reglas del
+proyecto, incluidos el hueco temporal y la aproximación de mes a 30 días.
+`docs/PROCESOS.md` contiene el mapeo, las equivalencias de niveles y las
+fórmulas de indicadores; `docs/contexto/05-contexto-leccion25.md` registra el
+hallazgo y los archivos relacionados. P05, P11, P12, P17 y Playwright deben
+ejecutarse y sus salidas reales añadirse a `docs/PRUEBAS.md` antes de dar el
+apartado por verificado.
+
 ## 4. Restricciones técnicas
 
 - No usar Prisma.
