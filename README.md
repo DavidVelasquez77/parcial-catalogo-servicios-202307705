@@ -639,6 +639,7 @@ dependencias instaladas.
 - [Ingeniería con IA: contexto, prompts, harness, loops y grafos](docs/IA.md)
 - [Matriz de requisitos y resultados reales](docs/PRUEBAS.md)
 - [Guía de evaluación y pruebas](docs/GUIA_EVALUACION.md)
+- [Guía visual de presentación: tickets, colas, roles y asignación](docs/GUIA_PRESENTACION_TICKETS_COLAS.md)
 - [Importación y calidad de datos](docs/IMPORTACION.md)
 - [API y reglas de autorización](docs/API.md)
 - [Context engineering](docs/contexto/)
