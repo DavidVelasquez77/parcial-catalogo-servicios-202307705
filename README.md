@@ -63,6 +63,13 @@ dependencias** examina relaciones `DEPENDS_ON` y `HOSTED_ON` en varios saltos y
 presenta servicios potencialmente afectados; es una ayuda de análisis, no una
 confirmación de interrupción.
 
+La carga sintética enlaza los CI existentes por parejas con `CONNECTED_TO`, de
+modo que cada ficha tenga una relación navegable. Son **datos de demostración**,
+no relaciones extraídas de `CMDB.xlsx`. Para mostrar el recorrido de impacto,
+busca `SYN-EVAL2026-004998`, abre su ficha y pulsa **Recorrer dependencias**:
+la cadena de muestra 5000 → 4999 → 4998 lleva a los servicios asociados a esos CI.
+Una conexión `CONNECTED_TO` no se interpreta como dependencia.
+
 La generación admite semilla y cantidad. Para crear otra colección aislada,
 usa un valor nuevo en `CMDB_SEED`; repetir el mismo valor reutiliza las mismas
 etiquetas y no duplica CI. En la salida JSON, `byCategory` presenta las hojas
@@ -83,7 +90,9 @@ generador no usa cuentas personales que pudieran existir en otra instalación.
 Si detecta registros antiguos de la misma semilla con otro responsable, los
 actualiza una vez, informa `updated` y registra la normalización en el historial
 del CI. La carga no elimina ni modifica el Excel original ni borra conjuntos de
-otras semillas.
+otras semillas. `demoRelations` informa el total de CI con relaciones y cuántas
+conexiones y dependencias se añadieron; al repetir la carga esos dos contadores
+de creación quedan en cero.
 
 ### Pruebas reproducibles
 

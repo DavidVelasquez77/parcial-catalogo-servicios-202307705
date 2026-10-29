@@ -132,6 +132,14 @@ requiere la aplicación se identifican como catálogos o reglas del proyecto.
 ## Generación, distribución y consulta de los 5,000 dispositivos
 
 `apps/api/src/scripts/generate-cmdb.ts` acepta `CMDB_SEED` y `CMDB_COUNT`.
+La carga también crea conexiones sintéticas `CONNECTED_TO` por parejas entre
+los CI presentes; si el total es impar, conecta el último con el primero. Así
+cada CI tiene una relación navegable. La descripción marca estas conexiones
+como demostración: no proceden de `CMDB.xlsx`. Para la colección de 5,000,
+los CI 5000→4999 y 4999→4998 forman una pequeña cadena `DEPENDS_ON` para
+mostrar el impacto desde el CI 4998. El generador comprueba que no crearía un ciclo y la repetición no duplica
+aristas. El recorrido de impacto ignora `CONNECTED_TO`: solo sigue
+`DEPENDS_ON` y `HOSTED_ON`.
 Con la semilla `EVAL2026` y cantidad `5000`, produce códigos deterministas
 `SYN-EVAL2026-000001` a `SYN-EVAL2026-005000`, y divide el conjunto en cuatro
 clases bajo la categoría original Hardware: servidor, estación de trabajo,

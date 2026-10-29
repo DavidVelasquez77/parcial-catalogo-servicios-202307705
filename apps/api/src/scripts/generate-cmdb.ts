@@ -19,6 +19,50 @@ const locations = [
   { code: 'OFFICE-B', name: 'Oficina B' },
 ] as const;
 
+// Relaciones de muestra separadas de la clasificación y de las relaciones del Excel.
+// Una conexión por pareja da a cada CI existente una relación navegable sin
+// afirmar una dependencia operativa que no está documentada en la fuente.
+async function prepareDemoRelations(client: PoolClient, currentSeed: string) {
+  const paired = await client.query(`WITH ordered AS (
+      SELECT id,ROW_NUMBER() OVER (ORDER BY code,id) AS position FROM configuration_items
+    ), pairs AS (
+      SELECT a.id AS source_id,b.id AS target_id FROM ordered a
+      JOIN ordered b ON b.position=a.position+1 WHERE a.position % 2=1
+      UNION ALL
+      SELECT last.id,first.id FROM ordered last CROSS JOIN ordered first
+      WHERE last.position=(SELECT MAX(position) FROM ordered)
+        AND last.position % 2=1 AND last.position>1 AND first.position=1
+    )
+    INSERT INTO ci_relations(from_ci_id,to_ci_id,relation_type,description)
+    SELECT source_id,target_id,'CONNECTED_TO','Conexión sintética de demostración; no procede de CMDB.xlsx'
+    FROM pairs ON CONFLICT DO NOTHING RETURNING id`);
+  const demoIndexes = count >= 5000 ? [4998,4999,5000] : [1,2,3];
+  const examples = await client.query<{id:number;code:string}>(`SELECT id,code FROM configuration_items
+    WHERE code=ANY($1::text[])`, [demoIndexes.map((index)=>`SYN-${currentSeed}-${String(index).padStart(6,'0')}`)]);
+  const byCode = new Map(examples.rows.map((row)=>[row.code,row.id]));
+  let dependenciesCreated = 0;
+  for (const [fromIndex,toIndex] of [[demoIndexes[1],demoIndexes[0]],[demoIndexes[2],demoIndexes[1]]]) {
+    const from=byCode.get(`SYN-${currentSeed}-${String(fromIndex).padStart(6,'0')}`);
+    const to=byCode.get(`SYN-${currentSeed}-${String(toIndex).padStart(6,'0')}`);
+    if (!from || !to) continue;
+    const inserted = await client.query(`WITH RECURSIVE reachable(id) AS (
+        SELECT to_ci_id FROM ci_relations WHERE from_ci_id=$2 AND relation_type IN ('DEPENDS_ON','HOSTED_ON')
+        UNION SELECT r.to_ci_id FROM ci_relations r JOIN reachable x ON r.from_ci_id=x.id
+        WHERE r.relation_type IN ('DEPENDS_ON','HOSTED_ON')
+      ) INSERT INTO ci_relations(from_ci_id,to_ci_id,relation_type,description)
+      SELECT $1,$2,'DEPENDS_ON','Dependencia sintética de demostración; no procede de CMDB.xlsx'
+      WHERE NOT EXISTS(SELECT 1 FROM reachable WHERE id=$1)
+      ON CONFLICT DO NOTHING RETURNING id`, [from,to]);
+    dependenciesCreated += inserted.rowCount ?? 0;
+  }
+  const coverage = await client.query<{total:number;related:number}>(`SELECT COUNT(*)::int AS total,
+    COUNT(*) FILTER (WHERE EXISTS (SELECT 1 FROM ci_relations r
+      WHERE r.from_ci_id=ci.id OR r.to_ci_id=ci.id))::int AS related
+    FROM configuration_items ci`);
+  return {connectionsCreated:paired.rowCount ?? 0,dependenciesCreated,
+    totalCi:coverage.rows[0].total,ciWithRelations:coverage.rows[0].related};
+}
+
 async function prepare(client: PoolClient) {
   for (const root of ['HARDWARE', 'SOFTWARE']) {
     await client.query(`INSERT INTO ci_categories(code,name,source_kind,source_reference)
@@ -142,6 +186,7 @@ async function main() {
         JOIN configuration_items ci ON ci.code=v.code
         ON CONFLICT DO NOTHING`, linkValues);
     }
+    const demoRelations = await prepareDemoRelations(client,seed);
     const totals = await client.query<{ total: number }>(`SELECT COUNT(*)::int AS total
       FROM configuration_items WHERE synthetic_seed=$1 AND is_device`, [seed]);
     const categories = await client.query(`SELECT cc.code,COUNT(*)::int AS count
@@ -164,7 +209,7 @@ async function main() {
     if (totals.rows[0].total < count) throw new Error(`Solo hay ${totals.rows[0].total} dispositivos de ${count} esperados.`);
     await client.query('COMMIT');
     console.log(JSON.stringify({ ok: true, seed, requested: count, created, updated, skipped,
-      totalForSeed: totals.rows[0].total, byCategory: categories.rows,
+      totalForSeed: totals.rows[0].total, demoRelations, byCategory: categories.rows,
       byLevelAndCategory: levelAndCategory.rows }));
   } catch (error) {
     await client.query('ROLLBACK');

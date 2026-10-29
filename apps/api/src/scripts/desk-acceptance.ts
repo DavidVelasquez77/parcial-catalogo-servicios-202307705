@@ -131,6 +131,18 @@ async function main() {
     eq(generatorIntegrity.rows[0].missing_service,0,'servicio existente asociado a cada dispositivo de muestra');
     eq(generatorIntegrity.rows[0].invented_required_ip,0,'dirección IP no obligatoria');
     eq(generatorIntegrity.rows[0].invalid_class_attributes,0,'atributos técnicos de acuerdo con la clase');
+    const demoRelations = await pool.query(`SELECT COUNT(*)::int AS total,
+      COUNT(*) FILTER(WHERE EXISTS (SELECT 1 FROM ci_relations r
+        WHERE r.from_ci_id=ci.id OR r.to_ci_id=ci.id))::int AS related
+      FROM configuration_items ci WHERE ci.synthetic_seed='EVAL2026' AND ci.is_device`);
+    eq(demoRelations.rows[0].related,5000,'cada dispositivo sintético tiene una relación navegable');
+    const exampleChain = await pool.query(`SELECT COUNT(*)::int AS total FROM ci_relations r
+      JOIN configuration_items a ON a.id=r.from_ci_id
+      JOIN configuration_items b ON b.id=r.to_ci_id
+      WHERE r.relation_type='DEPENDS_ON' AND (
+        (a.code='SYN-EVAL2026-004999' AND b.code='SYN-EVAL2026-004998') OR
+        (a.code='SYN-EVAL2026-005000' AND b.code='SYN-EVAL2026-004999'))`);
+    eq(exampleChain.rows[0].total,2,'cadena sintética de impacto en dos saltos');
     const categoryTree = await pool.query(`WITH RECURSIVE category_path(id,code,name,level_no,path) AS (
         SELECT id,code,name,0,ARRAY[id] FROM ci_categories WHERE parent_id IS NULL AND active
         UNION ALL SELECT child.id,child.code,child.name,parent.level_no+1,parent.path||child.id
