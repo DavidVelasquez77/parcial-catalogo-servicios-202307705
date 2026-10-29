@@ -442,32 +442,43 @@ function objectiveSummary(value: unknown) {
   return `${met} de ${evaluated} dentro del objetivo (${percentage}%)`;
 }
 
+const chartColors = ['#2867b2','#31a782','#e5a64d','#7763ba','#e07673','#6094b9','#aab7c9'];
+function chartEntries(value: unknown) {
+  return Object.entries(value && typeof value === 'object' ? value as Record<string,number> : {})
+    .filter((entry) => Number.isFinite(Number(entry[1])) && Number(entry[1]) > 0)
+    .sort((a,b) => Number(b[1]) - Number(a[1]));
+}
+function MetricBars({ title, subtitle, values }: { title: string; subtitle: string; values: unknown }) {
+  const entries = chartEntries(values);
+  const maximum = Math.max(1,...entries.map(([,count]) => Number(count)));
+  return <section className="panel metrics-chart"><div className="metrics-chart-head"><h2>{title}</h2><span>{subtitle}</span></div>{entries.length ? <div className="metrics-bars">{entries.map(([name,count],index) => {const display=title==='Por prioridad'?`Prioridad ${name}`:title==='Por cola'?name:label(name);return <div className="metrics-bar-row" key={name}><div className="metrics-bar-label"><span title={display}>{display}</span><strong>{count}</strong></div><div className="metrics-track" role="img" aria-label={`${display}: ${count} tickets`}><span style={{width:`${Number(count)/maximum*100}%`,backgroundColor:chartColors[index%chartColors.length]}} /></div></div>;})}</div> : <p className="muted">Aún no hay tickets visibles para esta distribución.</p>}</section>;
+}
+function MetricDonut({ values }: { values: unknown }) {
+  const entries = chartEntries(values);
+  const total = entries.reduce((sum,[,count]) => sum+Number(count),0);
+  let position = 0;
+  const stops = entries.map(([,count],index) => {const start=position;position+=Number(count)/total*100;return `${chartColors[index%chartColors.length]} ${start}% ${position}%`;});
+  return <section className="panel metrics-chart"><div className="metrics-chart-head"><h2>Por estado</h2><span>Distribución de tickets</span></div><div className="metrics-donut-layout"><div className="metrics-donut" role="img" aria-label={entries.map(([name,count]) => `${label(name)}: ${count}`).join(', ') || 'Sin tickets'} style={{background:total?`conic-gradient(${stops.join(',')})`:'#e6edf5'}}><div><strong>{total}</strong><small>tickets</small></div></div><div className="metrics-legend">{entries.length ? entries.map(([name,count],index) => <div key={name}><i style={{backgroundColor:chartColors[index%chartColors.length]}}/><span>{label(name)}</span><strong>{count}</strong></div>) : <p className="muted">Sin tickets visibles.</p>}</div></div></section>;
+}
+function ObjectiveGauge({ title, value }: { title: string; value: unknown }) {
+  const row = value && typeof value==='object' ? value as {met?:number;evaluated?:number} : {};
+  const met = Number(row.met ?? 0), evaluated=Number(row.evaluated ?? 0);
+  const percentage = evaluated > 0 ? Math.min(100,Math.max(0,met/evaluated*100)) : 0;
+  return <div className="objective-gauge"><div className="objective-heading"><strong>{title}</strong><span>{evaluated ? `${percentage.toFixed(1)}%` : '—'}</span></div><div className="metrics-track" role="img" aria-label={objectiveSummary(value)}><span style={{width:`${percentage}%`,backgroundColor:percentage>=80?'#31a782':percentage>=50?'#e5a64d':'#e07673'}} /></div><small>{objectiveSummary(value)}</small></div>;
+}
+
 export function DeskMetricsPage() {
   const [data,setData] = useState<Record<string,unknown> | null>(null);
   const [error,setError] = useState('');
   useEffect(() => {api<Record<string,unknown>>('/desk/metrics').then(setData).catch((e) => setError(message(e)));},[]);
   if (error) return <div className="alert error">{error}</div>;
   if (!data) return <div className="loading">Cargando indicadores...</div>;
-  const groups = [['Por cola',data.byQueue],['Por proceso',data.byProcess],['Por prioridad',data.byPriority],['Por estado',data.byState]] as const;
-  return <div className="page">
-    <div className="page-heading"><div><p className="eyebrow">Indicadores</p><h1>Tablero de atención</h1><p className="muted">Cálculos sobre tickets visibles para tu cuenta.</p></div></div>
-    <div className="desk-kpi-grid">
-      {[
-        ['Tickets',data.total],['No cerrados o rechazados',data.open],
-        ['Antigüedad abierta (min)',data.averageOpenAgeMinutes],
-        ['Primera atención promedio (min)',data.averageFirstResponseMinutes],
-        ['Resolución promedio (min)',data.averageResolutionMinutes],
-      ].map(([title,value]) => <div className="metric-card" key={String(title)}><div><span>{String(title)}</span><strong>{value==null?'—':String(value)}</strong></div></div>)}
-    </div>
-    <div className="desk-metric-grid">{groups.map(([title,values]) => <section className="panel" key={title}><h2>{title}</h2>{Object.entries(values as Record<string,number>).map(([key,value]) => <div className="desk-stat" key={key}><span>{label(key)}</span><strong>{value}</strong></div>)}</section>)}</div>
-    <section className="panel desk-section">
-      <h2>Objetivos de atención</h2>
-      <div className="desk-objectives">
-        <div><strong>Primera respuesta</strong><span>{objectiveSummary(data.firstResponseObjective)}</span></div>
-        <div><strong>Resolución</strong><span>{objectiveSummary(data.resolutionObjective)}</span></div>
-      </div>
-      <p className="muted">{String(data.basis)}</p>
-    </section>
+  const kpis: Array<[string,unknown,string]> = [['Tickets visibles',data.total,'Total en las colas y solicitudes accesibles'],['En atención',data.open,'No cerrados ni rechazados'],['Antigüedad abierta',data.averageOpenAgeMinutes,'Promedio · minutos calendario'],['Primera atención',data.averageFirstResponseMinutes,'Promedio · minutos calendario'],['Resolución',data.averageResolutionMinutes,'Promedio · minutos sin pausas']];
+  return <div className="page metrics-page">
+    <div className="page-heading"><div><p className="eyebrow">Service Desk · medición</p><h1>Indicadores de atención</h1><p className="muted">Lectura actual de los tickets visibles para tu cuenta. Los gráficos se calculan con datos de la API.</p></div></div>
+    <div className="metrics-kpis">{kpis.map(([title,value,description],index) => <div className="metrics-kpi" key={title}><span className="metrics-kpi-mark" style={{backgroundColor:chartColors[index]}}/><small>{title}</small><strong>{value==null?'—':String(value)}{index>1&&value!=null?<em> min</em>:null}</strong><p>{description}</p></div>)}</div>
+    <div className="metrics-visual-grid"><MetricBars title="Por cola" subtitle="Carga de trabajo" values={data.byQueue}/><MetricBars title="Por proceso" subtitle="Origen de la demanda" values={data.byProcess}/><MetricBars title="Por prioridad" subtitle="Nivel asignado" values={data.byPriority}/><MetricDonut values={data.byState}/></div>
+    <section className="panel metrics-objectives"><div className="metrics-chart-head"><h2>Cumplimiento de objetivos</h2><span>Solo tickets con hito y objetivo configurado</span></div><div className="metrics-objective-grid"><ObjectiveGauge title="Primera respuesta" value={data.firstResponseObjective}/><ObjectiveGauge title="Resolución" value={data.resolutionObjective}/></div><details><summary>Cómo se calculan los indicadores</summary><p className="muted">{String(data.basis)}</p></details></section>
   </div>;
 }
 
