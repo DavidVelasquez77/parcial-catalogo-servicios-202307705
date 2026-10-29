@@ -1,5 +1,17 @@
 # Pruebas y evidencia reproducible
 
+## Verificación de los campos visibles del ticket (28 de octubre de 2026)
+
+Sobre el commit de código `1a51995`, se ejecutó
+`docker compose -p service-desk-dev up --build -d`. La compilación NestJS de la
+API y `tsc -b && vite build` de la web finalizaron correctamente; los tres
+servicios quedaron arriba, PostgreSQL reportó estado saludable y una petición a
+`http://localhost:8080` devolvió HTTP 200. Esta es evidencia de compilación y
+arranque de la ampliación de la ficha/formulario de tickets; **no equivale a una
+nueva ejecución de P01–P18**. Los resultados de aceptación y su commit se
+mantienen en las secciones correspondientes de este documento. El recorrido
+visual actualizado está en [GUIA_EVALUACION.md](GUIA_EVALUACION.md#foco-en-el-inciso-4-ciclo-de-un-ticket).
+
 ## Registro vigente del punto 11 (27 de octubre de 2026)
 
 La evidencia íntegra P01–P18, con **entrada, resultado esperado, resultado
