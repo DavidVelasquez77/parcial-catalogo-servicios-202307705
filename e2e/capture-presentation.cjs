@@ -8,6 +8,11 @@ async function main() {
     await page.getByLabel('Usuario o correo').fill(process.env.DEMO_ADMIN_USERNAME || 'admin.demo');
     await page.getByLabel('Contraseña').fill(process.env.DEMO_ADMIN_PASSWORD || 'Admin123!');
     await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+    await page.getByRole('button', { name: 'Procesos', exact: true }).click();
+    await page.getByRole('heading', { name: 'Siete procesos de atención' }).waitFor();
+    await page.screenshot({ path: '/screens/07-procesos.png' });
+    await page.getByRole('button', { name: /Cambios.*cola/, exact: false }).click();
+    await page.getByText('No se ejecuta sin aprobación registrada.').waitFor();
     await page.getByRole('button', { name: 'Tickets', exact: true }).click();
     await page.getByRole('heading', { name: 'Tickets', exact: true }).waitFor();
     await page.locator('section.panel tbody tr').first().waitFor();

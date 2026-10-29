@@ -471,6 +471,35 @@ export function DeskMetricsPage() {
   </div>;
 }
 
+const processGuide: Record<string,{ summary:string; evidence:string[]; rules:string[]; route:string[] }> = {
+  NEW_SERVICE:{summary:'Solicitar y evaluar un servicio que todavía no está en el catálogo.',evidence:['Necesidad y viabilidad','Servicio existente o código y nombre propuestos','Resultado de implementación'],rules:['La aprobación vincula un servicio existente o crea uno en revisión sin duplicar códigos.','El rechazo detiene la implementación.'],route:['SUBMITTED','ANALYSIS','PENDING_APPROVAL','APPROVED','IMPLEMENTING','RESOLVED','CLOSED']},
+  CHANGE:{summary:'Evaluar, aprobar y ejecutar un cambio controlado.',evidence:['CI afectados','Impacto y riesgo','Plan de pruebas y reversión','Resultados de ejecución y validación'],rules:['No se ejecuta sin aprobación registrada.','El alcance aprobado queda protegido.'],route:['SUBMITTED','RISK_ASSESSMENT','PENDING_APPROVAL','APPROVED','PLANNED','EXECUTING','VALIDATING','RESOLVED','CLOSED']},
+  INCIDENT:{summary:'Restaurar un servicio interrumpido o degradado y registrar la solución.',evidence:['Categoría I0–I6','Interrupción o degradación y duración','Redundancia y solución aplicada'],rules:['El escalamiento exige una cola del mismo proceso con nivel superior.','La resolución exige una solución documentada.'],route:['SUBMITTED','CLASSIFIED','DIAGNOSING','IN_PROGRESS','RESOLVED','CLOSED']},
+  EVENT:{summary:'Registrar y evaluar eventos; convertir E2/E3 en incidentes atendibles.',evidence:['Categoría E0–E3','Evaluación para E1–E3','Incidente y notificación para E2/E3'],rules:['E0 se registra y cierra; E1 se evalúa sin respuesta operativa.','E2/E3 generan o vinculan un único incidente.'],route:['SUBMITTED','CLASSIFIED','EVALUATED','RESPONDED','CLOSED']},
+  PROBLEM:{summary:'Encontrar la causa de incidentes repetidos y su corrección definitiva.',evidence:['Incidentes vinculados','Causa raíz','Solución temporal o error conocido','Solución definitiva y cambio relacionado'],rules:['La investigación requiere al menos un incidente vinculado.','El cambio puede documentar la corrección.'],route:['SUBMITTED','INVESTIGATING','WORKAROUND','KNOWN_ERROR','DEFINITIVE_SOLUTION','RESOLVED','CLOSED']},
+  ACCESS:{summary:'Autorizar y comprobar la provisión o revocación de un acceso.',evidence:['Beneficiario, recurso y permiso','Aprobación o rechazo','Resultado de provisión o revocación y validación'],rules:['El solicitante no puede autoaprobarse.','No se resuelve antes de validar el resultado.'],route:['SUBMITTED','PENDING_APPROVAL','APPROVED','PROVISIONING','VALIDATING','RESOLVED','CLOSED']},
+  TECH_SERVICE:{summary:'Atender una prestación de un servicio que ya existe en el catálogo.',evidence:['Servicio existente y prestación solicitada','Asignación y cumplimiento','Confirmación del solicitante'],rules:['Se distingue de proponer un servicio nuevo.','La asignación requiere un agente autorizado.'],route:['SUBMITTED','VALIDATING','ASSIGNED','FULFILLING','CONFIRMING','RESOLVED','CLOSED']},
+};
+
+export function ProcessesPage({ onOpenTickets }: { onOpenTickets: () => void }) {
+  const stateLabels: Record<string,string> = { IMPLEMENTING:'Implementación', RISK_ASSESSMENT:'Evaluación de riesgo', PROVISIONING:'Provisión o revocación', ASSIGNED:'Asignado', WORKAROUND:'Solución temporal', KNOWN_ERROR:'Error conocido', DEFINITIVE_SOLUTION:'Solución definitiva' };
+  const [queues,setQueues] = useState<Queue[]>([]);
+  const [error,setError] = useState('');
+  const [selected,setSelected] = useState('NEW_SERVICE');
+  useEffect(() => { api<Queue[]>('/desk/queues').then(setQueues).catch((err) => setError(message(err))); }, []);
+  const guide = processGuide[selected];
+  const related = queues.filter((queue) => queue.process === selected);
+  return <div className="page process-page">
+    <div className="page-heading"><div><p className="eyebrow">Service Desk</p><h1>Siete procesos de atención</h1><p className="muted">Elige un proceso para ver su recorrido, las evidencias exigidas y sus colas configuradas.</p></div></div>
+    {error && <div className="alert error">{error}</div>}
+    <div className="process-layout"><nav className="process-list" aria-label="Seleccionar proceso">{Object.keys(processGuide).map((key) => <button key={key} className={selected===key?'process-choice selected':'process-choice'} aria-current={selected===key?'true':undefined} onClick={() => setSelected(key)}><strong>{label(key)}</strong><small>{queues.filter((queue) => queue.process===key && queue.active).length} cola(s) activa(s)</small></button>)}</nav>
+      <section className="panel process-detail"><p className="eyebrow">Proceso · {label(selected)}</p><h2>{label(selected)}</h2><p className="muted">{guide.summary}</p><div className="process-columns"><div><h3>Ruta principal</h3><ol className="process-steps">{guide.route.map((state,index) => <li key={`${state}-${index}`}>{stateLabels[state] ?? label(state)}</li>)}</ol><p className="muted">Puede haber rutas alternativas de rechazo, escalamiento o reapertura según el caso.</p></div><div><h3>Evidencias y datos</h3><ul>{guide.evidence.map((item) => <li key={item}>{item}</li>)}</ul><h3>Reglas para avanzar</h3><ul>{guide.rules.map((item) => <li key={item}>{item}</li>)}</ul></div></div>
+        <div className="desk-section"><h3>Colas de este proceso</h3>{related.length ? <div className="process-queues">{related.map((queue) => <span className="badge" key={queue.id}>{queue.code} · {queue.name} · nivel {queue.support_level}{queue.active?'':' · inactiva'}</span>)}</div> : <p className="muted">No hay colas visibles para esta cuenta.</p>}</div>
+        <p className="muted">Esta vista explica los flujos. Las transiciones, permisos y validaciones efectivas se comprueban en el servidor al operar un ticket.</p><button className="primary" onClick={onOpenTickets}>Abrir tickets</button>
+      </section></div>
+  </div>;
+}
+
 export function KnowledgePage({ user }: { user: Account }) {
   const [rows,setRows] = useState<Array<{id:number;title:string;body:string;serviceCode:string|null}>>([]);
   const [title,setTitle] = useState(''); const [body,setBody] = useState(''); const [error,setError] = useState('');

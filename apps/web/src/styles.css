@@ -45,6 +45,18 @@
 @media (max-width: 640px) { .button-row { width: 100%; } .button-row button { flex: 1; } .import-facts, .summary-grid { grid-template-columns: 1fr 1fr; } }
 .desk-detail { width: min(900px, 100%); }
 .desk-section { margin-top: 22px; border-top: 1px solid var(--color-border); padding-top: 19px; }
+.process-layout { display: grid; grid-template-columns: minmax(220px,280px) minmax(0,1fr); gap: 18px; align-items: start; }
+.process-list { display: grid; gap: 8px; }
+.process-choice { display: grid; gap: 5px; width: 100%; text-align: left; padding: 14px 16px; border: 1px solid var(--color-border); border-radius: 9px; background: var(--color-surface,#fff); color: var(--color-text); cursor: pointer; }
+.process-choice small { color: var(--color-text-muted,#69788a); }
+.process-choice.selected { border-color: var(--color-primary); background: #edf5ff; }
+.process-detail { padding: 24px; }
+.process-detail h2 { margin-top: 0; }
+.process-columns { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.process-columns li { margin: 0 0 10px; line-height: 1.45; }
+.process-steps { padding-left: 26px; }
+.process-queues { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 800px) { .process-layout, .process-columns { grid-template-columns: 1fr; } }
 .desk-section h3 { margin-top: 0; }
 .desk-section textarea, .stack-form textarea { width: 100%; padding: 11px 12px; border: 1px solid var(--color-border); border-radius: 7px; font: inherit; resize: vertical; }
 .desk-actions { margin-top: 14px; }
