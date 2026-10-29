@@ -6,6 +6,29 @@ Desde un clon limpio de `main`, copiar `.env.example` a `.env` (PowerShell: `Cop
 
 En cinco minutos, mostrar: (1) **Tickets**, filtros, un detalle con bitácora, CI y campos específicos de proceso; (2) **Colas**, siete procesos, nivel y permisos por rol o usuario; (3) **CMDB**, dos CI con procedencia `CMDB.xlsx` y 5,000 dispositivos, clasificación y recorrido de impacto; (4) **Indicadores**, antigüedad, primera atención, resolución y cumplimiento en minutos calendario; (5) **Conocimientos**, autoservicio nivel 0 con las FAQ iniciales. Para demostrar el punto 8, filtrar la categoría **Hardware**, elegir **Solo dispositivos**, mostrar las 25 filas por página y el total; buscar `CMDB-XLSX-5` y abrir la ficha para señalar los valores originales, su responsable y procedencia. En otro CI, abrir un ticket desde **Tickets relacionados** y seguir sus permisos e historial. Para mostrar la distribución, ejecutar el generador con `EVAL2026` y leer `byLevelAndCategory`: Hardware = 5,000, Software = 0 y 1,250 en cada subcategoría de Hardware. Para impacto, señalar que el recorrido atraviesa `DEPENDS_ON` y `HOSTED_ON` en varios saltos y enumera servicios *potencialmente* afectados; no demuestra una interrupción efectiva. Para eventos, explicar que E0 solo se registra y se cierra; E1 se evalúa sin respuesta operativa; E2/E3 generan incidente y notificación, y reciben respuesta antes del cierre. Mostrar `GET /api/desk/notifications` como verificación de la notificación, sin correo real. Enseñar `docs/PROCESOS.md` para explicar el mapeo de tipos, E0–E3, I0–I6, niveles y fórmulas; `docs/MODELO.md` para diferenciar jerarquía de categorías y relaciones técnicas.
 
+### Foco en el inciso 4: ciclo de un ticket
+
+En **Tickets → Nuevo ticket**, seleccionar cola/proceso y servicio; llenar título,
+descripción, prioridad, impacto, urgencia y canal. Como ADMIN se puede elegir un
+solicitante distinto; el creador siempre es la cuenta que inició la sesión. Al
+seleccionar un servicio, el nivel 1 se deriva del nivel 2. Buscar y asociar uno o
+varios CI, o conservar el motivo cuando el trámite no necesita CI. Los cambios
+de estos campos de clasificación ahora se eligen en el formulario y quedan
+visibles en la ficha.
+
+Abrir la ficha y mostrar tipo, proceso, solicitante, creador, servicio de nivel
+2 y nivel 1, cola, responsable, estado, prioridad, impacto, urgencia, canal,
+CI/motivo de ausencia y las fechas de creación, actualización, primera atención,
+resolución y cierre. Para demostrar la atención, tomar o asignar el ticket,
+registrar comentario público y nota interna, adjuntar evidencia, transferirlo
+con motivo y, si es incidente, escalarlo a una cola de soporte superior. Luego
+resolver con explicación, cerrar y mostrar la reapertura controlada desde un
+caso cerrado reciente; el solicitante o ADMIN debe aportar el motivo y la
+política permite reabrir durante siete días. Terminar en **Bitácora** para
+enseñar actor, fecha, motivo y valores anteriores/nuevos. Los permisos de
+servidor, concurrencia, transferencias y reapertura se corroboran con P01,
+P05–P08 y P15 en la suite aislada.
+
 Si se solicita harness, ejecutar `powershell -NoProfile -ExecutionPolicy Bypass -File scripts/service-desk-test.ps1` en Windows o `sh scripts/service-desk-test.sh` en Linux/macOS. La salida muestra P01–P18 y P18 tras reiniciar PostgreSQL. Para la evidencia de IA, abrir `docs/IA.md` y `docs/prompts/service-desk.md`; explicar un prompt revisado y una actualización de `AGENTS.md`. El proyecto de pruebas usa otro nombre Compose y no modifica la instalación normal. El recorrido antiguo del catálogo continúa debajo.
 
 ### Cómo demostrar el punto 6: los siete procesos

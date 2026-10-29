@@ -6,9 +6,13 @@ type Page<T> = { data: T[]; total: number; page: number; pageSize: number };
 type Queue = { id: number; code: string; name: string; description: string | null; process: string; active: boolean; canHandle: boolean; canTransfer: boolean; canAdmin: boolean; responsible_user_id: number; responsibleName: string; sort_rule: string; support_level: number; first_response_minutes: number | null; resolution_minutes: number | null };
 type Ticket = { id: number; number: string; title: string; state: string; process: string; priority: number; queueId: number; queueName: string; createdAt: string; assignedUserId: number | null };
 type TicketDetail = Record<string, unknown> & {
-  id: number; number: string; title: string; description: string; state: string; process: string;
-  queue_id: number; requester_id: number; assigned_user_id: number | null; process_data: Record<string, unknown>;
-  service_name: string; level_1_name: string; no_ci_reason: string | null; paused_at: string | null;
+  id: number; number: string; title: string; description: string; state: string; type: string; process: string;
+  queue_id: number; requester_id: number; requester_name: string | null; creator_id: number;
+  creator_name: string | null; assigned_user_id: number | null; assigned_user_name: string | null;
+  process_data: Record<string, unknown>; priority: number; impact: number; urgency: number; channel: string;
+  service_code: string; service_name: string; level_1_code: string; level_1_name: string;
+  no_ci_reason: string | null; paused_at: string | null; created_at: string; updated_at: string;
+  first_attended_at: string | null; resolved_at: string | null; closed_at: string | null;
   history: Array<{ id: number; action: string; actor_id: number; actor_name: string | null; created_at: string; reason: string | null; old_values: unknown; new_values: unknown }>;
   comments: Array<{ id: number; body: string; visibility: string; author_id: number; created_at: string }>;
   ci: Array<{ id: number; code: string; name: string }>;
@@ -19,7 +23,9 @@ type Ci = { id: number; code: string; name: string; categoryName: string; status
 type Category = { id: number; code: string; name: string; parentId: number | null; sourceKind: string; active: boolean };
 type CiLocation = { id: number; code: string; name: string; active: boolean };
 type Service = { id: number; code: string; name: string; status: string };
-const names: Record<string,string> = { NEW_SERVICE:'Nuevos servicios', CHANGE:'Cambios', INCIDENT:'Incidentes', EVENT:'Eventos', PROBLEM:'Problemas', ACCESS:'Accesos', TECH_SERVICE:'Servicios de tecnología', SUBMITTED:'Registrado', ANALYSIS:'Análisis', PENDING_APPROVAL:'Pendiente de aprobación', APPROVED:'Aprobado', REJECTED:'Rechazado', RESOLVED:'Resuelto', CLOSED:'Cerrado', CLASSIFIED:'Clasificado', EVALUATED:'Evaluado', RESPONDED:'Respuesta', DIAGNOSING:'Diagnóstico', IN_PROGRESS:'En atención', ESCALATED:'Escalado', ESCALATE:'Escalamiento', TRANSFER:'Transferencia', PAUSE:'Pausa', RESUME:'Reanudación', CLAIM:'Asignación', ASSIGN:'Asignación dirigida', TRANSITION:'Cambio de estado', INVESTIGATING:'Investigación', VALIDATING:'Validación', EXECUTING:'Ejecución', PLANNED:'Planificado', FULFILLING:'Cumplimiento', CONFIRMING:'Confirmación' };
+const names: Record<string,string> = { NEW_SERVICE:'Nuevos servicios', CHANGE:'Cambios', INCIDENT:'Incidentes', EVENT:'Eventos', PROBLEM:'Problemas', ACCESS:'Accesos', TECH_SERVICE:'Servicios de tecnología', SERVICE_REQUEST:'Requisición de servicio', SUBMITTED:'Registrado', ANALYSIS:'Análisis', PENDING_APPROVAL:'Pendiente de aprobación', APPROVED:'Aprobado', REJECTED:'Rechazado', RESOLVED:'Resuelto', CLOSED:'Cerrado', CLASSIFIED:'Clasificado', EVALUATED:'Evaluado', RESPONDED:'Respuesta', DIAGNOSING:'Diagnóstico', IN_PROGRESS:'En atención', ESCALATED:'Escalado', ESCALATE:'Escalamiento', TRANSFER:'Transferencia', PAUSE:'Pausa', RESUME:'Reanudación', CLAIM:'Asignación', ASSIGN:'Asignación dirigida', TRANSITION:'Cambio de estado', INVESTIGATING:'Investigación', VALIDATING:'Validación', EXECUTING:'Ejecución', PLANNED:'Planificado', FULFILLING:'Cumplimiento', CONFIRMING:'Confirmación' };
+const channelNames: Record<string,string> = { PORTAL:'Portal', PHONE:'Teléfono', EMAIL:'Correo electrónico', IN_PERSON:'Presencial', SYSTEM:'Sistema' };
+const ratingNames: Record<number,string> = { 1:'Muy baja', 2:'Baja', 3:'Media', 4:'Alta', 5:'Muy alta' };
 const sortRuleLabel = (rule: string) => rule === 'AGE_PRIORITY' ? 'Antigüedad y prioridad' : 'Prioridad y antigüedad';
 const label = (value: string) => names[value] ?? value.replaceAll('_',' ').toLowerCase();
 const transitions: Record<string,Record<string,string[]>> = {
@@ -52,13 +58,15 @@ const incidentLabels: Record<string,string> = {
   I4:'1 semana o menos',I5:'1 mes o más',I6:'Afecta la seguridad de los recursos y la información',
 };
 const date = (value: string) => new Date(value).toLocaleString('es-GT');
+const dateOrPending = (value: string | null | undefined) => value ? date(value) : 'Pendiente';
+const rating = (value: number) => `${value} · ${ratingNames[value] ?? 'Sin clasificar'}`;
 const message = (error: unknown) => error instanceof Error ? error.message : 'No fue posible completar la operación.';
 const canWrite = (user: Account) => !(user.roles ?? [user.role]).includes('CONSULTA');
 const isAdmin = (user: Account) => (user.roles ?? [user.role]).includes('ADMIN');
 
-function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: () => void; onCancel: () => void }) {
+function TicketCreate({ queues, user, onDone, onCancel }: { queues: Queue[]; user: Account; onDone: () => void; onCancel: () => void }) {
   const [services,setServices] = useState<Service[]>([]);
-  const [users,setUsers] = useState<Array<{id:number;name:string;active:boolean}>>([]);
+  const [users,setUsers] = useState<Array<{id:number;name:string}>>([]);
   const [queueId,setQueueId] = useState(String(queues.find((q) => q.active)?.id ?? ''));
   const [serviceId,setServiceId] = useState('');
   const [title,setTitle] = useState('');
@@ -70,6 +78,10 @@ function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: (
   const [permission,setPermission] = useState('');
   const [accessAction,setAccessAction] = useState('GRANT');
   const [priority,setPriority] = useState('3');
+  const [impact,setImpact] = useState('3');
+  const [urgency,setUrgency] = useState('3');
+  const [channel,setChannel] = useState('PORTAL');
+  const [requesterId,setRequesterId] = useState(String(user.id));
   const [extra,setExtra] = useState<Record<string,string>>({});
   const [ciSearch,setCiSearch] = useState('');
   const [ciOptions,setCiOptions] = useState<Ci[]>([]);
@@ -101,7 +113,8 @@ function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: (
       interruptsOrDegrades:extra.interruptsOrDegrades==='yes'?true:extra.interruptsOrDegrades==='no'?false:null});
     try {
       await post('/desk/tickets',{ queueId:Number(queueId),serviceId:Number(serviceId),title,description,
-        priority:Number(priority),impact:3,urgency:3,ciIds,noCiReason:ciIds.length?undefined:noCiReason,processData,
+        priority:Number(priority),impact:Number(impact),urgency:Number(urgency),channel,ciIds,noCiReason:ciIds.length?undefined:noCiReason,processData,
+        ...(isAdmin(user) ? { requesterId:Number(requesterId) } : {}),
         ...(process === 'ACCESS' ? { beneficiaryId:Number(beneficiaryId) } : {}) });
       onDone();
     } catch (e) { setError(message(e)); } finally { setSaving(false); }
@@ -111,7 +124,12 @@ function TicketCreate({ queues, onDone, onCancel }: { queues: Queue[]; onDone: (
     <label>Servicio existente<select value={serviceId} onChange={(e) => setServiceId(e.target.value)} required><option value="">Selecciona un servicio</option>{services.map((s) => <option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</select></label>
     <label>Título<input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={240} required /></label>
     <label>Descripción<textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} required /></label>
-    <label>Prioridad<select value={priority} onChange={(e) => setPriority(e.target.value)}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{n} · {n===5?'Muy alta':n===1?'Muy baja':'Nivel '+n}</option>)}</select></label>
+    {isAdmin(user) && <label>Solicitante<select value={requesterId} onChange={(e) => setRequesterId(e.target.value)} required>{users.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>}
+    <p className="muted">Creador: cuenta con la que iniciaste sesión.</p>
+    <label>Prioridad<select value={priority} onChange={(e) => setPriority(e.target.value)}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{rating(n)}</option>)}</select></label>
+    <label>Impacto<select value={impact} onChange={(e) => setImpact(e.target.value)}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{rating(n)}</option>)}</select></label>
+    <label>Urgencia<select value={urgency} onChange={(e) => setUrgency(e.target.value)}>{[1,2,3,4,5].map((n) => <option key={n} value={n}>{rating(n)}</option>)}</select></label>
+    <label>Canal<select value={channel} onChange={(e) => setChannel(e.target.value)}><option value="PORTAL">Portal</option><option value="PHONE">Teléfono</option><option value="EMAIL">Correo electrónico</option><option value="IN_PERSON">Presencial</option><option value="SYSTEM">Sistema</option></select></label>
     {(process === 'EVENT' || process === 'INCIDENT') && <label>Categoría<select value={category} onChange={(e) => setCategory(e.target.value)} required><option value="">Selecciona</option>{(process === 'EVENT' ? ['E0','E1','E2','E3'] : ['I0','I1','I2','I3','I4','I5','I6']).map((x) => <option key={x} value={x}>{x} · {(process === 'EVENT' ? eventLabels : incidentLabels)[x]}</option>)}</select></label>}
     {process === 'EVENT' && category === 'E0' && <p className="muted">E0 queda registrado al crear el ticket y puede cerrarse sin clasificación, evaluación ni respuesta operativa.</p>}
     {process === 'EVENT' && category === 'E1' && <p className="muted">E1 requiere guardar una evaluación; no requiere respuesta operativa.</p>}
@@ -182,7 +200,21 @@ function TicketView({ id, user, queues, users, onClose, onChanged }: { id: numbe
   }) : [];
   return <div className="modal-backdrop" onClick={onClose}><section className="modal-card desk-detail" role="dialog" aria-modal="true" aria-label="Ficha de ticket" onClick={(e) => e.stopPropagation()}><div className="drawer-head"><div><p className="eyebrow">Ficha de ticket</p><h2>{ticket?.number ?? 'Cargando...'}</h2></div><button className="icon-button" onClick={onClose} aria-label="Cerrar">×</button></div>
     {error && <div className="alert error">{error}</div>}
-    {ticket && <><h3>{ticket.title}</h3><p className="muted">{ticket.description}</p><div className="desk-facts"><span><strong>Proceso</strong>{label(ticket.process)}</span><span><strong>Estado</strong>{label(ticket.state)}</span><span><strong>Servicio</strong>{ticket.service_name}</span><span><strong>Nivel 1</strong>{ticket.level_1_name}</span><span><strong>Prioridad</strong>{String(ticket.priority)}</span><span><strong>Cola</strong>{String(ticket.queue_name)}</span><span><strong>Asignado</strong>{ticket.assigned_user_id === null ? 'Sin asignar' : users.find((person) => person.id===ticket.assigned_user_id)?.name ?? `Usuario #${ticket.assigned_user_id}`}</span><span><strong>CI</strong>{ticket.ci.length ? ticket.ci.map((ci) => ci.code).join(', ') : ticket.no_ci_reason ?? 'Sin CI'}</span></div>
+    {ticket && <><h3>{ticket.title}</h3><p className="muted">{ticket.description}</p><div className="desk-facts">
+      <span><strong>Tipo de ticket</strong>{label(ticket.type)}</span><span><strong>Proceso</strong>{label(ticket.process)}</span>
+      <span><strong>Estado</strong>{label(ticket.state)}</span><span><strong>Solicitante</strong>{ticket.requester_name ?? `Usuario #${ticket.requester_id}`}</span>
+      <span><strong>Creador</strong>{ticket.creator_name ?? `Usuario #${ticket.creator_id}`}</span><span><strong>Servicio de nivel 2</strong>{ticket.service_code} · {ticket.service_name}</span>
+      <span><strong>Servicio de nivel 1</strong>{ticket.level_1_code} · {ticket.level_1_name}</span><span><strong>Cola</strong>{String(ticket.queue_name)}</span>
+      <span><strong>Responsable</strong>{ticket.assigned_user_name ?? (ticket.assigned_user_id === null ? 'Sin asignar' : users.find((person) => person.id===ticket.assigned_user_id)?.name ?? `Usuario #${ticket.assigned_user_id}`)}</span>
+      <span><strong>Prioridad</strong>{rating(ticket.priority)}</span><span><strong>Impacto</strong>{rating(ticket.impact)}</span>
+      <span><strong>Urgencia</strong>{rating(ticket.urgency)}</span><span><strong>Canal</strong>{channelNames[ticket.channel] ?? label(ticket.channel)}</span>
+      <span><strong>CI asociados</strong>{ticket.ci.length ? ticket.ci.map((ci) => ci.code).join(', ') : ticket.no_ci_reason ?? 'Sin CI'}</span>
+    </div>
+      <section className="desk-section"><h3>Fechas del ticket</h3><div className="desk-facts">
+        <span><strong>Creación</strong>{dateOrPending(ticket.created_at)}</span><span><strong>Última actualización</strong>{dateOrPending(ticket.updated_at)}</span>
+        <span><strong>Primera atención</strong>{dateOrPending(ticket.first_attended_at)}</span><span><strong>Resolución</strong>{dateOrPending(ticket.resolved_at)}</span>
+        <span><strong>Cierre</strong>{dateOrPending(ticket.closed_at)}</span>
+      </div></section>
       <section className="desk-section"><h3>Acciones</h3><label>Motivo o solución<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Obligatorio al resolver, rechazar o reabrir" /></label><div className="button-row desk-actions">{staff && !ticket.assigned_user_id && canWrite(user) && <button className="secondary" disabled={busy} onClick={() => void action('claim',{})}>Tomar ticket</button>}{options.filter((to) => to !== 'APPROVED' && to !== 'REJECTED' || isAdmin(user) || (user.roles ?? [user.role]).includes('APROBADOR')).map((to) => <button key={to} className={to==='CLOSED'?'primary':'secondary'} disabled={busy || !canWrite(user)} onClick={() => void action('transition',{to,reason})}>{label(to)}</button>)}{staff && !ticket.paused_at && <button className="secondary" disabled={busy} onClick={() => void action('pause',{reason})}>Pausar</button>}{staff && !!ticket.paused_at && <button className="secondary" disabled={busy} onClick={() => void action('resume',{reason})}>Reanudar</button>}</div></section>
       {mayAssign && !['CLOSED','REJECTED'].includes(ticket.state) && <section className="desk-section"><h3>Asignar agente</h3><p className="muted">Solo aparecen agentes activos con permiso para atender esta cola.</p><div className="button-row"><select aria-label="Agente autorizado" value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)}><option value="">Selecciona agente</option>{assignees.map((person) => <option key={person.id} value={person.id}>{person.name}</option>)}</select><button className="secondary" disabled={busy || !assigneeId} onClick={() => void action('assign',{userId:Number(assigneeId),reason:reason.trim() || undefined})}>Asignar</button></div></section>}
       {staff && <section className="desk-section"><h3>Datos de {label(ticket.process)}</h3><p className="muted">Completa las evidencias necesarias antes de avanzar el proceso.</p>{ticket.process==='EVENT' && <p className="muted"><strong>{String(ticket.process_data?.eventCategory)}:</strong> {eventLabels[String(ticket.process_data?.eventCategory)] ?? 'Categoría no disponible'}.</p>}<div className="form-grid">{visibleProcessFields.map(([key,title,kind]) => <label key={key}>{title}{kind==='boolean'?<select value={processValues[key]===true?'true':processValues[key]===false?'false':''} onChange={(e) => setProcessValues({...processValues,[key]:e.target.value===''?null:e.target.value==='true'})}><option value="">No informado</option><option value="true">Sí</option><option value="false">No</option></select>:kind==='category'?<select value={String(processValues[key] ?? '')} onChange={(e) => setProcessValues({...processValues,[key]:e.target.value})}>{(ticket.process==='EVENT'?['E0','E1','E2','E3']:['I0','I1','I2','I3','I4','I5','I6']).map((item) => <option key={item} value={item}>{item} · {(ticket.process==='EVENT'?eventLabels:incidentLabels)[item]}</option>)}</select>:<input type={kind==='number'?'number':'text'} value={String(processValues[key] ?? '')} onChange={(e) => setProcessValues({...processValues,[key]:kind==='number'?(e.target.value===''?null:Number(e.target.value)):e.target.value})} />}</label>)}</div>{ticket.process !== 'EVENT' || ticket.process_data?.eventCategory !== 'E0' ? <div className="button-row desk-actions"><button className="secondary" disabled={busy} onClick={async () => {try {setBusy(true);await patch(`/desk/tickets/${id}/process-data`,processValues);await load();}catch(e){setError(message(e));}finally{setBusy(false);}}}>Guardar datos</button></div> : null}</section>}
@@ -228,7 +260,7 @@ export function TicketsPage({ user, initialTicketId, onTicketOpened }: { user: A
     <div className="filters"><div className="search-input"><input aria-label="Buscar ticket" placeholder="Número o título" value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => {if(e.key==='Enter'){setPage(1);void load();}}} /></div><select aria-label="Filtrar proceso" value={process} onChange={(e) => {setProcess(e.target.value);setPage(1);}}><option value="">Todos los procesos</option>{Object.keys(transitions).map((key) => <option key={key} value={key}>{label(key)}</option>)}</select><select aria-label="Filtrar estado" value={state} onChange={(e) => {setState(e.target.value);setPage(1);}}><option value="">Todos los estados</option>{['SUBMITTED','IN_PROGRESS','PENDING_APPROVAL','APPROVED','RESOLVED','CLOSED','REJECTED'].map((key) => <option key={key} value={key}>{label(key)}</option>)}</select><button className="secondary" onClick={() => {setPage(1);void load();}}>Buscar</button></div>
     <div className="filters desk-extra-filters"><select aria-label="Filtrar cola" value={queueId} onChange={(e)=>{setQueueId(e.target.value);setPage(1);}}><option value="">Todas las colas</option>{queues.map((q)=><option key={q.id} value={q.id}>{q.name}</option>)}</select><select aria-label="Filtrar servicio" value={serviceId} onChange={(e)=>{setServiceId(e.target.value);setPage(1);}}><option value="">Todos los servicios</option>{services.map((s)=><option key={s.id} value={s.id}>{s.code} · {s.name}</option>)}</select><select aria-label="Filtrar prioridad" value={priority} onChange={(e)=>{setPriority(e.target.value);setPage(1);}}><option value="">Todas las prioridades</option>{[1,2,3,4,5].map((n)=><option key={n} value={n}>Prioridad {n}</option>)}</select><select aria-label="Filtrar responsable" value={assigneeId} onChange={(e)=>{setAssigneeId(e.target.value);setPage(1);}}><option value="">Todos los responsables</option>{users.map((u)=><option key={u.id} value={u.id}>{u.name}</option>)}</select><label>Desde<input type="date" value={fromDate} onChange={(e)=>{setFromDate(e.target.value);setPage(1);}} /></label><label>Antes de<input type="date" value={toDate} onChange={(e)=>{setToDate(e.target.value);setPage(1);}} /></label></div>
     {error && <div className="alert error">{error}</div>}<section className="panel"><div className="table-wrap"><table><thead><tr><th>Número</th><th>Título</th><th>Proceso</th><th>Cola</th><th>Estado</th><th>Prioridad</th><th>Creado</th></tr></thead><tbody>{rows?.data.map((row) => <tr className="clickable" key={row.id} onClick={() => setSelected(row.id)}><td><strong>{row.number}</strong></td><td>{row.title}</td><td>{label(row.process)}</td><td>{row.queueName}</td><td><span className="badge">{label(row.state)}</span></td><td>{row.priority}</td><td>{date(row.createdAt)}</td></tr>)}</tbody></table>{rows?.data.length===0 && <p className="empty">No hay tickets con esos filtros.</p>}</div><div className="pagination"><button className="secondary" disabled={page<=1} onClick={() => setPage(page-1)}>Anterior</button><span>Página {page} · {rows?.total ?? 0} tickets</span><button className="secondary" disabled={!rows || page*20>=rows.total} onClick={() => setPage(page+1)}>Siguiente</button></div></section>
-    {creating && <TicketCreate queues={queues} onCancel={() => setCreating(false)} onDone={() => {setCreating(false);void load();}} />}
+    {creating && <TicketCreate queues={queues} user={user} onCancel={() => setCreating(false)} onDone={() => {setCreating(false);void load();}} />}
     {selected !== null && <TicketView id={selected} user={user} queues={queues} users={users} onClose={() => setSelected(null)} onChanged={() => void load()} />}
   </div>;
 }

@@ -453,9 +453,13 @@ export class DeskService {
 
   async ticket(id: number, user: AuthenticatedUser) {
     const result = await this.db.query(`SELECT t.*,q.name AS queue_name,s.code AS service_code,
-      s.name AS service_name,l1.code AS level_1_code,l1.name AS level_1_name
+      s.name AS service_name,l1.code AS level_1_code,l1.name AS level_1_name,
+      requester.name AS requester_name,creator.name AS creator_name,assignee.name AS assigned_user_name
       FROM tickets t JOIN support_queues q ON q.id=t.queue_id
       JOIN service_level_2 s ON s.id=t.service_id JOIN service_level_1 l1 ON l1.id=s.level_1_id
+      LEFT JOIN users requester ON requester.id=t.requester_id
+      LEFT JOIN users creator ON creator.id=t.creator_id
+      LEFT JOIN users assignee ON assignee.id=t.assigned_user_id
       WHERE t.id=$1`, [id]);
     const row = result.rows[0];
     if (!row) throw new NotFoundException('Ticket no encontrado.');
