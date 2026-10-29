@@ -229,13 +229,13 @@ function TicketView({ id, user, queues, users, onClose, onChanged }: { id: numbe
   </section></div>;
 }
 
-export function TicketsPage({ user, initialTicketId, onTicketOpened }: { user: Account; initialTicketId?: number | null; onTicketOpened?: () => void }) {
+export function TicketsPage({ user, initialTicketId, onTicketOpened, initialProcess = '' }: { user: Account; initialTicketId?: number | null; onTicketOpened?: () => void; initialProcess?: string }) {
   const [queues,setQueues] = useState<Queue[]>([]);
   const [services,setServices] = useState<Service[]>([]);
   const [users,setUsers] = useState<Array<{id:number;name:string}>>([]);
   const [rows,setRows] = useState<Page<Ticket> | null>(null);
   const [search,setSearch] = useState('');
-  const [process,setProcess] = useState('');
+  const [process,setProcess] = useState(initialProcess);
   const [state,setState] = useState('');
   const [queueId,setQueueId] = useState('');
   const [priority,setPriority] = useState('');
@@ -481,7 +481,7 @@ const processGuide: Record<string,{ summary:string; evidence:string[]; rules:str
   TECH_SERVICE:{summary:'Atender una prestación de un servicio que ya existe en el catálogo.',evidence:['Servicio existente y prestación solicitada','Asignación y cumplimiento','Confirmación del solicitante'],rules:['Se distingue de proponer un servicio nuevo.','La asignación requiere un agente autorizado.'],route:['SUBMITTED','VALIDATING','ASSIGNED','FULFILLING','CONFIRMING','RESOLVED','CLOSED']},
 };
 
-export function ProcessesPage({ onOpenTickets }: { onOpenTickets: () => void }) {
+export function ProcessesPage({ onOpenTickets }: { onOpenTickets: (process: string) => void }) {
   const stateLabels: Record<string,string> = { IMPLEMENTING:'Implementación', RISK_ASSESSMENT:'Evaluación de riesgo', PROVISIONING:'Provisión o revocación', ASSIGNED:'Asignado', WORKAROUND:'Solución temporal', KNOWN_ERROR:'Error conocido', DEFINITIVE_SOLUTION:'Solución definitiva' };
   const [queues,setQueues] = useState<Queue[]>([]);
   const [error,setError] = useState('');
@@ -495,7 +495,7 @@ export function ProcessesPage({ onOpenTickets }: { onOpenTickets: () => void }) 
     <div className="process-layout"><nav className="process-list" aria-label="Seleccionar proceso">{Object.keys(processGuide).map((key) => <button key={key} className={selected===key?'process-choice selected':'process-choice'} aria-current={selected===key?'true':undefined} onClick={() => setSelected(key)}><strong>{label(key)}</strong><small>{queues.filter((queue) => queue.process===key && queue.active).length} cola(s) activa(s)</small></button>)}</nav>
       <section className="panel process-detail"><p className="eyebrow">Proceso · {label(selected)}</p><h2>{label(selected)}</h2><p className="muted">{guide.summary}</p><div className="process-columns"><div><h3>Ruta principal</h3><ol className="process-steps">{guide.route.map((state,index) => <li key={`${state}-${index}`}>{stateLabels[state] ?? label(state)}</li>)}</ol><p className="muted">Puede haber rutas alternativas de rechazo, escalamiento o reapertura según el caso.</p></div><div><h3>Evidencias y datos</h3><ul>{guide.evidence.map((item) => <li key={item}>{item}</li>)}</ul><h3>Reglas para avanzar</h3><ul>{guide.rules.map((item) => <li key={item}>{item}</li>)}</ul></div></div>
         <div className="desk-section"><h3>Colas de este proceso</h3>{related.length ? <div className="process-queues">{related.map((queue) => <span className="badge" key={queue.id}>{queue.code} · {queue.name} · nivel {queue.support_level}{queue.active?'':' · inactiva'}</span>)}</div> : <p className="muted">No hay colas visibles para esta cuenta.</p>}</div>
-        <p className="muted">Esta vista explica los flujos. Las transiciones, permisos y validaciones efectivas se comprueban en el servidor al operar un ticket.</p><button className="primary" onClick={onOpenTickets}>Abrir tickets</button>
+        <p className="muted">Esta vista explica los flujos. Las transiciones, permisos y validaciones efectivas se comprueban en el servidor al operar un ticket.</p><button className="primary" onClick={() => onOpenTickets(selected)}>Abrir tickets de {label(selected)}</button>
       </section></div>
   </div>;
 }

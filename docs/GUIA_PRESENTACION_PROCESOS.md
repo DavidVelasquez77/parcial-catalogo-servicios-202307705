@@ -5,7 +5,7 @@
 3. Selecciona **Cambios**. Señala CI, riesgo, plan de pruebas y reversión. Di: «La API impide ejecutar sin aprobación registrada».
 4. Selecciona **Incidentes** y **Eventos**. Distingue la recuperación de un incidente de la evaluación E0–E3; E2/E3 crean o vinculan un incidente.
 5. Selecciona **Problemas**, **Accesos** y **Servicios de tecnología**. Señala, respectivamente, causa raíz y cambio vinculado; beneficiario y prohibición de autoaprobación; prestación de un servicio ya existente.
-6. Pulsa **Abrir tickets** para pasar de la explicación a un caso real. Abre un ticket de muestra y enseña su estado, evidencias y botones disponibles. La vista Procesos es explicativa: los controles efectivos viven en el servidor.
+6. Pulsa **Abrir tickets de [proceso]** para pasar de la explicación a casos reales. La lista se abre **con ese proceso ya filtrado**; abre un ticket y enseña su estado, evidencias y botones disponibles. La vista Procesos es explicativa: los controles efectivos viven en el servidor.
 
 ![Vista de procesos con ruta, evidencias, reglas y cola](img/guia-tickets/07-procesos.png)
 

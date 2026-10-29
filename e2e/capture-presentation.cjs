@@ -13,6 +13,9 @@ async function main() {
     await page.screenshot({ path: '/screens/07-procesos.png' });
     await page.getByRole('button', { name: /Cambios.*cola/, exact: false }).click();
     await page.getByText('No se ejecuta sin aprobación registrada.').waitFor();
+    await page.getByRole('button', { name: 'Abrir tickets de Cambios' }).click();
+    await page.getByRole('combobox', { name: 'Filtrar proceso' }).waitFor();
+    if (await page.getByRole('combobox', { name: 'Filtrar proceso' }).inputValue() !== 'CHANGE') throw new Error('El filtro del proceso no se aplicó.');
     await page.getByRole('button', { name: 'Tickets', exact: true }).click();
     await page.getByRole('heading', { name: 'Tickets', exact: true }).waitFor();
     await page.locator('section.panel tbody tr').first().waitFor();
