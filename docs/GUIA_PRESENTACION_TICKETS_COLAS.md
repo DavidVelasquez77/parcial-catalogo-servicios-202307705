@@ -92,7 +92,7 @@ Los botones exactos varían según proceso, estado y rol. Si un botón no aparec
 
 ![Matriz real de permisos por rol y usuario en una cola](img/guia-tickets/06-permisos-cola.png)
 
-5. Pulsa **Permisos** en una cola. Explica las cinco columnas independientes: **Consultar**, **Atender**, **Transferir**, **Aprobar**, **Administrar**. En **Rol o usuario**, muestra que se puede asignar a `AGENTE`, `APROBADOR` o a una cuenta individual. El responsable conserva consulta y atención; primero hay que sustituirlo para retirar esa concesión.
+5. Pulsa **Permisos** en una cola. Explica las cinco columnas independientes: **Consultar**, **Atender**, **Transferir**, **Aprobar**, **Administrar**. En **Rol o usuario**, muestra que se puede asignar a `AGENTE`, `APROBADOR` o a una cuenta individual. Señala **Caduca**: todas las concesiones actuales vencen el **31 de diciembre de 2026**, inclusive, y se pueden renovar guardando una fecha posterior. Al vencer, la API deja de reconocerlas. El responsable conserva consulta y atención; primero hay que sustituirlo para retirar esa concesión.
 6. Cierra sesión y entra como `consulta.demo`. Abre tickets para mostrar lectura y ausencia de acciones de mantenimiento. La prueba P01/P06 confirma que el servidor también rechaza escrituras, aunque se intente llamar directamente a la API. Entra como `solicitante.demo` para mostrar que consulta sus propios tickets; `agente1.demo` ve las colas autorizadas.
 
 **Frase útil:** “La pertenencia a una cola no convierte el rol de consulta en editor. Los permisos se verifican de nuevo en la API”.

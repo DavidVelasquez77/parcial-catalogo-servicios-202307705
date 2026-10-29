@@ -40,6 +40,8 @@ La importación de `data/fuentes/CMDB.xlsx` procesa dos CI originales y registra
 
 En **Colas**, `ADMIN` crea una cola con responsable activo, proceso, nivel, objetivos y regla de orden (`prioridad → antigüedad` o `antigüedad → prioridad`). `ADMIN` puede delegar la administración de una cola con el permiso `can_admin`; ese permiso permite editarla, gestionar sus accesos y asignar tickets a usuarios autorizados. En **Tickets**, un agente con permiso puede tomar un caso libre; el administrador global o de la cola puede asignarlo o reasignarlo. La API conserva actor, motivo y valores anteriores/nuevos. La [política de autorización y asignación](docs/PROCESOS.md#colas-autorización-y-asignación) explica los bloqueos al desactivar usuarios o colas.
 
+Los permisos de cola de la demostración caducan el **31 de diciembre de 2026**, inclusive (fecha de Guatemala). En **Colas → Permisos**, el administrador puede ver la fecha y renovarla al guardar una concesión con una fecha futura. Después del vencimiento, la API deja de aceptar esos permisos; conviene renovarlos antes para que los agentes sigan atendiendo tickets abiertos.
+
 En **CMDB**, el administrador puede mantener categorías, ubicaciones
 controladas y CI. Un CI importado conserva la ubicación textual del Excel si
 no existe una ubicación identificada. La composición `Padre técnico de`

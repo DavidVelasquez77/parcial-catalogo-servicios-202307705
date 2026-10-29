@@ -59,6 +59,7 @@ export class DeskService {
     if (user.roles.includes('CONSULTA')) return false;
     const statement = `SELECT 1 FROM queue_grants g
       WHERE g.queue_id=$1 AND g.${permission}=TRUE
+      AND g.expires_on >= (NOW() AT TIME ZONE 'America/Guatemala')::date
       AND (g.user_id=$2 OR g.role=ANY($3::text[])) LIMIT 1`;
     const values = [queueId,user.id,user.roles];
     const grants = client ? await client.query(statement,values) : await this.db.query(statement,values);
@@ -148,7 +149,7 @@ export class DeskService {
     const existing = await client.query(`SELECT id FROM queue_grants
       WHERE queue_id=$1 AND user_id=$2 AND role IS NULL FOR UPDATE`, [queueId,responsibleId]);
     if (existing.rows[0]) {
-      await client.query('UPDATE queue_grants SET can_view=TRUE,can_handle=TRUE WHERE id=$1', [existing.rows[0].id]);
+      await client.query("UPDATE queue_grants SET can_view=TRUE,can_handle=TRUE,expires_on=GREATEST(expires_on,DATE '2026-12-31') WHERE id=$1", [existing.rows[0].id]);
     } else {
       await client.query(`INSERT INTO queue_grants(queue_id,user_id,can_view,can_handle)
         VALUES($1,$2,TRUE,TRUE)`, [queueId,responsibleId]);
@@ -164,11 +165,11 @@ export class DeskService {
 
   async queues(user: AuthenticatedUser) {
     const result = await this.db.query(`SELECT q.*,owner.name AS "responsibleName",
-      EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_handle
+      EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_handle AND g.expires_on >= (NOW() AT TIME ZONE 'America/Guatemala')::date
         AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canHandle",
-      EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_transfer
+      EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_transfer AND g.expires_on >= (NOW() AT TIME ZONE 'America/Guatemala')::date
         AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canTransfer",
-      EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_admin
+      EXISTS(SELECT 1 FROM queue_grants g WHERE g.queue_id=q.id AND g.can_admin AND g.expires_on >= (NOW() AT TIME ZONE 'America/Guatemala')::date
         AND (g.user_id=$1 OR g.role=ANY($2::text[]))) AS "canAdmin"
       FROM support_queues q JOIN users owner ON owner.id=q.responsible_user_id
       ORDER BY q.process,q.name`, [user.id,user.roles]);
@@ -249,6 +250,11 @@ export class DeskService {
     }
     const flags = ['canView','canHandle','canTransfer','canApprove','canAdmin'];
     if (!flags.some((key) => body[key] === true)) throw new BadRequestException('Activa al menos un permiso.');
+    const expiresOn = String(body.expiresOn ?? '2026-12-31');
+    const expiryDate = new Date(`${expiresOn}T00:00:00Z`);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(expiresOn) || Number.isNaN(expiryDate.getTime()) || expiryDate.toISOString().slice(0,10) !== expiresOn) throw new BadRequestException('Indica una fecha de caducidad válida.');
+    const today = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Guatemala',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    if (expiresOn < today) throw new BadRequestException('La caducidad no puede estar en el pasado.');
     return this.db.transaction(async (client) => {
       const previous = await client.query(`SELECT * FROM queue_grants
         WHERE queue_id=$1 AND user_id IS NOT DISTINCT FROM $2
@@ -267,9 +273,9 @@ export class DeskService {
       }
       await client.query('DELETE FROM queue_grants WHERE queue_id=$1 AND user_id IS NOT DISTINCT FROM $2 AND role IS NOT DISTINCT FROM $3', [queueId,userId,role]);
       const result = await client.query(`INSERT INTO queue_grants
-        (queue_id,user_id,role,can_view,can_handle,can_transfer,can_approve,can_admin)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
-        [queueId,userId,role,...flags.map((key) => body[key] === true)]);
+        (queue_id,user_id,role,can_view,can_handle,can_transfer,can_approve,can_admin,expires_on)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [queueId,userId,role,...flags.map((key) => body[key] === true),expiresOn]);
       return result.rows[0];
     });
   }
@@ -280,7 +286,7 @@ export class DeskService {
     await this.assertAllowed(queueId,user,'can_admin');
     const result = await this.db.query(`SELECT g.id,g.role,g.user_id AS "userId",u.name AS "userName",
       g.can_view AS "canView",g.can_handle AS "canHandle",g.can_transfer AS "canTransfer",
-      g.can_approve AS "canApprove",g.can_admin AS "canAdmin"
+      g.can_approve AS "canApprove",g.can_admin AS "canAdmin",g.expires_on::text AS "expiresOn"
       FROM queue_grants g LEFT JOIN users u ON u.id=g.user_id
       WHERE g.queue_id=$1 ORDER BY g.role NULLS LAST,u.name`, [queueId]);
     return result.rows;
@@ -290,7 +296,7 @@ export class DeskService {
     const statement = `SELECT u.id,u.name FROM users u WHERE u.active
       AND NOT EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role='CONSULTA')
       AND (EXISTS (SELECT 1 FROM user_roles ur WHERE ur.user_id=u.id AND ur.role='ADMIN')
-        OR EXISTS (SELECT 1 FROM queue_grants g WHERE g.queue_id=$1 AND g.can_handle
+        OR EXISTS (SELECT 1 FROM queue_grants g WHERE g.queue_id=$1 AND g.can_handle AND g.expires_on >= (NOW() AT TIME ZONE 'America/Guatemala')::date
           AND (g.user_id=u.id OR EXISTS (SELECT 1 FROM user_roles ur
             WHERE ur.user_id=u.id AND ur.role=g.role))))
       ORDER BY u.name,u.id`;
@@ -346,7 +352,7 @@ export class DeskService {
       AND ($10::timestamptz IS NULL OR t.created_at >= $10)
       AND ($11::timestamptz IS NULL OR t.created_at < $11)
       AND ($12::boolean OR t.requester_id=$1 OR EXISTS(
-        SELECT 1 FROM queue_grants g WHERE g.queue_id=t.queue_id AND g.can_view
+        SELECT 1 FROM queue_grants g WHERE g.queue_id=t.queue_id AND g.can_view AND g.expires_on >= (NOW() AT TIME ZONE 'America/Guatemala')::date
         AND (g.user_id=$1 OR g.role=ANY($2::text[]))))`;
     params.push(query.serviceId ? idOf(query.serviceId,'Servicio') : null,
       query.assigneeId ? idOf(query.assigneeId,'Responsable') : null,
@@ -914,7 +920,7 @@ export class DeskService {
       q.name AS queue_name,q.first_response_minutes,q.resolution_minutes
       FROM tickets t JOIN support_queues q ON q.id=t.queue_id
       WHERE ($4::bigint IS NULL OR t.id=$4) AND ($3::boolean OR t.requester_id=$1 OR EXISTS(
-        SELECT 1 FROM queue_grants g WHERE g.queue_id=t.queue_id AND g.can_view
+        SELECT 1 FROM queue_grants g WHERE g.queue_id=t.queue_id AND g.can_view AND g.expires_on >= (NOW() AT TIME ZONE 'America/Guatemala')::date
         AND (g.user_id=$1 OR g.role=ANY($2::text[]))))`, [user.id,user.roles,all,selectedId]);
     const now = Date.now();
     const byQueue: Record<string,number> = {};
